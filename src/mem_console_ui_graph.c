@@ -1,5 +1,6 @@
 #include "mem_console_ui_graph.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -114,6 +115,124 @@ static void sanitize_hud_text(const char *input, char *output, size_t output_cap
     if (output[0] == '\0' && output_cap >= 2u) {
         output[0] = '-';
         output[1] = '\0';
+    }
+}
+
+static void normalize_node_rect_sizes_for_zoom(KitGraphStructNodeLayout *layouts,
+                                               uint32_t layout_count,
+                                               float zoom) {
+    uint32_t i;
+    float safe_zoom = zoom;
+
+    if (!layouts || layout_count == 0u) {
+        return;
+    }
+    if (safe_zoom < 0.0001f) {
+        safe_zoom = 1.0f;
+    }
+
+    for (i = 0u; i < layout_count; ++i) {
+        float center_x = layouts[i].rect.x + (layouts[i].rect.width * 0.5f);
+        float center_y = layouts[i].rect.y + (layouts[i].rect.height * 0.5f);
+        float width = layouts[i].rect.width / safe_zoom;
+        float height = layouts[i].rect.height / safe_zoom;
+
+        if (width < 24.0f) width = 24.0f;
+        if (height < 14.0f) height = 14.0f;
+
+        layouts[i].rect.width = width;
+        layouts[i].rect.height = height;
+        layouts[i].rect.x = center_x - (width * 0.5f);
+        layouts[i].rect.y = center_y - (height * 0.5f);
+    }
+}
+
+static int find_layout_index_by_node_id(const KitGraphStructNodeLayout *layouts,
+                                        uint32_t layout_count,
+                                        uint32_t node_id) {
+    uint32_t i;
+
+    if (!layouts) {
+        return -1;
+    }
+    for (i = 0u; i < layout_count; ++i) {
+        if (layouts[i].node_id == node_id) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
+static void apply_multi_edge_route_lanes(const KitGraphStructEdge *edges,
+                                         uint32_t edge_count,
+                                         const KitGraphStructNodeLayout *layouts,
+                                         uint32_t layout_count,
+                                         KitGraphStructEdgeRoute *routes) {
+    const float lane_spacing = 7.0f;
+    uint32_t i;
+
+    if (!edges || !layouts || !routes || edge_count == 0u) {
+        return;
+    }
+
+    for (i = 0u; i < edge_count; ++i) {
+        uint32_t from_id = edges[i].from_id;
+        uint32_t to_id = edges[i].to_id;
+        uint32_t lane_index = 0u;
+        uint32_t lane_count = 0u;
+        uint32_t j;
+        float lane_offset = 0.0f;
+        float offset_x = 0.0f;
+        float offset_y = 0.0f;
+        int from_layout_index;
+        int to_layout_index;
+
+        if (routes[i].point_count < 2u) {
+            continue;
+        }
+
+        for (j = 0u; j < edge_count; ++j) {
+            if (edges[j].from_id == from_id && edges[j].to_id == to_id) {
+                if (j < i) {
+                    lane_index += 1u;
+                }
+                lane_count += 1u;
+            }
+        }
+        if (lane_count <= 1u) {
+            continue;
+        }
+
+        from_layout_index = find_layout_index_by_node_id(layouts, layout_count, from_id);
+        to_layout_index = find_layout_index_by_node_id(layouts, layout_count, to_id);
+        if (from_layout_index < 0 || to_layout_index < 0) {
+            continue;
+        }
+
+        lane_offset = (((float)lane_index) - (((float)lane_count - 1.0f) * 0.5f)) * lane_spacing;
+        if (fabsf(lane_offset) < 0.01f) {
+            continue;
+        }
+
+        {
+            float from_center_x = layouts[from_layout_index].rect.x + (layouts[from_layout_index].rect.width * 0.5f);
+            float from_center_y = layouts[from_layout_index].rect.y + (layouts[from_layout_index].rect.height * 0.5f);
+            float to_center_x = layouts[to_layout_index].rect.x + (layouts[to_layout_index].rect.width * 0.5f);
+            float to_center_y = layouts[to_layout_index].rect.y + (layouts[to_layout_index].rect.height * 0.5f);
+            float dx = to_center_x - from_center_x;
+            float dy = to_center_y - from_center_y;
+
+            if (fabsf(dx) >= fabsf(dy)) {
+                offset_y = lane_offset;
+            } else {
+                offset_x = lane_offset;
+            }
+        }
+
+        for (j = 0u; j < routes[i].point_count; ++j) {
+            routes[i].points[j].x += offset_x;
+            routes[i].points[j].y += offset_y;
+        }
     }
 }
 
@@ -384,6 +503,7 @@ static CoreResult compute_graph_preview_layout(const MemConsoleState *state,
             return result;
         }
         transpose_layouts_to_horizontal_flow(bounds, out_layouts, node_count);
+        normalize_node_rect_sizes_for_zoom(out_layouts, node_count, viewport.zoom);
     }
 
     *out_node_count = node_count;
@@ -516,6 +636,11 @@ CoreResult mem_console_ui_graph_ensure_layout_cache(const KitRenderContext *rend
     if (result.code != CORE_OK) {
         return result;
     }
+    apply_multi_edge_route_lanes(state->graph_layout_edges,
+                                 state->graph_layout_edge_count,
+                                 state->graph_layout_node_layouts,
+                                 state->graph_layout_node_count,
+                                 state->graph_layout_edge_routes);
     kit_graph_struct_edge_label_options_default(&label_options);
     label_options.current_zoom = state->graph_viewport.zoom;
     label_options.min_zoom_for_labels = 1.25f;
