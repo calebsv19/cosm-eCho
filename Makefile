@@ -1,24 +1,25 @@
 CC ?= cc
 CFLAGS ?= -std=c11 -Wall -Wextra -Werror -O2
 PKG_CONFIG ?= pkg-config
+SHARED_ROOT ?= third_party/codework_shared
 
-CORE_BASE_DIR ?= ../shared/core/core_base
-CORE_THEME_DIR ?= ../shared/core/core_theme
-CORE_FONT_DIR ?= ../shared/core/core_font
-CORE_PACK_DIR ?= ../shared/core/core_pack
-CORE_TIME_DIR ?= ../shared/core/core_time
-CORE_QUEUE_DIR ?= ../shared/core/core_queue
-CORE_SCHED_DIR ?= ../shared/core/core_sched
-CORE_JOBS_DIR ?= ../shared/core/core_jobs
-CORE_WORKERS_DIR ?= ../shared/core/core_workers
-CORE_WAKE_DIR ?= ../shared/core/core_wake
-CORE_KERNEL_DIR ?= ../shared/core/core_kernel
-CORE_MEMDB_DIR ?= ../shared/core/core_memdb
-CORE_PANE_DIR ?= ../shared/core/core_pane
-KIT_RENDER_DIR ?= ../shared/kit/kit_render
-KIT_UI_DIR ?= ../shared/kit/kit_ui
-KIT_GRAPH_STRUCT_DIR ?= ../shared/kit/kit_graph_struct
-VK_RENDERER_DIR ?= ../shared/vk_renderer
+CORE_BASE_DIR ?= $(SHARED_ROOT)/core/core_base
+CORE_THEME_DIR ?= $(SHARED_ROOT)/core/core_theme
+CORE_FONT_DIR ?= $(SHARED_ROOT)/core/core_font
+CORE_PACK_DIR ?= $(SHARED_ROOT)/core/core_pack
+CORE_TIME_DIR ?= $(SHARED_ROOT)/core/core_time
+CORE_QUEUE_DIR ?= $(SHARED_ROOT)/core/core_queue
+CORE_SCHED_DIR ?= $(SHARED_ROOT)/core/core_sched
+CORE_JOBS_DIR ?= $(SHARED_ROOT)/core/core_jobs
+CORE_WORKERS_DIR ?= $(SHARED_ROOT)/core/core_workers
+CORE_WAKE_DIR ?= $(SHARED_ROOT)/core/core_wake
+CORE_KERNEL_DIR ?= $(SHARED_ROOT)/core/core_kernel
+CORE_MEMDB_DIR ?= $(SHARED_ROOT)/core/core_memdb
+CORE_PANE_DIR ?= $(SHARED_ROOT)/core/core_pane
+KIT_RENDER_DIR ?= $(SHARED_ROOT)/kit/kit_render
+KIT_UI_DIR ?= $(SHARED_ROOT)/kit/kit_ui
+KIT_GRAPH_STRUCT_DIR ?= $(SHARED_ROOT)/kit/kit_graph_struct
+VK_RENDERER_DIR ?= $(SHARED_ROOT)/vk_renderer
 
 VULKAN_CFLAGS := $(shell $(PKG_CONFIG) --cflags vulkan 2>/dev/null)
 SDL_CFLAGS := $(shell $(PKG_CONFIG) --cflags sdl2 2>/dev/null)

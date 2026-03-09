@@ -105,6 +105,10 @@ Current source layout:
 
 ## Build
 
+Shared runtime/modules are vendored in-repo at:
+
+- `third_party/codework_shared/`
+
 ```sh
 make -C mem_console
 ```
@@ -128,6 +132,19 @@ Pass extra args:
 ```sh
 make -C mem_console run RUN_ARGS="--db /tmp/mem_console_phase7.sqlite"
 make -C mem_console run RUN_ARGS="--db /tmp/mem_console_phase7.sqlite --kernel-bridge"
+```
+
+### Shared Subtree Update
+
+```bash
+git -C mem_console fetch shared-upstream main
+git -C mem_console subtree pull --prefix=third_party/codework_shared shared-upstream main --squash
+```
+
+Rebuild check:
+
+```bash
+make -C mem_console clean && make -C mem_console
 ```
 
 ## Run
