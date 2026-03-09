@@ -141,6 +141,7 @@ void set_default_detail(MemConsoleState *state) {
     }
 
     state->selected_item_id = 0;
+    state->selected_created_ns = 0;
     state->selected_pinned = 0;
     state->selected_canonical = 0;
     (void)snprintf(state->selected_title,
@@ -404,6 +405,8 @@ void seed_state(MemConsoleState *state, const char *db_path) {
     state->list_query_offset = 0;
     state->visible_start_index = 0;
     state->project_filter_scroll = 0.0f;
+    state->detail_connection_scroll = 0.0f;
+    state->detail_body_scroll = 0.0f;
     state->title_edit_mode = 0;
     state->body_edit_mode = 0;
     state->input_target = MEM_CONSOLE_INPUT_SEARCH;

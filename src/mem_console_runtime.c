@@ -119,6 +119,7 @@ static void apply_refreshed_state(MemConsoleState *state, const MemConsoleState 
                    refreshed->project_filter_summary_line);
 
     state->selected_item_id = refreshed->selected_item_id;
+    state->selected_created_ns = refreshed->selected_created_ns;
     state->selected_pinned = refreshed->selected_pinned;
     state->selected_canonical = refreshed->selected_canonical;
     (void)snprintf(state->selected_title, sizeof(state->selected_title), "%s", refreshed->selected_title);

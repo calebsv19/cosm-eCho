@@ -5,6 +5,43 @@
 
 #include <SDL2/SDL.h>
 
+static int apply_graph_node_preview_selection(MemConsoleState *state,
+                                              int64_t hit_item_id) {
+    int i;
+
+    if (!state || hit_item_id == 0) {
+        return 0;
+    }
+
+    for (i = 0; i < state->graph_node_count; ++i) {
+        if (state->graph_nodes[i].item_id == hit_item_id) {
+            state->selected_item_id = hit_item_id;
+            state->selected_created_ns = state->graph_nodes[i].created_ns;
+            state->selected_pinned = state->graph_nodes[i].pinned ? 1 : 0;
+            state->selected_canonical = state->graph_nodes[i].canonical ? 1 : 0;
+            (void)snprintf(state->selected_title,
+                           sizeof(state->selected_title),
+                           "%s",
+                           state->graph_nodes[i].title[0] ? state->graph_nodes[i].title : "UNTITLED");
+            (void)snprintf(state->selected_body,
+                           sizeof(state->selected_body),
+                           "%s",
+                           state->graph_nodes[i].body_preview[0] ? state->graph_nodes[i].body_preview : "-");
+            state->title_edit_mode = 0;
+            state->body_edit_mode = 0;
+            state->input_target = MEM_CONSOLE_INPUT_SEARCH;
+            sync_edit_buffers_from_selection(state);
+            mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+            return 1;
+        }
+    }
+
+    state->selected_item_id = hit_item_id;
+    state->selected_created_ns = 0;
+    mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+    return 1;
+}
+
 static int handle_graph_node_click(MemConsoleState *state,
                                    int64_t hit_item_id,
                                    MemConsoleAction *io_action) {
@@ -26,21 +63,17 @@ static int handle_graph_node_click(MemConsoleState *state,
     state->graph_last_click_ms = now_ms;
 
     if (is_double_click) {
-        state->selected_item_id = hit_item_id;
+        (void)apply_graph_node_preview_selection(state, hit_item_id);
         kit_graph_struct_viewport_default(&state->graph_viewport);
         state->graph_layout_valid = 0;
         if (*io_action == MEM_CONSOLE_ACTION_NONE) {
-            *io_action = MEM_CONSOLE_ACTION_REFRESH;
+            *io_action = MEM_CONSOLE_ACTION_REFRESH_GRAPH;
         }
         return 1;
     }
 
     if (hit_item_id != state->selected_item_id) {
-        state->selected_item_id = hit_item_id;
-        if (*io_action == MEM_CONSOLE_ACTION_NONE) {
-            *io_action = MEM_CONSOLE_ACTION_REFRESH;
-        }
-        return 1;
+        return apply_graph_node_preview_selection(state, hit_item_id);
     }
 
     return 0;
@@ -170,8 +203,7 @@ CoreResult mem_console_ui_draw_graph_panel(KitRenderContext *render_ctx,
                                                                              input->mouse_x,
                                                                              input->mouse_y,
                                                                              &next_item_id)) {
-                        state->selected_item_id = next_item_id;
-                        *io_action = MEM_CONSOLE_ACTION_REFRESH;
+                        (void)apply_graph_node_preview_selection(state, next_item_id);
                     }
                 } else if (result.code != CORE_OK) {
                     return result;

@@ -9,6 +9,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                                               KitRenderFrame *frame,
                                               MemConsoleState *state,
                                               const KitUiInputState *input,
+                                              int wheel_y,
                                               const MemConsoleLayoutConfig *layout_cfg,
                                               KitUiStackLayout *out_right_layout);
 

@@ -72,7 +72,7 @@ static CoreResult load_graph_node_detail(CoreMemDb *db, int64_t item_id, MemCons
     out_node->item_id = item_id;
 
     result = core_memdb_prepare(db,
-                                "SELECT title, body, pinned, canonical "
+                                "SELECT title, body, pinned, canonical, created_ns "
                                 "FROM mem_item "
                                 "WHERE id = ?1 AND archived_ns IS NULL;",
                                 &stmt);
@@ -125,6 +125,11 @@ static CoreResult load_graph_node_detail(CoreMemDb *db, int64_t item_id, MemCons
         goto cleanup;
     }
     out_node->canonical = flag_value ? 1 : 0;
+
+    result = core_memdb_stmt_column_i64(&stmt, 4, &out_node->created_ns);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
     result = core_result_ok();
 
 cleanup:
@@ -168,6 +173,12 @@ static CoreResult ensure_graph_node(CoreMemDb *db,
     *out_index = state->graph_node_count;
     state->graph_node_count += 1;
     return core_result_ok();
+}
+
+static int is_graph_node_limit_result(CoreResult result) {
+    return result.code == CORE_ERR_NOT_FOUND &&
+           result.message &&
+           strcmp(result.message, "graph node limit reached") == 0;
 }
 
 static int64_t current_time_ns(void) {
@@ -1057,7 +1068,7 @@ static CoreResult read_selected_detail(CoreMemDb *db, MemConsoleState *state) {
     }
 
     result = core_memdb_prepare(db,
-                                "SELECT title, body, pinned, canonical "
+                                "SELECT title, body, pinned, canonical, created_ns "
                                 "FROM mem_item "
                                 "WHERE id = ?1 AND archived_ns IS NULL;",
                                 &stmt);
@@ -1107,6 +1118,11 @@ static CoreResult read_selected_detail(CoreMemDb *db, MemConsoleState *state) {
             goto cleanup;
         }
         state->selected_canonical = flag_value ? 1 : 0;
+
+        result = core_memdb_stmt_column_i64(&stmt, 4, &state->selected_created_ns);
+        if (result.code != CORE_OK) {
+            goto cleanup;
+        }
     }
 
     result = core_result_ok();
@@ -1160,7 +1176,9 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
                                 "  FROM walk "
                                 "  JOIN mem_link l ON (l.from_item_id = walk.node_id OR l.to_item_id = walk.node_id) "
                                 "  JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
+                                "                    AND (?5 = 0 OR src.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)) "
                                 "  JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
+                                "                    AND (?5 = 0 OR dst.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)) "
                                 "  WHERE walk.depth < ?2 "
                                 "    AND (?3 = '' OR l.kind = ?3)"
                                 "), nodes AS ("
@@ -1171,7 +1189,9 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
                                 "  JOIN nodes a ON a.node_id = l.from_item_id "
                                 "  JOIN nodes b ON b.node_id = l.to_item_id "
                                 "  JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
+                                "                    AND (?5 = 0 OR src.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)) "
                                 "  JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
+                                "                    AND (?5 = 0 OR dst.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)) "
                                 "  WHERE (?3 = '' OR l.kind = ?3) "
                                 "  ORDER BY l.id ASC "
                                 "  LIMIT ?4"
@@ -1197,6 +1217,10 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
         goto cleanup;
     }
     result = core_memdb_stmt_bind_i64(&stmt, 4, edge_limit);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
+    result = bind_project_filters(&stmt, 5, state);
     if (result.code != CORE_OK) {
         goto cleanup;
     }
@@ -1234,10 +1258,16 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
 
         result = ensure_graph_node(db, state, from_item_id, &from_index);
         if (result.code != CORE_OK) {
+            if (is_graph_node_limit_result(result)) {
+                continue;
+            }
             goto cleanup;
         }
         result = ensure_graph_node(db, state, to_item_id, &to_index);
         if (result.code != CORE_OK) {
+            if (is_graph_node_limit_result(result)) {
+                continue;
+            }
             goto cleanup;
         }
 

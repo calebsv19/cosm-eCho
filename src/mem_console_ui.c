@@ -30,6 +30,7 @@ int run_frame(KitRenderContext *render_ctx,
     const MemConsoleLayoutConfig *layout_cfg;
 
     if (!render_ctx || !ui_ctx || !state || !input || !out_action) {
+        fprintf(stderr, "mem_console: run_frame invalid args\n");
         return 1;
     }
     layout_cfg = mem_console_layout_config_get();
@@ -83,15 +84,27 @@ int run_frame(KitRenderContext *render_ctx,
 
     result = mem_console_ui_resolve_theme_color(render_ctx, CORE_THEME_COLOR_SURFACE_0, &clear_color);
     if (result.code != CORE_OK) {
+        fprintf(stderr,
+                "mem_console: mem_console_ui_resolve_theme_color failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
     result = kit_render_push_clear(&frame, clear_color);
     if (result.code != CORE_OK) {
+        fprintf(stderr,
+                "mem_console: kit_render_push_clear failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
 
     result = mem_console_ui_draw_root_chrome(render_ctx, &frame, state, layout_cfg);
     if (result.code != CORE_OK) {
+        fprintf(stderr,
+                "mem_console: mem_console_ui_draw_root_chrome failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
 
@@ -99,6 +112,10 @@ int run_frame(KitRenderContext *render_ctx,
 
     result = kit_ui_clip_push(ui_ctx, &frame, state->left_pane);
     if (result.code != CORE_OK) {
+        fprintf(stderr,
+                "mem_console: kit_ui_clip_push(left_pane) failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
     result = mem_console_ui_draw_left_section(render_ctx,
@@ -112,15 +129,27 @@ int run_frame(KitRenderContext *render_ctx,
                                               out_action);
     if (result.code != CORE_OK) {
         (void)kit_ui_clip_pop(ui_ctx, &frame);
+        fprintf(stderr,
+                "mem_console: mem_console_ui_draw_left_section failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
     result = kit_ui_clip_pop(ui_ctx, &frame);
     if (result.code != CORE_OK) {
+        fprintf(stderr,
+                "mem_console: kit_ui_clip_pop(left_pane) failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
 
     result = kit_ui_clip_push(ui_ctx, &frame, state->pane_right_detail);
     if (result.code != CORE_OK) {
+        fprintf(stderr,
+                "mem_console: kit_ui_clip_push(pane_right_detail) failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
     result = mem_console_ui_draw_detail_section(render_ctx,
@@ -128,10 +157,15 @@ int run_frame(KitRenderContext *render_ctx,
                                                 &frame,
                                                 state,
                                                 input,
+                                                wheel_y,
                                                 layout_cfg,
                                                 &right_layout);
     if (result.code != CORE_OK) {
         (void)kit_ui_clip_pop(ui_ctx, &frame);
+        fprintf(stderr,
+                "mem_console: mem_console_ui_draw_detail_section failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
     result = mem_console_ui_draw_graph_controls(render_ctx,
@@ -145,15 +179,27 @@ int run_frame(KitRenderContext *render_ctx,
                                                 out_action);
     if (result.code != CORE_OK) {
         (void)kit_ui_clip_pop(ui_ctx, &frame);
+        fprintf(stderr,
+                "mem_console: mem_console_ui_draw_graph_controls failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
     result = kit_ui_clip_pop(ui_ctx, &frame);
     if (result.code != CORE_OK) {
+        fprintf(stderr,
+                "mem_console: kit_ui_clip_pop(pane_right_detail) failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
 
     result = kit_ui_clip_push(ui_ctx, &frame, state->pane_right_graph);
     if (result.code != CORE_OK) {
+        fprintf(stderr,
+                "mem_console: kit_ui_clip_push(pane_right_graph) failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
     result = mem_console_ui_draw_graph_panel(render_ctx,
@@ -167,10 +213,18 @@ int run_frame(KitRenderContext *render_ctx,
                                              out_action);
     if (result.code != CORE_OK) {
         (void)kit_ui_clip_pop(ui_ctx, &frame);
+        fprintf(stderr,
+                "mem_console: mem_console_ui_draw_graph_panel failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
     result = kit_ui_clip_pop(ui_ctx, &frame);
     if (result.code != CORE_OK) {
+        fprintf(stderr,
+                "mem_console: kit_ui_clip_pop(pane_right_graph) failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
         return 1;
     }
 

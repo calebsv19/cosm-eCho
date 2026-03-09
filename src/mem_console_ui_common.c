@@ -135,6 +135,12 @@ CoreResult mem_console_ui_draw_info_line_custom(KitUiContext *ui_ctx,
                                                 CoreThemeColorToken token,
                                                 CoreFontRoleId font_role,
                                                 CoreFontTextSizeTier text_tier) {
+    if (!text) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid info line text" };
+    }
+    if (text[0] == '\0') {
+        return core_result_ok();
+    }
     return kit_ui_draw_label_custom(ui_ctx, frame, rect, text, token, font_role, text_tier);
 }
 

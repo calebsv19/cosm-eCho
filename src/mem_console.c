@@ -118,15 +118,8 @@ static int handle_theme_shortcut(KitRenderContext *render_ctx,
 
     (void)kit_ui_style_apply_theme_scale(ui_ctx);
     apply_compact_ui_density(ui_ctx);
-    if (prefs_path && prefs_path[0]) {
-        result = mem_console_prefs_save(prefs_path, state);
-        if (result.code != CORE_OK) {
-            (void)snprintf(state->status_line,
-                           sizeof(state->status_line),
-                           "Theme switched; prefs save failed.");
-            return 1;
-        }
-    }
+    (void)prefs_path;
+    state->pane_prefs_dirty = 1;
 
     (void)snprintf(state->status_line, sizeof(state->status_line), "Theme switched to %s.", state->theme_name);
     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_THEME | MEM_CONSOLE_REDRAW_REASON_CONTENT);
@@ -167,15 +160,8 @@ static int handle_font_shortcut(KitRenderContext *render_ctx,
         return 1;
     }
 
-    if (prefs_path && prefs_path[0]) {
-        result = mem_console_prefs_save(prefs_path, state);
-        if (result.code != CORE_OK) {
-            (void)snprintf(state->status_line,
-                           sizeof(state->status_line),
-                           "Font switched; prefs save failed.");
-            return 1;
-        }
-    }
+    (void)prefs_path;
+    state->pane_prefs_dirty = 1;
 
     (void)snprintf(state->status_line, sizeof(state->status_line), "Font switched to %s.", state->font_name);
     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_THEME | MEM_CONSOLE_REDRAW_REASON_CONTENT);
@@ -712,6 +698,8 @@ int main(int argc, char **argv) {
     int wheel_y = 0;
     int exit_code = 1;
     int prefs_path_valid = 0;
+    int prefs_signature_valid = 0;
+    uint64_t prefs_last_saved_signature = 0u;
 
     if (has_unknown_flag(argc, argv)) {
         print_usage(argv[0]);
@@ -752,6 +740,11 @@ int main(int argc, char **argv) {
         goto cleanup_db;
     }
     sync_edit_buffers_from_selection(&state);
+    if (prefs_path_valid) {
+        prefs_last_saved_signature = mem_console_prefs_state_signature(&state);
+        prefs_signature_valid = 1;
+        state.pane_prefs_dirty = 0;
+    }
     mem_console_redraw_mark(&state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -936,10 +929,25 @@ int main(int argc, char **argv) {
         }
         apply_pending_action(&db, &state, &runtime, pending_action);
 
-        if (prefs_path_valid && state.pane_prefs_dirty && !state.pane_drag_active) {
+        if (prefs_path_valid) {
+            uint64_t current_signature = mem_console_prefs_state_signature(&state);
+            if (!prefs_signature_valid) {
+                prefs_last_saved_signature = current_signature;
+                prefs_signature_valid = 1;
+            } else if (current_signature != prefs_last_saved_signature) {
+                state.pane_prefs_dirty = 1;
+            }
+        }
+
+        if (prefs_path_valid &&
+            state.pane_prefs_dirty &&
+            !state.pane_drag_active &&
+            !state.search_refresh_pending) {
             result = mem_console_prefs_save(prefs_path, &state);
             if (result.code == CORE_OK) {
                 state.pane_prefs_dirty = 0;
+                prefs_last_saved_signature = mem_console_prefs_state_signature(&state);
+                prefs_signature_valid = 1;
             } else {
                 (void)snprintf(state.status_line,
                                sizeof(state.status_line),
@@ -959,8 +967,12 @@ int main(int argc, char **argv) {
 
 cleanup_text_input:
     if (prefs_path_valid && state.pane_prefs_dirty) {
-        (void)mem_console_prefs_save(prefs_path, &state);
-        state.pane_prefs_dirty = 0;
+        result = mem_console_prefs_save(prefs_path, &state);
+        if (result.code == CORE_OK) {
+            state.pane_prefs_dirty = 0;
+            prefs_last_saved_signature = mem_console_prefs_state_signature(&state);
+            prefs_signature_valid = 1;
+        }
     }
     SDL_StopTextInput();
 cleanup_kernel_bridge:

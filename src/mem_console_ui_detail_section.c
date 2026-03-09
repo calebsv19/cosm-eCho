@@ -5,12 +5,318 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
+
+static int format_created_timestamp_compact(int64_t created_ns, char *out_text, size_t out_cap) {
+    time_t seconds;
+    struct tm local_tm;
+    size_t written = 0u;
+
+    if (!out_text || out_cap == 0u || created_ns <= 0) {
+        return 0;
+    }
+    out_text[0] = '\0';
+
+    seconds = (time_t)(created_ns / 1000000000LL);
+    if (seconds <= 0) {
+        return 0;
+    }
+
+#if defined(_POSIX_VERSION)
+    if (!localtime_r(&seconds, &local_tm)) {
+        return 0;
+    }
+    written = strftime(out_text, out_cap, "%b %d %H:%M", &local_tm);
+#else
+    {
+        struct tm *tmp = localtime(&seconds);
+        if (!tmp) {
+            return 0;
+        }
+        local_tm = *tmp;
+    }
+    written = strftime(out_text, out_cap, "%b %d %H:%M", &local_tm);
+#endif
+    return written > 0u ? 1 : 0;
+}
+
+static float detail_wrapped_text_line_step(CoreFontTextSizeTier text_tier) {
+    switch (text_tier) {
+        case CORE_FONT_TEXT_SIZE_CAPTION:
+            return 16.0f;
+        case CORE_FONT_TEXT_SIZE_BASIC:
+            return 20.0f;
+        case CORE_FONT_TEXT_SIZE_PARAGRAPH:
+        case CORE_FONT_TEXT_SIZE_TITLE:
+        case CORE_FONT_TEXT_SIZE_HEADER:
+        default:
+            return 24.0f;
+    }
+}
+
+static int detail_wrap_text_lines(const char *text,
+                                  char line_storage[][256],
+                                  int line_storage_count,
+                                  int max_chars) {
+    const char *cursor;
+    int line_count = 0;
+
+    if (!text || !line_storage || line_storage_count <= 0) {
+        return 0;
+    }
+
+    if (max_chars < 18) {
+        max_chars = 18;
+    }
+    if (max_chars > 120) {
+        max_chars = 120;
+    }
+
+    cursor = text;
+    while (*cursor != '\0' && line_count < line_storage_count) {
+        const char *line_start;
+        const char *break_at = 0;
+        int len = 0;
+        char *line = line_storage[line_count];
+
+        while (*cursor == ' ') {
+            cursor += 1;
+        }
+        if (*cursor == '\n') {
+            line[0] = '\0';
+            cursor += 1;
+            line_count += 1;
+            continue;
+        }
+
+        line_start = cursor;
+        while (*cursor != '\0' && *cursor != '\n' && len < max_chars) {
+            if (*cursor == ' ') {
+                break_at = cursor;
+            }
+            cursor += 1;
+            len += 1;
+        }
+
+        if (*cursor != '\0' && *cursor != '\n' && len >= max_chars && break_at && break_at > line_start) {
+            cursor = break_at;
+            len = (int)(break_at - line_start);
+        }
+
+        if (len <= 0) {
+            if (*cursor == '\n') {
+                cursor += 1;
+            } else if (*cursor != '\0') {
+                cursor += 1;
+            }
+            continue;
+        }
+
+        if ((size_t)len >= 256u) {
+            len = 255;
+        }
+        memcpy(line, line_start, (size_t)len);
+        line[len] = '\0';
+
+        while (*cursor == ' ') {
+            cursor += 1;
+        }
+        if (*cursor == '\n') {
+            cursor += 1;
+        }
+
+        line_count += 1;
+    }
+
+    return line_count;
+}
+
+static float detail_estimate_graph_controls_reserved_height(const MemConsoleLayoutConfig *layout_cfg,
+                                                            float stack_gap,
+                                                            int graph_mode_enabled) {
+    float action_block_h;
+    float reserved_h;
+
+    if (!layout_cfg) {
+        return 0.0f;
+    }
+
+    action_block_h = (layout_cfg->action_button_h * 2.0f) +
+                     layout_cfg->action_button_gap +
+                     (layout_cfg->action_block_pad * 2.0f);
+
+    reserved_h = layout_cfg->right_section_h + stack_gap;
+    if (graph_mode_enabled) {
+        reserved_h += layout_cfg->graph_filter_h + stack_gap;
+        reserved_h += layout_cfg->graph_settings_h + stack_gap;
+    } else {
+        reserved_h += layout_cfg->graph_collapsed_hint_h + stack_gap;
+    }
+    reserved_h += action_block_h + stack_gap;
+
+    return reserved_h;
+}
+
+static CoreResult detail_draw_scrollable_wrapped_text(KitUiContext *ui_ctx,
+                                                      KitRenderFrame *frame,
+                                                      char line_storage[][256],
+                                                      int line_storage_count,
+                                                      KitRenderRect bounds,
+                                                      const char *text,
+                                                      CoreThemeColorToken token,
+                                                      CoreFontTextSizeTier text_tier,
+                                                      const KitUiInputState *input,
+                                                      int wheel_y,
+                                                      float *io_scroll,
+                                                      KitRenderRect *out_text_viewport,
+                                                      float *out_line_step) {
+    KitRenderRect text_viewport = bounds;
+    float line_step;
+    int max_chars;
+    int line_count;
+    float content_height;
+    float scroll = 0.0f;
+    int has_scrollbar = 0;
+    CoreResult result;
+    int i;
+
+    if (!ui_ctx || !frame || !line_storage || line_storage_count <= 0 || !text || !io_scroll) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid scrollable wrapped text draw request" };
+    }
+
+    if (bounds.width <= 2.0f || bounds.height <= 2.0f) {
+        if (out_text_viewport) {
+            *out_text_viewport = bounds;
+        }
+        if (out_line_step) {
+            *out_line_step = detail_wrapped_text_line_step(text_tier);
+        }
+        return core_result_ok();
+    }
+
+    line_step = detail_wrapped_text_line_step(text_tier);
+    if (line_step < 14.0f) {
+        line_step = 14.0f;
+    }
+
+    max_chars = (int)((bounds.width - 16.0f) / 8.0f);
+    line_count = detail_wrap_text_lines(text, line_storage, line_storage_count, max_chars);
+
+    content_height = 12.0f + ((float)line_count * line_step);
+    if (content_height < bounds.height) {
+        content_height = bounds.height;
+    }
+
+    scroll = *io_scroll;
+    if (scroll < 0.0f) {
+        scroll = 0.0f;
+    }
+    if (scroll > content_height - bounds.height) {
+        scroll = content_height - bounds.height;
+    }
+    if (scroll < 0.0f) {
+        scroll = 0.0f;
+    }
+
+    if (wheel_y != 0 && input && kit_ui_point_in_rect(bounds, input->mouse_x, input->mouse_y)) {
+        KitUiScrollResult scroll_result = kit_ui_eval_scroll(bounds,
+                                                             scroll,
+                                                             content_height,
+                                                             (float)wheel_y);
+        if (scroll_result.changed) {
+            scroll = scroll_result.offset_y;
+        }
+    }
+
+    has_scrollbar = (content_height - bounds.height) > 0.5f;
+    if (has_scrollbar) {
+        text_viewport.width -= 10.0f;
+        if (text_viewport.width < 20.0f) {
+            text_viewport.width = 20.0f;
+        }
+
+        max_chars = (int)((text_viewport.width - 16.0f) / 8.0f);
+        line_count = detail_wrap_text_lines(text, line_storage, line_storage_count, max_chars);
+        content_height = 12.0f + ((float)line_count * line_step);
+        if (content_height < bounds.height) {
+            content_height = bounds.height;
+        }
+        if (scroll > content_height - bounds.height) {
+            scroll = content_height - bounds.height;
+        }
+        if (scroll < 0.0f) {
+            scroll = 0.0f;
+        }
+    }
+
+    *io_scroll = scroll;
+    if (out_text_viewport) {
+        *out_text_viewport = text_viewport;
+    }
+    if (out_line_step) {
+        *out_line_step = line_step;
+    }
+
+    result = kit_ui_clip_push(ui_ctx, frame, text_viewport);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+
+    for (i = 0; i < line_count; ++i) {
+        float y = bounds.y + 6.0f + ((float)i * line_step) - scroll;
+        KitRenderRect line_rect;
+
+        if (y + line_step < bounds.y || y > bounds.y + bounds.height) {
+            continue;
+        }
+
+        line_rect = (KitRenderRect){
+            text_viewport.x + 8.0f,
+            y,
+            text_viewport.width - 16.0f,
+            line_step
+        };
+        if (line_storage[i][0] == '\0') {
+            continue;
+        }
+        result = mem_console_ui_draw_info_line_custom(ui_ctx,
+                                                      frame,
+                                                      line_rect,
+                                                      line_storage[i],
+                                                      token,
+                                                      CORE_FONT_ROLE_UI_REGULAR,
+                                                      text_tier);
+        if (result.code != CORE_OK) {
+            (void)kit_ui_clip_pop(ui_ctx, frame);
+            return result;
+        }
+    }
+
+    result = kit_ui_clip_pop(ui_ctx, frame);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+
+    if (has_scrollbar) {
+        result = kit_ui_draw_scrollbar(ui_ctx,
+                                       frame,
+                                       bounds,
+                                       scroll,
+                                       content_height);
+        if (result.code != CORE_OK) {
+            return result;
+        }
+    }
+
+    return core_result_ok();
+}
 
 CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                                               KitUiContext *ui_ctx,
                                               KitRenderFrame *frame,
                                               MemConsoleState *state,
                                               const KitUiInputState *input,
+                                              int wheel_y,
                                               const MemConsoleLayoutConfig *layout_cfg,
                                               KitUiStackLayout *out_right_layout) {
     KitUiStackLayout right_layout;
@@ -19,8 +325,13 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
     KitRenderRect detail_title_row;
     KitRenderRect detail_meta_left;
     KitRenderRect detail_meta_right;
+    KitRenderRect summary_content;
     KitRenderRect body_panel;
     KitRenderRect body_content;
+    KitRenderRect body_text_viewport;
+    float body_h;
+    float reserved_controls_h;
+    float body_line_step = 24.0f;
     CoreResult result;
     int title_input_active;
 
@@ -66,16 +377,17 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                                                    state->detail_connection_summary_text,
                                                    sizeof(state->detail_connection_summary_text));
     {
-        const float gap = 8.0f;
-        const float min_left = 200.0f;
-        const float min_right = 170.0f;
-        float desired_right = detail_top_band.width * 0.40f;
+        const float gap = 4.0f;
+        const float min_left = 180.0f;
+        const float min_right = 190.0f;
+        float desired_right = detail_top_band.width * 0.46f;
         float max_right = detail_top_band.width - min_left - gap;
         float right_width;
 
         if (max_right < min_right) {
             max_right = detail_top_band.width * 0.5f;
         }
+
         right_width = desired_right;
         if (right_width < min_right) {
             right_width = min_right;
@@ -92,7 +404,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
 
         detail_meta_right = detail_top_band;
         detail_meta_right.width = right_width;
-        detail_meta_right.x = detail_top_band.x + detail_top_band.width - detail_meta_right.width;
+        detail_meta_right.x = (state->pane_right_detail.x + state->pane_right_detail.width - 2.0f) - detail_meta_right.width;
 
         detail_meta_left = detail_top_band;
         detail_meta_left.width = detail_meta_right.x - detail_top_band.x - gap;
@@ -152,10 +464,21 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
     }
 
     if (state->selected_item_id != 0) {
-        (void)snprintf(state->detail_meta_line,
-                       sizeof(state->detail_meta_line),
-                       "MEMORY ID %lld",
-                       (long long)state->selected_item_id);
+        char created_label[32];
+        if (format_created_timestamp_compact(state->selected_created_ns,
+                                             created_label,
+                                             sizeof(created_label))) {
+            (void)snprintf(state->detail_meta_line,
+                           sizeof(state->detail_meta_line),
+                           "MEMORY ID %lld | %s",
+                           (long long)state->selected_item_id,
+                           created_label);
+        } else {
+            (void)snprintf(state->detail_meta_line,
+                           sizeof(state->detail_meta_line),
+                           "MEMORY ID %lld",
+                           (long long)state->selected_item_id);
+        }
     } else {
         (void)snprintf(state->detail_meta_line,
                        sizeof(state->detail_meta_line),
@@ -176,6 +499,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
     if (result.code != CORE_OK) {
         return result;
     }
+
     result = mem_console_ui_push_themed_rect(render_ctx,
                                              frame,
                                              detail_meta_right,
@@ -184,25 +508,28 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
     if (result.code != CORE_OK) {
         return result;
     }
-    {
-        KitRenderRect summary_content = {
-            detail_meta_right.x + 8.0f,
-            detail_meta_right.y + 6.0f,
-            detail_meta_right.width - 16.0f,
-            detail_meta_right.height - 12.0f
-        };
-        result = mem_console_ui_draw_wrapped_text_block(ui_ctx,
-                                                        frame,
-                                                        state->detail_connection_summary_lines,
-                                                        6,
-                                                        summary_content,
-                                                        state->detail_connection_summary_text,
-                                                        CORE_THEME_COLOR_TEXT_MUTED,
-                                                        CORE_FONT_TEXT_SIZE_CAPTION,
-                                                        6);
-        if (result.code != CORE_OK) {
-            return result;
-        }
+
+    summary_content = (KitRenderRect){
+        detail_meta_right.x + 6.0f,
+        detail_meta_right.y + 5.0f,
+        detail_meta_right.width - 12.0f,
+        detail_meta_right.height - 10.0f
+    };
+    result = detail_draw_scrollable_wrapped_text(ui_ctx,
+                                                 frame,
+                                                 state->detail_connection_summary_lines,
+                                                 MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT,
+                                                 summary_content,
+                                                 state->detail_connection_summary_text,
+                                                 CORE_THEME_COLOR_TEXT_MUTED,
+                                                 CORE_FONT_TEXT_SIZE_CAPTION,
+                                                 input,
+                                                 wheel_y,
+                                                 &state->detail_connection_scroll,
+                                                 0,
+                                                 0);
+    if (result.code != CORE_OK) {
+        return result;
     }
 
     result = kit_ui_stack_next(&right_layout, layout_cfg->right_section_h, 0.0f, &row);
@@ -220,7 +547,15 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         return result;
     }
 
-    result = kit_ui_stack_next(&right_layout, layout_cfg->right_body_h, 0.0f, &body_panel);
+    reserved_controls_h = detail_estimate_graph_controls_reserved_height(layout_cfg,
+                                                                          right_layout.gap,
+                                                                          state->graph_mode_enabled);
+    body_h = right_layout.bounds.height - right_layout.cursor - reserved_controls_h;
+    if (body_h < 26.0f) {
+        body_h = 26.0f;
+    }
+
+    result = kit_ui_stack_next(&right_layout, body_h, 0.0f, &body_panel);
     if (result.code != CORE_OK) {
         return result;
     }
@@ -239,15 +574,20 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         body_panel.width - 12.0f,
         body_panel.height - 10.0f
     };
-    result = mem_console_ui_draw_wrapped_text_block(ui_ctx,
-                                                    frame,
-                                                    state->wrapped_body_lines,
-                                                    6,
-                                                    body_content,
-                                                    state->body_edit_mode ? state->body_edit_text : state->selected_body,
-                                                    CORE_THEME_COLOR_TEXT_MUTED,
-                                                    CORE_FONT_TEXT_SIZE_BASIC,
-                                                    6);
+
+    result = detail_draw_scrollable_wrapped_text(ui_ctx,
+                                                 frame,
+                                                 state->wrapped_body_lines,
+                                                 MEM_CONSOLE_DETAIL_BODY_WRAP_LINE_LIMIT,
+                                                 body_content,
+                                                 state->body_edit_mode ? state->body_edit_text : state->selected_body,
+                                                 CORE_THEME_COLOR_TEXT_MUTED,
+                                                 CORE_FONT_TEXT_SIZE_BASIC,
+                                                 input,
+                                                 wheel_y,
+                                                 &state->detail_body_scroll,
+                                                 &body_text_viewport,
+                                                 &body_line_step);
     if (result.code != CORE_OK) {
         return result;
     }
@@ -258,7 +598,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         int char_w = mem_console_ui_estimate_char_width_px(CORE_FONT_TEXT_SIZE_BASIC);
         int body_len = (int)strlen(state->body_edit_text);
         int cursor = mem_console_ui_clamp_cursor_for_text(state->body_edit_text, state->body_edit_cursor);
-        int line_capacity = (int)((body_content.width - 16.0f) / (float)char_w);
+        int line_capacity;
         int line_index;
         int line_start_idx;
         int line_prefix_len;
@@ -267,10 +607,15 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         float caret_x;
         float caret_y0;
 
+        (void)body_line_step;
+
         if (char_w < 1) {
             char_w = 8;
         }
-        if (line_capacity < 1) line_capacity = 1;
+        line_capacity = (int)((body_text_viewport.width - 16.0f) / (float)char_w);
+        if (line_capacity < 1) {
+            line_capacity = 1;
+        }
         line_index = cursor / line_capacity;
         if (cursor >= body_len && body_len > 0 && body_len % line_capacity == 0) {
             line_index = body_len / line_capacity;
@@ -295,31 +640,31 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         }
         line_prefix[line_prefix_len] = '\0';
 
-        caret_x = body_content.x + 8.0f +
+        caret_x = body_text_viewport.x + 8.0f +
                   mem_console_ui_measure_text_width_px(render_ctx,
                                                        CORE_FONT_ROLE_UI_REGULAR,
                                                        CORE_FONT_TEXT_SIZE_BASIC,
                                                        line_prefix);
-        caret_y0 = body_content.y + 8.0f + ((float)line_index * 24.0f);
+        caret_y0 = body_text_viewport.y + 8.0f + ((float)line_index * 24.0f) - state->detail_body_scroll;
 
-        if (caret_x > body_content.x + body_content.width - 8.0f) {
-            caret_x = body_content.x + body_content.width - 8.0f;
-        }
-        if (caret_y0 > body_content.y + body_content.height - 20.0f) {
-            caret_y0 = body_content.y + body_content.height - 20.0f;
+        if (caret_x > body_text_viewport.x + body_text_viewport.width - 8.0f) {
+            caret_x = body_text_viewport.x + body_text_viewport.width - 8.0f;
         }
 
-        if (input->mouse_released && kit_ui_point_in_rect(body_content, input->mouse_x, input->mouse_y)) {
-            float text_x = body_content.x + 8.0f;
-            float text_y = body_content.y + 8.0f;
-            int click_row = (int)((input->mouse_y - text_y + 12.0f) / 24.0f);
+        if (input->mouse_released &&
+            kit_ui_point_in_rect(body_text_viewport, input->mouse_x, input->mouse_y)) {
+            float text_x = body_text_viewport.x + 8.0f;
+            float text_y = body_text_viewport.y + 8.0f;
+            int click_row = (int)((input->mouse_y - text_y + state->detail_body_scroll + 12.0f) / 24.0f);
             int candidate_cursor;
             int line_end_idx;
             float delta_x;
             float advance = 0.0f;
             char glyph[2];
 
-            if (click_row < 0) click_row = 0;
+            if (click_row < 0) {
+                click_row = 0;
+            }
             line_start_idx = click_row * line_capacity;
             if (line_start_idx < 0) {
                 line_start_idx = 0;
@@ -356,8 +701,12 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                     advance += glyph_w;
                 }
             }
-            if (candidate_cursor < 0) candidate_cursor = 0;
-            if (candidate_cursor > body_len) candidate_cursor = body_len;
+            if (candidate_cursor < 0) {
+                candidate_cursor = 0;
+            }
+            if (candidate_cursor > body_len) {
+                candidate_cursor = body_len;
+            }
 
             state->input_target = MEM_CONSOLE_INPUT_BODY_EDIT;
             state->body_edit_cursor = candidate_cursor;
@@ -381,12 +730,12 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                 line_prefix[i] = state->body_edit_text[line_start_idx + i];
             }
             line_prefix[line_prefix_len] = '\0';
-            caret_x = body_content.x + 8.0f +
+            caret_x = body_text_viewport.x + 8.0f +
                       mem_console_ui_measure_text_width_px(render_ctx,
                                                            CORE_FONT_ROLE_UI_REGULAR,
                                                            CORE_FONT_TEXT_SIZE_BASIC,
                                                            line_prefix);
-            caret_y0 = body_content.y + 8.0f + ((float)line_index * 24.0f);
+            caret_y0 = body_text_viewport.y + 8.0f + ((float)line_index * 24.0f) - state->detail_body_scroll;
         }
 
         result = mem_console_ui_resolve_theme_color(render_ctx, CORE_THEME_COLOR_ACCENT_PRIMARY, &caret_color);
@@ -394,7 +743,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
             return result;
         }
 
-        result = kit_ui_clip_push(ui_ctx, frame, body_content);
+        result = kit_ui_clip_push(ui_ctx, frame, body_text_viewport);
         if (result.code != CORE_OK) {
             return result;
         }

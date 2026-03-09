@@ -15,6 +15,56 @@ static const CoreFontTextSizeTier k_graph_edge_label_tiers[] = {
     CORE_FONT_TEXT_SIZE_CAPTION
 };
 
+typedef struct GraphEdgeLegendEntry {
+    const char *kind;
+    const char *label;
+    KitRenderColor color;
+} GraphEdgeLegendEntry;
+
+static const GraphEdgeLegendEntry k_graph_edge_legend_entries[] = {
+    { "supports", "SUPPORTS", { 64, 208, 128, 255 } },
+    { "depends_on", "DEPENDS", { 232, 162, 56, 255 } },
+    { "references", "REFS", { 74, 184, 255, 255 } },
+    { "summarizes", "SUMMARY", { 178, 120, 255, 255 } },
+    { "related", "RELATED", { 168, 178, 196, 255 } },
+    { "implements", "IMPLEMENTS", { 156, 214, 78, 255 } },
+    { "blocks", "BLOCKS", { 230, 92, 92, 255 } },
+    { "contradicts", "CONTRADICTS", { 255, 96, 152, 255 } }
+};
+
+static const GraphEdgeLegendEntry *graph_edge_legend_entry_for_kind(const char *kind) {
+    uint32_t i;
+
+    if (!kind || !kind[0]) {
+        kind = "related";
+    }
+    for (i = 0u; i < (uint32_t)(sizeof(k_graph_edge_legend_entries) / sizeof(k_graph_edge_legend_entries[0])); ++i) {
+        if (strcmp(k_graph_edge_legend_entries[i].kind, kind) == 0) {
+            return &k_graph_edge_legend_entries[i];
+        }
+    }
+    return 0;
+}
+
+static KitRenderColor graph_edge_color_for_kind(const char *kind) {
+    const GraphEdgeLegendEntry *entry = graph_edge_legend_entry_for_kind(kind);
+    if (entry) {
+        return entry->color;
+    }
+    return (KitRenderColor){ 188, 196, 210, 255 };
+}
+
+static const char *graph_edge_display_label_for_kind(const char *kind) {
+    const GraphEdgeLegendEntry *entry = graph_edge_legend_entry_for_kind(kind);
+    if (entry) {
+        return entry->label;
+    }
+    if (!kind || !kind[0]) {
+        return "RELATED";
+    }
+    return kind;
+}
+
 static void configure_graph_layout_style(KitGraphStructLayoutStyle *style) {
     if (!style) {
         return;
@@ -163,12 +213,24 @@ static int find_layout_index_by_node_id(const KitGraphStructNodeLayout *layouts,
     return -1;
 }
 
+static float graph_lane_slot_for_index(uint32_t lane_index, uint32_t lane_count) {
+    if (lane_count <= 1u) {
+        return 0.0f;
+    }
+    /* Keep all lanes non-zero when we have multi-edges so nothing sits on top of a center line. */
+    {
+        float magnitude = (float)(lane_index / 2u) + 1.0f;
+        float sign = (lane_index & 1u) ? 1.0f : -1.0f;
+        return magnitude * sign;
+    }
+}
+
 static void apply_multi_edge_route_lanes(const KitGraphStructEdge *edges,
                                          uint32_t edge_count,
                                          const KitGraphStructNodeLayout *layouts,
                                          uint32_t layout_count,
                                          KitGraphStructEdgeRoute *routes) {
-    const float lane_spacing = 7.0f;
+    const float lane_spacing = 8.0f;
     uint32_t i;
 
     if (!edges || !layouts || !routes || edge_count == 0u) {
@@ -178,9 +240,12 @@ static void apply_multi_edge_route_lanes(const KitGraphStructEdge *edges,
     for (i = 0u; i < edge_count; ++i) {
         uint32_t from_id = edges[i].from_id;
         uint32_t to_id = edges[i].to_id;
+        uint32_t pair_min = from_id < to_id ? from_id : to_id;
+        uint32_t pair_max = from_id < to_id ? to_id : from_id;
         uint32_t lane_index = 0u;
         uint32_t lane_count = 0u;
         uint32_t j;
+        float lane_slot = 0.0f;
         float lane_offset = 0.0f;
         float offset_x = 0.0f;
         float offset_y = 0.0f;
@@ -192,7 +257,11 @@ static void apply_multi_edge_route_lanes(const KitGraphStructEdge *edges,
         }
 
         for (j = 0u; j < edge_count; ++j) {
-            if (edges[j].from_id == from_id && edges[j].to_id == to_id) {
+            uint32_t other_from = edges[j].from_id;
+            uint32_t other_to = edges[j].to_id;
+            uint32_t other_min = other_from < other_to ? other_from : other_to;
+            uint32_t other_max = other_from < other_to ? other_to : other_from;
+            if (other_min == pair_min && other_max == pair_max) {
                 if (j < i) {
                     lane_index += 1u;
                 }
@@ -209,7 +278,8 @@ static void apply_multi_edge_route_lanes(const KitGraphStructEdge *edges,
             continue;
         }
 
-        lane_offset = (((float)lane_index) - (((float)lane_count - 1.0f) * 0.5f)) * lane_spacing;
+        lane_slot = graph_lane_slot_for_index(lane_index, lane_count);
+        lane_offset = lane_slot * lane_spacing;
         if (fabsf(lane_offset) < 0.01f) {
             continue;
         }
@@ -234,6 +304,417 @@ static void apply_multi_edge_route_lanes(const KitGraphStructEdge *edges,
             routes[i].points[j].y += offset_y;
         }
     }
+}
+
+static float graph_clampf(float value, float min_v, float max_v) {
+    if (value < min_v) return min_v;
+    if (value > max_v) return max_v;
+    return value;
+}
+
+static void graph_route_nearest_point_with_tangent(const KitGraphStructEdgeRoute *route,
+                                                   KitRenderVec2 target,
+                                                   KitRenderVec2 *out_point,
+                                                   KitRenderVec2 *out_tangent) {
+    float best_dist_sq = 0.0f;
+    int has_best = 0;
+    uint32_t p;
+
+    if (!route || route->point_count < 2u || !out_point || !out_tangent) {
+        return;
+    }
+
+    for (p = 0u; p + 1u < route->point_count; ++p) {
+        KitRenderVec2 a = route->points[p];
+        KitRenderVec2 b = route->points[p + 1u];
+        float vx = b.x - a.x;
+        float vy = b.y - a.y;
+        float seg_len_sq = (vx * vx) + (vy * vy);
+        float t = 0.0f;
+        float cx;
+        float cy;
+        float dx;
+        float dy;
+        float dist_sq;
+
+        if (seg_len_sq <= 0.00001f) {
+            continue;
+        }
+
+        t = ((target.x - a.x) * vx + (target.y - a.y) * vy) / seg_len_sq;
+        t = graph_clampf(t, 0.0f, 1.0f);
+        cx = a.x + (vx * t);
+        cy = a.y + (vy * t);
+        dx = target.x - cx;
+        dy = target.y - cy;
+        dist_sq = (dx * dx) + (dy * dy);
+
+        if (!has_best || dist_sq < best_dist_sq) {
+            float inv_len = 1.0f / sqrtf(seg_len_sq);
+            best_dist_sq = dist_sq;
+            has_best = 1;
+            *out_point = (KitRenderVec2){ cx, cy };
+            *out_tangent = (KitRenderVec2){ vx * inv_len, vy * inv_len };
+        }
+    }
+
+    if (!has_best) {
+        KitRenderVec2 a = route->points[0];
+        KitRenderVec2 b = route->points[1];
+        float vx = b.x - a.x;
+        float vy = b.y - a.y;
+        float len_sq = (vx * vx) + (vy * vy);
+        float inv_len = len_sq > 0.00001f ? (1.0f / sqrtf(len_sq)) : 1.0f;
+        *out_point = a;
+        *out_tangent = (KitRenderVec2){ vx * inv_len, vy * inv_len };
+    }
+}
+
+static int graph_point_in_rect(KitRenderRect rect, float x, float y) {
+    return (x >= rect.x && x <= rect.x + rect.width &&
+            y >= rect.y && y <= rect.y + rect.height);
+}
+
+static float graph_orient2d(KitRenderVec2 a, KitRenderVec2 b, KitRenderVec2 c) {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+static int graph_on_segment(KitRenderVec2 a, KitRenderVec2 b, KitRenderVec2 p) {
+    const float eps = 0.0001f;
+    if (p.x < (a.x < b.x ? a.x : b.x) - eps || p.x > (a.x > b.x ? a.x : b.x) + eps) return 0;
+    if (p.y < (a.y < b.y ? a.y : b.y) - eps || p.y > (a.y > b.y ? a.y : b.y) + eps) return 0;
+    return 1;
+}
+
+static int graph_segments_intersect(KitRenderVec2 a0,
+                                    KitRenderVec2 a1,
+                                    KitRenderVec2 b0,
+                                    KitRenderVec2 b1) {
+    float o1 = graph_orient2d(a0, a1, b0);
+    float o2 = graph_orient2d(a0, a1, b1);
+    float o3 = graph_orient2d(b0, b1, a0);
+    float o4 = graph_orient2d(b0, b1, a1);
+    const float eps = 0.0001f;
+
+    if (((o1 > eps && o2 < -eps) || (o1 < -eps && o2 > eps)) &&
+        ((o3 > eps && o4 < -eps) || (o3 < -eps && o4 > eps))) {
+        return 1;
+    }
+    if (fabsf(o1) <= eps && graph_on_segment(a0, a1, b0)) return 1;
+    if (fabsf(o2) <= eps && graph_on_segment(a0, a1, b1)) return 1;
+    if (fabsf(o3) <= eps && graph_on_segment(b0, b1, a0)) return 1;
+    if (fabsf(o4) <= eps && graph_on_segment(b0, b1, a1)) return 1;
+    return 0;
+}
+
+static int graph_segment_intersects_rect(KitRenderVec2 a,
+                                         KitRenderVec2 b,
+                                         KitRenderRect rect) {
+    KitRenderVec2 r0 = { rect.x, rect.y };
+    KitRenderVec2 r1 = { rect.x + rect.width, rect.y };
+    KitRenderVec2 r2 = { rect.x + rect.width, rect.y + rect.height };
+    KitRenderVec2 r3 = { rect.x, rect.y + rect.height };
+
+    if (graph_point_in_rect(rect, a.x, a.y) || graph_point_in_rect(rect, b.x, b.y)) {
+        return 1;
+    }
+    if (graph_segments_intersect(a, b, r0, r1)) return 1;
+    if (graph_segments_intersect(a, b, r1, r2)) return 1;
+    if (graph_segments_intersect(a, b, r2, r3)) return 1;
+    if (graph_segments_intersect(a, b, r3, r0)) return 1;
+    return 0;
+}
+
+static int graph_label_rect_edge_overlap_count(const KitGraphStructEdgeRoute *routes,
+                                               uint32_t route_count,
+                                               KitRenderRect rect) {
+    uint32_t i;
+    int overlap_count = 0;
+    const float edge_pad = 1.0f;
+    KitRenderRect test_rect = {
+        rect.x - edge_pad,
+        rect.y - edge_pad,
+        rect.width + (edge_pad * 2.0f),
+        rect.height + (edge_pad * 2.0f)
+    };
+
+    for (i = 0u; i < route_count; ++i) {
+        const KitGraphStructEdgeRoute *route = &routes[i];
+        uint32_t p;
+        int hit = 0;
+
+        if (route->point_count < 2u) {
+            continue;
+        }
+        for (p = 0u; p + 1u < route->point_count; ++p) {
+            if (graph_segment_intersects_rect(route->points[p], route->points[p + 1u], test_rect)) {
+                hit = 1;
+                break;
+            }
+        }
+        if (hit) {
+            overlap_count += 1;
+        }
+    }
+    return overlap_count;
+}
+
+static int graph_rects_overlap(KitRenderRect a,
+                               KitRenderRect b,
+                               float pad) {
+    float ax0 = a.x - pad;
+    float ay0 = a.y - pad;
+    float ax1 = a.x + a.width + pad;
+    float ay1 = a.y + a.height + pad;
+    float bx0 = b.x - pad;
+    float by0 = b.y - pad;
+    float bx1 = b.x + b.width + pad;
+    float by1 = b.y + b.height + pad;
+
+    if (ax1 <= bx0 || bx1 <= ax0) return 0;
+    if (ay1 <= by0 || by1 <= ay0) return 0;
+    return 1;
+}
+
+static int graph_label_rect_label_overlap_count(const KitGraphStructEdgeLabelLayout *label_layouts,
+                                                uint32_t placed_count,
+                                                KitRenderRect rect) {
+    uint32_t i;
+    int overlap_count = 0;
+    const float label_pad = 2.0f;
+
+    if (!label_layouts || placed_count == 0u) {
+        return 0;
+    }
+
+    for (i = 0u; i < placed_count; ++i) {
+        const KitRenderRect other = label_layouts[i].rect;
+        if (other.width <= 0.0f || other.height <= 0.0f) {
+            continue;
+        }
+        if (graph_rects_overlap(other, rect, label_pad)) {
+            overlap_count += 1;
+        }
+    }
+
+    return overlap_count;
+}
+
+static void refine_edge_label_layouts_for_callouts(KitRenderRect bounds,
+                                                    const KitGraphStructEdgeRoute *routes,
+                                                    uint32_t route_count,
+                                                    KitGraphStructEdgeLabelLayout *label_layouts) {
+    uint32_t i;
+
+    if (!routes || !label_layouts) {
+        return;
+    }
+
+    for (i = 0u; i < route_count; ++i) {
+        const KitGraphStructEdgeRoute *route = &routes[i];
+        KitGraphStructEdgeLabelLayout *layout = &label_layouts[i];
+        KitRenderRect rect = layout->rect;
+        KitRenderVec2 target = layout->anchor;
+        KitRenderVec2 anchor = {0.0f, 0.0f};
+        KitRenderVec2 tangent = {1.0f, 0.0f};
+        KitRenderVec2 normal;
+        float normal_len;
+        float width;
+        float height;
+        float center_x;
+        float center_y;
+        float to_center_x;
+        float to_center_y;
+        float side_dot;
+        const float callout_gap = 10.0f;
+        const float pad = 2.0f;
+        float min_x;
+        float max_x;
+        float min_y;
+        float max_y;
+        float best_score = 1e9f;
+        int best_label_overlap_count = 2147483647;
+        int best_overlap_count = 2147483647;
+        uint32_t side_index;
+        uint32_t dist_index;
+        uint32_t lateral_index;
+        const float distance_opts[] = { 10.0f, 16.0f, 24.0f, 34.0f, 46.0f };
+        const float lateral_opts[] = { 0.0f, 10.0f, -10.0f, 18.0f, -18.0f, 28.0f, -28.0f };
+        KitRenderRect best_rect = rect;
+        int found_zero_overlap = 0;
+
+        if (route->point_count < 2u || rect.width <= 0.0f || rect.height <= 0.0f) {
+            continue;
+        }
+
+        if (target.x == 0.0f && target.y == 0.0f) {
+            target.x = rect.x + (rect.width * 0.5f);
+            target.y = rect.y + (rect.height * 0.5f);
+        }
+
+        graph_route_nearest_point_with_tangent(route, target, &anchor, &tangent);
+        normal = (KitRenderVec2){ -tangent.y, tangent.x };
+        normal_len = sqrtf((normal.x * normal.x) + (normal.y * normal.y));
+        if (normal_len <= 0.00001f) {
+            normal = (KitRenderVec2){0.0f, -1.0f};
+        } else {
+            normal.x /= normal_len;
+            normal.y /= normal_len;
+        }
+
+        center_x = rect.x + (rect.width * 0.5f);
+        center_y = rect.y + (rect.height * 0.5f);
+        to_center_x = center_x - anchor.x;
+        to_center_y = center_y - anchor.y;
+        side_dot = (to_center_x * normal.x) + (to_center_y * normal.y);
+        if (side_dot < 0.0f) {
+            normal.x = -normal.x;
+            normal.y = -normal.y;
+        } else if (fabsf(side_dot) < 0.01f && (i & 1u)) {
+            normal.x = -normal.x;
+            normal.y = -normal.y;
+        }
+
+        width = rect.width;
+        height = rect.height;
+
+        min_x = bounds.x + pad;
+        max_x = bounds.x + bounds.width - width - pad;
+        min_y = bounds.y + pad;
+        max_y = bounds.y + bounds.height - height - pad;
+        if (max_x < min_x) max_x = min_x;
+        if (max_y < min_y) max_y = min_y;
+
+        for (side_index = 0u; side_index < 2u; ++side_index) {
+            KitRenderVec2 trial_normal = normal;
+            if (side_index == 1u) {
+                trial_normal.x = -trial_normal.x;
+                trial_normal.y = -trial_normal.y;
+            }
+
+            for (dist_index = 0u; dist_index < (uint32_t)(sizeof(distance_opts) / sizeof(distance_opts[0])); ++dist_index) {
+                for (lateral_index = 0u; lateral_index < (uint32_t)(sizeof(lateral_opts) / sizeof(lateral_opts[0])); ++lateral_index) {
+                    KitRenderRect trial_rect;
+                    float dist = distance_opts[dist_index] + callout_gap;
+                    float lateral = lateral_opts[lateral_index];
+                    float score;
+                    int overlaps;
+                    int label_overlaps;
+
+                    center_x = anchor.x + (trial_normal.x * dist) + (tangent.x * lateral);
+                    center_y = anchor.y + (trial_normal.y * dist) + (tangent.y * lateral);
+
+                    trial_rect.width = width;
+                    trial_rect.height = height;
+                    trial_rect.x = graph_clampf(center_x - (width * 0.5f), min_x, max_x);
+                    trial_rect.y = graph_clampf(center_y - (height * 0.5f), min_y, max_y);
+
+                    overlaps = graph_label_rect_edge_overlap_count(routes, route_count, trial_rect);
+                    label_overlaps = graph_label_rect_label_overlap_count(label_layouts, i, trial_rect);
+                    score = (float)overlaps * 10000.0f +
+                            (float)label_overlaps * 16000.0f +
+                            dist * 1.0f +
+                            fabsf(lateral) * 0.2f +
+                            (side_index == 1u ? 0.5f : 0.0f);
+
+                    if (overlaps == 0 && label_overlaps == 0) {
+                        if (!found_zero_overlap || score < best_score) {
+                            found_zero_overlap = 1;
+                            best_score = score;
+                            best_rect = trial_rect;
+                        }
+                    } else if (!found_zero_overlap) {
+                        if (label_overlaps < best_label_overlap_count ||
+                            (label_overlaps == best_label_overlap_count &&
+                             (overlaps < best_overlap_count ||
+                              (overlaps == best_overlap_count && score < best_score)))) {
+                            best_label_overlap_count = label_overlaps;
+                            best_overlap_count = overlaps;
+                            best_score = score;
+                            best_rect = trial_rect;
+                        }
+                    }
+                }
+            }
+        }
+
+        layout->rect = best_rect;
+        layout->anchor = anchor;
+    }
+}
+
+static KitRenderVec2 compute_label_attach_point(KitRenderRect rect, KitRenderVec2 anchor) {
+    KitRenderVec2 out = {
+        graph_clampf(anchor.x, rect.x, rect.x + rect.width),
+        graph_clampf(anchor.y, rect.y, rect.y + rect.height)
+    };
+
+    if (anchor.x >= rect.x && anchor.x <= rect.x + rect.width &&
+        anchor.y >= rect.y && anchor.y <= rect.y + rect.height) {
+        float left_d = anchor.x - rect.x;
+        float right_d = (rect.x + rect.width) - anchor.x;
+        float top_d = anchor.y - rect.y;
+        float bottom_d = (rect.y + rect.height) - anchor.y;
+        float best = left_d;
+        out = (KitRenderVec2){ rect.x, anchor.y };
+        if (right_d < best) {
+            best = right_d;
+            out = (KitRenderVec2){ rect.x + rect.width, anchor.y };
+        }
+        if (top_d < best) {
+            best = top_d;
+            out = (KitRenderVec2){ anchor.x, rect.y };
+        }
+        if (bottom_d < best) {
+            out = (KitRenderVec2){ anchor.x, rect.y + rect.height };
+        }
+    }
+
+    return out;
+}
+
+static CoreResult draw_rect_outline(KitRenderFrame *frame,
+                                    KitRenderRect rect,
+                                    float thickness,
+                                    KitRenderColor color) {
+    KitRenderLineCommand line_cmd;
+    CoreResult result;
+    float x0;
+    float y0;
+    float x1;
+    float y1;
+
+    if (!frame || thickness <= 0.0f || rect.width <= 0.0f || rect.height <= 0.0f) {
+        return core_result_ok();
+    }
+
+    x0 = rect.x;
+    y0 = rect.y;
+    x1 = rect.x + rect.width;
+    y1 = rect.y + rect.height;
+
+    line_cmd.thickness = thickness;
+    line_cmd.color = color;
+    line_cmd.transform = kit_render_identity_transform();
+
+    line_cmd.p0 = (KitRenderVec2){ x0, y0 };
+    line_cmd.p1 = (KitRenderVec2){ x1, y0 };
+    result = kit_render_push_line(frame, &line_cmd);
+    if (result.code != CORE_OK) return result;
+
+    line_cmd.p0 = (KitRenderVec2){ x1, y0 };
+    line_cmd.p1 = (KitRenderVec2){ x1, y1 };
+    result = kit_render_push_line(frame, &line_cmd);
+    if (result.code != CORE_OK) return result;
+
+    line_cmd.p0 = (KitRenderVec2){ x1, y1 };
+    line_cmd.p1 = (KitRenderVec2){ x0, y1 };
+    result = kit_render_push_line(frame, &line_cmd);
+    if (result.code != CORE_OK) return result;
+
+    line_cmd.p0 = (KitRenderVec2){ x0, y1 };
+    line_cmd.p1 = (KitRenderVec2){ x0, y0 };
+    return kit_render_push_line(frame, &line_cmd);
 }
 
 typedef struct GraphCameraWorldPoint {
@@ -643,7 +1124,7 @@ CoreResult mem_console_ui_graph_ensure_layout_cache(const KitRenderContext *rend
                                  state->graph_layout_edge_routes);
     kit_graph_struct_edge_label_options_default(&label_options);
     label_options.current_zoom = state->graph_viewport.zoom;
-    label_options.min_zoom_for_labels = 1.25f;
+    label_options.min_zoom_for_labels = 1.10f;
     label_options.density_mode = KIT_GRAPH_STRUCT_EDGE_LABEL_DENSITY_CULL_OVERLAP;
     result = kit_graph_struct_compute_edge_label_layouts_routed(state->graph_layout_node_layouts,
                                                                 state->graph_layout_node_count,
@@ -657,6 +1138,10 @@ CoreResult mem_console_ui_graph_ensure_layout_cache(const KitRenderContext *rend
     if (result.code != CORE_OK) {
         return result;
     }
+    refine_edge_label_layouts_for_callouts(bounds,
+                                           state->graph_layout_edge_routes,
+                                           state->graph_layout_edge_count,
+                                           state->graph_layout_edge_label_layouts);
 
     state->graph_layout_signature = signature;
     state->graph_layout_bounds = bounds;
@@ -809,36 +1294,121 @@ static CoreResult draw_graph_endpoint_markers(const KitRenderContext *render_ctx
     return core_result_ok();
 }
 
-static int has_reverse_edge_for_selected(const MemConsoleState *state,
-                                         int64_t selected_item_id,
-                                         int64_t neighbor_item_id) {
+static CoreResult draw_graph_edge_legend(KitUiContext *ui_ctx,
+                                         const KitRenderContext *render_ctx,
+                                         KitRenderFrame *frame,
+                                         KitRenderRect bounds,
+                                         const MemConsoleState *state) {
+    const GraphEdgeLegendEntry *rows[8];
+    int row_count = 0;
     int i;
+    float row_h = 11.0f;
+    float title_h = 12.0f;
+    float pad = 4.0f;
+    float legend_w = 132.0f;
+    float legend_h;
+    KitRenderRect legend_outer;
+    KitRenderRect legend_inner;
+    CoreResult result;
 
-    if (!state || selected_item_id == 0 || neighbor_item_id == 0) {
-        return 0;
+    if (!ui_ctx || !render_ctx || !frame || !state) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid graph legend draw request" };
     }
 
     for (i = 0; i < state->graph_edge_count; ++i) {
-        const MemConsoleGraphEdge *edge = &state->graph_edges[i];
-        int from_index = edge->from_index;
-        int to_index = edge->to_index;
-        int64_t from_item_id;
-        int64_t to_item_id;
+        const char *kind = state->graph_edges[i].kind[0] ? state->graph_edges[i].kind : "related";
+        const GraphEdgeLegendEntry *entry = graph_edge_legend_entry_for_kind(kind);
+        int r;
+        int exists = 0;
 
-        if (from_index < 0 || to_index < 0 ||
-            from_index >= state->graph_node_count ||
-            to_index >= state->graph_node_count) {
+        if (!entry) {
             continue;
         }
-
-        from_item_id = state->graph_nodes[from_index].item_id;
-        to_item_id = state->graph_nodes[to_index].item_id;
-        if (from_item_id == neighbor_item_id && to_item_id == selected_item_id) {
-            return 1;
+        for (r = 0; r < row_count; ++r) {
+            if (rows[r] == entry) {
+                exists = 1;
+                break;
+            }
+        }
+        if (!exists && row_count < (int)(sizeof(rows) / sizeof(rows[0]))) {
+            rows[row_count++] = entry;
         }
     }
 
-    return 0;
+    if (row_count <= 0) {
+        return core_result_ok();
+    }
+
+    legend_h = pad + title_h + 2.0f + ((float)row_count * row_h) + pad;
+    legend_outer = (KitRenderRect){
+        bounds.x + bounds.width - legend_w - 8.0f,
+        bounds.y + 8.0f,
+        legend_w,
+        legend_h
+    };
+    legend_inner = (KitRenderRect){
+        legend_outer.x + 2.0f,
+        legend_outer.y + 2.0f,
+        legend_outer.width - 4.0f,
+        legend_outer.height - 4.0f
+    };
+
+    result = mem_console_ui_push_themed_rect(render_ctx, frame, legend_outer, 6.0f, CORE_THEME_COLOR_SURFACE_1);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+    result = mem_console_ui_push_themed_rect(render_ctx, frame, legend_inner, 5.0f, CORE_THEME_COLOR_SURFACE_0);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+    result = mem_console_ui_draw_info_line_custom(ui_ctx,
+                                                  frame,
+                                                  (KitRenderRect){
+                                                      legend_inner.x + 5.0f,
+                                                      legend_inner.y + 2.0f,
+                                                      legend_inner.width - 10.0f,
+                                                      title_h
+                                                  },
+                                                  "EDGE KEY",
+                                                  CORE_THEME_COLOR_TEXT_MUTED,
+                                                  CORE_FONT_ROLE_UI_MEDIUM,
+                                                  CORE_FONT_TEXT_SIZE_CAPTION);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+
+    for (i = 0; i < row_count; ++i) {
+        float y = legend_inner.y + pad + title_h + 2.0f + ((float)i * row_h);
+        KitRenderLineCommand swatch_line;
+
+        swatch_line.p0 = (KitRenderVec2){ legend_inner.x + 6.0f, y + (row_h * 0.5f) };
+        swatch_line.p1 = (KitRenderVec2){ legend_inner.x + 19.0f, y + (row_h * 0.5f) };
+        swatch_line.thickness = 2.4f;
+        swatch_line.color = rows[i]->color;
+        swatch_line.transform = kit_render_identity_transform();
+        result = kit_render_push_line(frame, &swatch_line);
+        if (result.code != CORE_OK) {
+            return result;
+        }
+
+        result = mem_console_ui_draw_info_line_custom(ui_ctx,
+                                                      frame,
+                                                      (KitRenderRect){
+                                                          legend_inner.x + 24.0f,
+                                                          y,
+                                                          legend_inner.width - 28.0f,
+                                                          row_h
+                                                      },
+                                                      rows[i]->label,
+                                                      CORE_THEME_COLOR_TEXT_MUTED,
+                                                      CORE_FONT_ROLE_UI_REGULAR,
+                                                      CORE_FONT_TEXT_SIZE_CAPTION);
+        if (result.code != CORE_OK) {
+            return result;
+        }
+    }
+
+    return core_result_ok();
 }
 
 int mem_console_ui_graph_find_node_index_at_point(const MemConsoleState *state,
@@ -938,10 +1508,7 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
                                              KitRenderRect bounds,
                                              MemConsoleState *state) {
     CoreResult result;
-    KitRenderColor edge_color;
     KitRenderColor edge_white;
-    KitRenderColor edge_ok;
-    KitRenderColor edge_error;
     KitRenderColor node_base_color;
     KitRenderColor node_lane_color;
     KitRenderColor node_selected_color;
@@ -986,19 +1553,7 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         }
     }
 
-    color_result = mem_console_ui_resolve_theme_color(render_ctx, CORE_THEME_COLOR_TEXT_MUTED, &edge_color);
-    if (color_result.code != CORE_OK) {
-        return color_result;
-    }
     color_result = mem_console_ui_resolve_theme_color(render_ctx, CORE_THEME_COLOR_TEXT_PRIMARY, &edge_white);
-    if (color_result.code != CORE_OK) {
-        return color_result;
-    }
-    color_result = mem_console_ui_resolve_theme_color(render_ctx, CORE_THEME_COLOR_STATUS_OK, &edge_ok);
-    if (color_result.code != CORE_OK) {
-        return color_result;
-    }
-    color_result = mem_console_ui_resolve_theme_color(render_ctx, CORE_THEME_COLOR_STATUS_ERROR, &edge_error);
     if (color_result.code != CORE_OK) {
         return color_result;
     }
@@ -1020,46 +1575,23 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         KitRenderTextCommand label_text_cmd;
         KitUiTextFitResult edge_text_fit;
         KitRenderRect label_bg_rect = state->graph_layout_edge_label_layouts[i].rect;
+        KitRenderVec2 label_anchor = state->graph_layout_edge_label_layouts[i].anchor;
+        KitRenderVec2 label_attach;
         const KitGraphStructEdgeRoute *route = &state->graph_layout_edge_routes[i];
         int state_edge_index = state->graph_layout_edge_state_indices[i];
-        const char *edge_kind_label = "related";
-        KitRenderColor edge_draw_color = edge_color;
+        const char *edge_kind_raw = "related";
+        const char *edge_kind_label = "RELATED";
+        KitRenderColor edge_draw_color;
+        KitRenderColor label_outline_color;
         if (state_edge_index >= 0 &&
             state_edge_index < state->graph_edge_count &&
             state->graph_edges[state_edge_index].kind[0] != '\0') {
-            edge_kind_label = state->graph_edges[state_edge_index].kind;
+            edge_kind_raw = state->graph_edges[state_edge_index].kind;
         }
+        edge_kind_label = graph_edge_display_label_for_kind(edge_kind_raw);
+        edge_draw_color = graph_edge_color_for_kind(edge_kind_raw);
         if (route->point_count < 2u) {
             continue;
-        }
-
-        if (state_edge_index >= 0 && state_edge_index < state->graph_edge_count) {
-            const MemConsoleGraphEdge *state_edge = &state->graph_edges[state_edge_index];
-            int from_index = state_edge->from_index;
-            int to_index = state_edge->to_index;
-
-            if (from_index >= 0 && to_index >= 0 &&
-                from_index < state->graph_node_count &&
-                to_index < state->graph_node_count) {
-                int64_t from_item_id = state->graph_nodes[from_index].item_id;
-                int64_t to_item_id = state->graph_nodes[to_index].item_id;
-
-                if (from_item_id == state->selected_item_id && to_item_id != 0) {
-                    int bidirectional = has_reverse_edge_for_selected(state,
-                                                                      state->selected_item_id,
-                                                                      to_item_id);
-                    edge_draw_color = bidirectional
-                                          ? edge_white
-                                          : mix_color(edge_white, edge_ok, 0.20f);
-                } else if (to_item_id == state->selected_item_id && from_item_id != 0) {
-                    int bidirectional = has_reverse_edge_for_selected(state,
-                                                                      state->selected_item_id,
-                                                                      from_item_id);
-                    edge_draw_color = bidirectional
-                                          ? edge_white
-                                          : mix_color(edge_white, edge_error, 0.20f);
-                }
-            }
         }
 
         {
@@ -1079,11 +1611,44 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         if (label_bg_rect.width <= 0.0f || label_bg_rect.height <= 0.0f) {
             continue;
         }
+        label_attach = compute_label_attach_point(label_bg_rect, label_anchor);
+        line_cmd.p0 = label_anchor;
+        line_cmd.p1 = label_attach;
+        line_cmd.thickness = 1.4f;
+        line_cmd.color = edge_draw_color;
+        line_cmd.color.a = 220u;
+        line_cmd.transform = kit_render_identity_transform();
+        result = kit_render_push_line(frame, &line_cmd);
+        if (result.code != CORE_OK) {
+            return result;
+        }
+
         result = mem_console_ui_push_themed_rect(render_ctx,
                                                  frame,
                                                  label_bg_rect,
                                                  3.0f,
                                                  CORE_THEME_COLOR_SURFACE_0);
+        if (result.code != CORE_OK) {
+            return result;
+        }
+        label_outline_color = edge_draw_color;
+        label_outline_color.a = 230u;
+        result = draw_rect_outline(frame, label_bg_rect, 1.0f, label_outline_color);
+        if (result.code != CORE_OK) {
+            return result;
+        }
+        result = kit_render_push_rect(frame,
+                                      &(KitRenderRectCommand){
+                                          (KitRenderRect){
+                                              label_anchor.x - 1.8f,
+                                              label_anchor.y - 1.8f,
+                                              3.6f,
+                                              3.6f
+                                          },
+                                          1.8f,
+                                          label_outline_color,
+                                          kit_render_identity_transform()
+                                      });
         if (result.code != CORE_OK) {
             return result;
         }
@@ -1190,6 +1755,10 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
     }
 
     result = draw_graph_endpoint_markers(render_ctx, frame, state);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+    result = draw_graph_edge_legend(ui_ctx, render_ctx, frame, bounds, state);
     if (result.code != CORE_OK) {
         return result;
     }

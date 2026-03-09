@@ -14,7 +14,9 @@ enum {
     MEM_CONSOLE_GRAPH_EDGE_LIMIT_MIN = 4,
     MEM_CONSOLE_GRAPH_HOPS_MIN = 1,
     MEM_CONSOLE_GRAPH_HOPS_MAX = 5,
-    MEM_CONSOLE_SCOPE_FILTER_LIMIT = 8
+    MEM_CONSOLE_SCOPE_FILTER_LIMIT = 8,
+    MEM_CONSOLE_DETAIL_BODY_WRAP_LINE_LIMIT = 96,
+    MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT = 48
 };
 
 typedef enum MemConsoleAction {
@@ -63,6 +65,7 @@ typedef struct MemConsoleListItem {
 
 typedef struct MemConsoleGraphNode {
     int64_t item_id;
+    int64_t created_ns;
     int pinned;
     int canonical;
     char title[160];
@@ -113,10 +116,11 @@ typedef struct MemConsoleState {
     char project_filter_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
     int64_t project_filter_counts[MEM_CONSOLE_SCOPE_FILTER_LIMIT];
     char selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
-    char wrapped_body_lines[6][256];
+    char wrapped_body_lines[MEM_CONSOLE_DETAIL_BODY_WRAP_LINE_LIMIT][256];
     CoreThemePresetId theme_preset_id;
     CoreFontPresetId font_preset_id;
     int64_t selected_item_id;
+    int64_t selected_created_ns;
     int64_t active_count;
     int64_t matching_count;
     int selected_pinned;
@@ -155,6 +159,8 @@ typedef struct MemConsoleState {
     int kernel_last_render_requested;
     float list_scroll;
     float project_filter_scroll;
+    float detail_connection_scroll;
+    float detail_body_scroll;
     MemConsoleListItem visible_items[MEM_CONSOLE_LIST_FETCH_LIMIT];
     int graph_node_count;
     int graph_edge_count;
@@ -181,7 +187,7 @@ typedef struct MemConsoleState {
     char graph_hud_body[256];
     char graph_hud_wrapped_lines[4][256];
     char detail_connection_summary_text[640];
-    char detail_connection_summary_lines[6][256];
+    char detail_connection_summary_lines[MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT][256];
     int graph_drag_active;
     int graph_drag_moved;
     int graph_click_armed;
