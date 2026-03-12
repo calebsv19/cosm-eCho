@@ -6,9 +6,13 @@ enum {
     MEM_CONSOLE_PANE_TREE_NODE_ROOT = 0,
     MEM_CONSOLE_PANE_TREE_NODE_LEFT = 1,
     MEM_CONSOLE_PANE_TREE_NODE_RIGHT_SPLIT = 2,
-    MEM_CONSOLE_PANE_TREE_NODE_DETAIL = 3,
+    MEM_CONSOLE_PANE_TREE_NODE_DETAIL_SPLIT = 3,
     MEM_CONSOLE_PANE_TREE_NODE_GRAPH = 4,
-    MEM_CONSOLE_PANE_TREE_NODE_COUNT = 5
+    MEM_CONSOLE_PANE_TREE_NODE_DETAIL_TOP_SPLIT = 5,
+    MEM_CONSOLE_PANE_TREE_NODE_DETAIL_META = 6,
+    MEM_CONSOLE_PANE_TREE_NODE_DETAIL_CONNECTIONS = 7,
+    MEM_CONSOLE_PANE_TREE_NODE_DETAIL_BODY = 8,
+    MEM_CONSOLE_PANE_TREE_NODE_COUNT = 9
 };
 
 static float pane_clampf(float value, float min_value, float max_value) {
@@ -87,11 +91,11 @@ static void pane_ratio_limits_for_span(float span,
     if (out_max_ratio) *out_max_ratio = max_ratio;
 }
 
-static float estimate_right_detail_height(const MemConsoleLayoutConfig *layout_cfg,
-                                          int graph_mode_enabled) {
+static float estimate_graph_controls_reserved_height(const MemConsoleLayoutConfig *layout_cfg,
+                                                     int graph_mode_enabled) {
     float gap = 8.0f;
     float action_block_h;
-    float height;
+    float reserved_h;
 
     if (!layout_cfg) {
         return 0.0f;
@@ -101,21 +105,33 @@ static float estimate_right_detail_height(const MemConsoleLayoutConfig *layout_c
                      layout_cfg->action_button_gap +
                      (layout_cfg->action_block_pad * 2.0f);
 
-    height = layout_cfg->right_header_h + gap +
-             layout_cfg->right_meta_h + gap +
-             layout_cfg->right_section_h + gap +
-             layout_cfg->right_body_h + gap +
-             layout_cfg->right_section_h + gap;
-
+    reserved_h = layout_cfg->right_section_h + gap;
     if (graph_mode_enabled) {
-        height += layout_cfg->graph_filter_h + gap +
-                  layout_cfg->graph_settings_h + gap;
+        reserved_h += layout_cfg->graph_filter_h + gap;
+        reserved_h += layout_cfg->graph_settings_h + gap;
     } else {
-        height += layout_cfg->graph_collapsed_hint_h + gap;
+        reserved_h += layout_cfg->graph_collapsed_hint_h + gap;
+    }
+    reserved_h += action_block_h + gap;
+
+    return reserved_h;
+}
+
+static float estimate_right_detail_height(const MemConsoleLayoutConfig *layout_cfg,
+                                          int graph_mode_enabled) {
+    float gap = 8.0f;
+    float top_row_h;
+    float body_h;
+
+    if (!layout_cfg) {
+        return 0.0f;
     }
 
-    height += action_block_h + gap;
-    return height + (layout_cfg->panel_inner_padding * 2.0f);
+    top_row_h = layout_cfg->right_header_h + gap + layout_cfg->right_meta_h;
+    body_h = layout_cfg->right_section_h + gap + layout_cfg->right_body_h + gap +
+             estimate_graph_controls_reserved_height(layout_cfg, graph_mode_enabled);
+
+    return top_row_h + gap + body_h + (layout_cfg->panel_inner_padding * 2.0f);
 }
 
 static void pane_build_nodes(const MemConsoleState *state,
@@ -127,19 +143,38 @@ static void pane_build_nodes(const MemConsoleState *state,
     float root_max_ratio = 1.0f;
     float right_min_ratio = 0.0f;
     float right_max_ratio = 1.0f;
+    float detail_min_ratio = 0.0f;
+    float detail_max_ratio = 1.0f;
+    float detail_top_min_ratio = 0.0f;
+    float detail_top_max_ratio = 1.0f;
     float left_min = 220.0f;
     float right_min = 420.0f;
-    float detail_min = estimate_right_detail_height(layout_cfg, state ? state->graph_mode_enabled : 0);
-    float graph_min = layout_cfg ? (layout_cfg->graph_panel_min_h + 24.0f) : 220.0f;
+    float detail_total_min;
+    float graph_min;
+    float top_row_min;
+    float body_min;
+    float top_left_min = 220.0f;
+    float top_right_min = 220.0f;
     float root_ratio = 0.5f;
     float right_ratio = 0.5f;
+    float detail_ratio = 0.5f;
+    float detail_top_ratio = 0.55f;
 
     if (!out_nodes || !layout_cfg || !state) {
         return;
     }
 
+    detail_total_min = estimate_right_detail_height(layout_cfg, state->graph_mode_enabled);
+    graph_min = layout_cfg->graph_panel_min_h + 24.0f;
+    top_row_min = layout_cfg->right_header_h + 6.0f + layout_cfg->right_meta_h;
+    if (top_row_min < 92.0f) {
+        top_row_min = 92.0f;
+    }
+    body_min = layout_cfg->right_section_h + 24.0f +
+               estimate_graph_controls_reserved_height(layout_cfg, state->graph_mode_enabled);
+
     pane_ratio_limits_for_span(split_span, left_min, right_min, &root_min_ratio, &root_max_ratio);
-    pane_ratio_limits_for_span(pane_height, detail_min, graph_min, &right_min_ratio, &right_max_ratio);
+    pane_ratio_limits_for_span(pane_height, detail_total_min, graph_min, &right_min_ratio, &right_max_ratio);
 
     if (state->pane_left_ratio > 0.0f && state->pane_left_ratio < 1.0f) {
         root_ratio = state->pane_left_ratio;
@@ -154,6 +189,20 @@ static void pane_build_nodes(const MemConsoleState *state,
         right_ratio = estimate_right_detail_height(layout_cfg, state->graph_mode_enabled) / pane_height;
     }
     right_ratio = core_pane_clamp_ratio(right_ratio, right_min_ratio, right_max_ratio);
+
+    pane_ratio_limits_for_span(detail_total_min, top_row_min, body_min, &detail_min_ratio, &detail_max_ratio);
+    if (state->pane_detail_split_ratio > 0.0f && state->pane_detail_split_ratio < 1.0f) {
+        detail_ratio = state->pane_detail_split_ratio;
+    } else {
+        detail_ratio = 0.36f;
+    }
+    detail_ratio = core_pane_clamp_ratio(detail_ratio, detail_min_ratio, detail_max_ratio);
+
+    pane_ratio_limits_for_span(right_min, top_left_min, top_right_min, &detail_top_min_ratio, &detail_top_max_ratio);
+    if (state->pane_detail_top_split_ratio > 0.0f && state->pane_detail_top_split_ratio < 1.0f) {
+        detail_top_ratio = state->pane_detail_top_split_ratio;
+    }
+    detail_top_ratio = core_pane_clamp_ratio(detail_top_ratio, detail_top_min_ratio, detail_top_max_ratio);
 
     out_nodes[MEM_CONSOLE_PANE_TREE_NODE_ROOT] = (CorePaneNode){
         CORE_PANE_NODE_SPLIT,
@@ -178,22 +227,58 @@ static void pane_build_nodes(const MemConsoleState *state,
         200u,
         CORE_PANE_AXIS_VERTICAL,
         right_ratio,
-        MEM_CONSOLE_PANE_TREE_NODE_DETAIL,
+        MEM_CONSOLE_PANE_TREE_NODE_DETAIL_SPLIT,
         MEM_CONSOLE_PANE_TREE_NODE_GRAPH,
-        { detail_min, graph_min }
+        { detail_total_min, graph_min }
     };
-    out_nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL] = (CorePaneNode){
+    out_nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_SPLIT] = (CorePaneNode){
+        CORE_PANE_NODE_SPLIT,
+        300u,
+        CORE_PANE_AXIS_VERTICAL,
+        detail_ratio,
+        MEM_CONSOLE_PANE_TREE_NODE_DETAIL_TOP_SPLIT,
+        MEM_CONSOLE_PANE_TREE_NODE_DETAIL_BODY,
+        { top_row_min, body_min }
+    };
+    out_nodes[MEM_CONSOLE_PANE_TREE_NODE_GRAPH] = (CorePaneNode){
         CORE_PANE_NODE_LEAF,
-        MEM_CONSOLE_PANE_RIGHT_DETAIL,
+        MEM_CONSOLE_PANE_RIGHT_GRAPH,
         CORE_PANE_AXIS_HORIZONTAL,
         0.0f,
         0u,
         0u,
         { 0.0f, 0.0f }
     };
-    out_nodes[MEM_CONSOLE_PANE_TREE_NODE_GRAPH] = (CorePaneNode){
+    out_nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_TOP_SPLIT] = (CorePaneNode){
+        CORE_PANE_NODE_SPLIT,
+        400u,
+        CORE_PANE_AXIS_HORIZONTAL,
+        detail_top_ratio,
+        MEM_CONSOLE_PANE_TREE_NODE_DETAIL_META,
+        MEM_CONSOLE_PANE_TREE_NODE_DETAIL_CONNECTIONS,
+        { top_left_min, top_right_min }
+    };
+    out_nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_META] = (CorePaneNode){
         CORE_PANE_NODE_LEAF,
-        MEM_CONSOLE_PANE_RIGHT_GRAPH,
+        MEM_CONSOLE_PANE_RIGHT_DETAIL_META,
+        CORE_PANE_AXIS_HORIZONTAL,
+        0.0f,
+        0u,
+        0u,
+        { 0.0f, 0.0f }
+    };
+    out_nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_CONNECTIONS] = (CorePaneNode){
+        CORE_PANE_NODE_LEAF,
+        MEM_CONSOLE_PANE_RIGHT_DETAIL_CONNECTIONS,
+        CORE_PANE_AXIS_HORIZONTAL,
+        0.0f,
+        0u,
+        0u,
+        { 0.0f, 0.0f }
+    };
+    out_nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_BODY] = (CorePaneNode){
+        CORE_PANE_NODE_LEAF,
+        MEM_CONSOLE_PANE_RIGHT_DETAIL_BODY,
         CORE_PANE_AXIS_HORIZONTAL,
         0.0f,
         0u,
@@ -213,13 +298,15 @@ static CoreResult pane_compute_internal(MemConsoleState *state,
     float pane_height;
     float frame_inner_width;
     float split_span;
-    CorePaneLeafRect leaves[3];
+    CorePaneLeafRect leaves[5];
     uint32_t leaf_count = 0u;
     CorePaneNode nodes[MEM_CONSOLE_PANE_TREE_NODE_COUNT];
     CorePaneRect root_bounds;
     uint32_t i;
     int have_left = 0;
-    int have_detail = 0;
+    int have_meta = 0;
+    int have_connections = 0;
+    int have_body = 0;
     int have_graph = 0;
     CorePaneRect right_union = {0};
 
@@ -255,13 +342,15 @@ static CoreResult pane_compute_internal(MemConsoleState *state,
                          MEM_CONSOLE_PANE_TREE_NODE_ROOT,
                          root_bounds,
                          leaves,
-                         3u,
+                         5u,
                          &leaf_count)) {
         return (CoreResult){ CORE_ERR_FORMAT, "core_pane solve failed" };
     }
 
     state->pane_left_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_ROOT].ratio_01;
     state->pane_right_split_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_RIGHT_SPLIT].ratio_01;
+    state->pane_detail_split_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_SPLIT].ratio_01;
+    state->pane_detail_top_split_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_TOP_SPLIT].ratio_01;
 
     for (i = 0u; i < leaf_count; ++i) {
         KitRenderRect mapped = {
@@ -271,47 +360,82 @@ static CoreResult pane_compute_internal(MemConsoleState *state,
             leaves[i].rect.height
         };
 
-        if (leaves[i].id == MEM_CONSOLE_PANE_RIGHT_DETAIL || leaves[i].id == MEM_CONSOLE_PANE_RIGHT_GRAPH) {
+        if (leaves[i].id == MEM_CONSOLE_PANE_RIGHT_DETAIL_META ||
+            leaves[i].id == MEM_CONSOLE_PANE_RIGHT_DETAIL_CONNECTIONS ||
+            leaves[i].id == MEM_CONSOLE_PANE_RIGHT_DETAIL_BODY ||
+            leaves[i].id == MEM_CONSOLE_PANE_RIGHT_GRAPH) {
             mapped.x += pane_gap;
         }
 
         if (leaves[i].id == MEM_CONSOLE_PANE_LEFT_NAV) {
             state->left_pane = mapped;
             have_left = 1;
-        } else if (leaves[i].id == MEM_CONSOLE_PANE_RIGHT_DETAIL) {
-            state->pane_right_detail = mapped;
-            have_detail = 1;
+        } else if (leaves[i].id == MEM_CONSOLE_PANE_RIGHT_DETAIL_META) {
+            state->pane_right_detail_meta = mapped;
+            have_meta = 1;
+        } else if (leaves[i].id == MEM_CONSOLE_PANE_RIGHT_DETAIL_CONNECTIONS) {
+            state->pane_right_detail_connections = mapped;
+            have_connections = 1;
+        } else if (leaves[i].id == MEM_CONSOLE_PANE_RIGHT_DETAIL_BODY) {
+            state->pane_right_detail_body = mapped;
+            have_body = 1;
         } else if (leaves[i].id == MEM_CONSOLE_PANE_RIGHT_GRAPH) {
             state->pane_right_graph = mapped;
             have_graph = 1;
         }
     }
 
-    if (!have_left || !have_detail || !have_graph) {
+    if (!have_left || !have_meta || !have_connections || !have_body || !have_graph) {
         return (CoreResult){ CORE_ERR_FORMAT, "missing pane leaf from solve" };
     }
 
-    right_union.x = state->pane_right_detail.x;
-    right_union.y = state->pane_right_detail.y;
-    right_union.width = state->pane_right_detail.width;
-    right_union.height = state->pane_right_detail.height;
+    right_union.x = state->pane_right_detail_meta.x;
+    right_union.y = state->pane_right_detail_meta.y;
+    right_union.width = state->pane_right_detail_meta.width;
+    right_union.height = state->pane_right_detail_meta.height;
 
+    if (state->pane_right_detail_connections.y < right_union.y) {
+        right_union.y = state->pane_right_detail_connections.y;
+    }
+    if (state->pane_right_detail_body.y < right_union.y) {
+        right_union.y = state->pane_right_detail_body.y;
+    }
     if (state->pane_right_graph.y < right_union.y) {
         right_union.y = state->pane_right_graph.y;
     }
-    if (state->pane_right_graph.x < right_union.x) {
-        right_union.x = state->pane_right_graph.x;
-    }
+
     {
-        float x1 = state->pane_right_detail.x + state->pane_right_detail.width;
-        float y1 = state->pane_right_detail.y + state->pane_right_detail.height;
-        float x2 = state->pane_right_graph.x + state->pane_right_graph.width;
-        float y2 = state->pane_right_graph.y + state->pane_right_graph.height;
-        float max_x = x1 > x2 ? x1 : x2;
-        float max_y = y1 > y2 ? y1 : y2;
+        float x1 = state->pane_right_detail_meta.x + state->pane_right_detail_meta.width;
+        float y1 = state->pane_right_detail_meta.y + state->pane_right_detail_meta.height;
+        float x2 = state->pane_right_detail_connections.x + state->pane_right_detail_connections.width;
+        float y2 = state->pane_right_detail_connections.y + state->pane_right_detail_connections.height;
+        float x3 = state->pane_right_detail_body.x + state->pane_right_detail_body.width;
+        float y3 = state->pane_right_detail_body.y + state->pane_right_detail_body.height;
+        float x4 = state->pane_right_graph.x + state->pane_right_graph.width;
+        float y4 = state->pane_right_graph.y + state->pane_right_graph.height;
+        float max_x = x1;
+        float max_y = y1;
+
+        if (x2 > max_x) max_x = x2;
+        if (x3 > max_x) max_x = x3;
+        if (x4 > max_x) max_x = x4;
+        if (y2 > max_y) max_y = y2;
+        if (y3 > max_y) max_y = y3;
+        if (y4 > max_y) max_y = y4;
+
         right_union.width = max_x - right_union.x;
         right_union.height = max_y - right_union.y;
     }
+
+    state->pane_right_detail = (KitRenderRect){
+        state->pane_right_detail_meta.x < state->pane_right_detail_connections.x
+            ? state->pane_right_detail_meta.x
+            : state->pane_right_detail_connections.x,
+        state->pane_right_detail_meta.y,
+        state->pane_right_detail_body.width,
+        (state->pane_right_detail_body.y + state->pane_right_detail_body.height) - state->pane_right_detail_meta.y
+    };
+
     state->right_pane = (KitRenderRect){
         right_union.x,
         right_union.y,
@@ -355,6 +479,15 @@ CoreResult mem_console_pane_layout_get(const MemConsoleState *state,
         case MEM_CONSOLE_PANE_RIGHT_GRAPH:
             *out_bounds = state->pane_right_graph;
             break;
+        case MEM_CONSOLE_PANE_RIGHT_DETAIL_META:
+            *out_bounds = state->pane_right_detail_meta;
+            break;
+        case MEM_CONSOLE_PANE_RIGHT_DETAIL_CONNECTIONS:
+            *out_bounds = state->pane_right_detail_connections;
+            break;
+        case MEM_CONSOLE_PANE_RIGHT_DETAIL_BODY:
+            *out_bounds = state->pane_right_detail_body;
+            break;
         default:
             return (CoreResult){ CORE_ERR_INVALID_ARG, "unknown pane id" };
     }
@@ -367,6 +500,7 @@ CoreResult mem_console_pane_layout_get_splitter_bounds(const MemConsoleState *st
                                                        MemConsolePaneSplitterId splitter_id,
                                                        KitRenderRect *out_bounds) {
     float horizontal_thickness = 8.0f;
+    float vertical_thickness = 8.0f;
 
     if (!state || !layout_cfg || !out_bounds) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid splitter bounds request" };
@@ -382,21 +516,30 @@ CoreResult mem_console_pane_layout_get_splitter_bounds(const MemConsoleState *st
             };
             break;
         case MEM_CONSOLE_PANE_SPLITTER_RIGHT_STACK:
-            {
-                float seam_x = state->left_pane.x + state->left_pane.width;
-                float right_edge = state->right_pane.x + state->right_pane.width;
-                float seam_w = right_edge - seam_x;
-                if (seam_w < state->right_pane.width) {
-                    seam_x = state->right_pane.x;
-                    seam_w = state->right_pane.width;
-                }
             *out_bounds = (KitRenderRect){
-                seam_x,
+                state->right_pane.x,
                 state->pane_right_detail.y + state->pane_right_detail.height - (horizontal_thickness * 0.5f),
-                seam_w,
+                state->right_pane.width,
                 horizontal_thickness
             };
-            }
+            break;
+        case MEM_CONSOLE_PANE_SPLITTER_DETAIL_STACK:
+            *out_bounds = (KitRenderRect){
+                state->pane_right_detail.x,
+                state->pane_right_detail_meta.y + state->pane_right_detail_meta.height - (horizontal_thickness * 0.5f),
+                state->pane_right_detail.width,
+                horizontal_thickness
+            };
+            break;
+        case MEM_CONSOLE_PANE_SPLITTER_DETAIL_TOP_ROW:
+            *out_bounds = (KitRenderRect){
+                state->pane_right_detail_meta.x + state->pane_right_detail_meta.width - (vertical_thickness * 0.5f),
+                state->pane_right_detail_meta.y,
+                vertical_thickness,
+                state->pane_right_detail_meta.height > state->pane_right_detail_connections.height
+                    ? state->pane_right_detail_meta.height
+                    : state->pane_right_detail_connections.height
+            };
             break;
         default:
             return (CoreResult){ CORE_ERR_INVALID_ARG, "unknown splitter id" };
@@ -426,17 +569,39 @@ int mem_console_pane_layout_begin_drag(MemConsoleState *state,
 
     result = mem_console_pane_layout_get_splitter_bounds(state,
                                                          layout_cfg,
-                                                         MEM_CONSOLE_PANE_SPLITTER_LEFT_RIGHT,
+                                                         MEM_CONSOLE_PANE_SPLITTER_DETAIL_TOP_ROW,
                                                          &splitter_bounds);
     if (result.code == CORE_OK && pane_point_in_rect(splitter_bounds, mouse_x, mouse_y)) {
-        hit_splitter = MEM_CONSOLE_PANE_SPLITTER_LEFT_RIGHT;
-    } else {
+        hit_splitter = MEM_CONSOLE_PANE_SPLITTER_DETAIL_TOP_ROW;
+    }
+
+    if (hit_splitter == MEM_CONSOLE_PANE_SPLITTER_NONE) {
+        result = mem_console_pane_layout_get_splitter_bounds(state,
+                                                             layout_cfg,
+                                                             MEM_CONSOLE_PANE_SPLITTER_DETAIL_STACK,
+                                                             &splitter_bounds);
+        if (result.code == CORE_OK && pane_point_in_rect(splitter_bounds, mouse_x, mouse_y)) {
+            hit_splitter = MEM_CONSOLE_PANE_SPLITTER_DETAIL_STACK;
+        }
+    }
+
+    if (hit_splitter == MEM_CONSOLE_PANE_SPLITTER_NONE) {
         result = mem_console_pane_layout_get_splitter_bounds(state,
                                                              layout_cfg,
                                                              MEM_CONSOLE_PANE_SPLITTER_RIGHT_STACK,
                                                              &splitter_bounds);
         if (result.code == CORE_OK && pane_point_in_rect(splitter_bounds, mouse_x, mouse_y)) {
             hit_splitter = MEM_CONSOLE_PANE_SPLITTER_RIGHT_STACK;
+        }
+    }
+
+    if (hit_splitter == MEM_CONSOLE_PANE_SPLITTER_NONE) {
+        result = mem_console_pane_layout_get_splitter_bounds(state,
+                                                             layout_cfg,
+                                                             MEM_CONSOLE_PANE_SPLITTER_LEFT_RIGHT,
+                                                             &splitter_bounds);
+        if (result.code == CORE_OK && pane_point_in_rect(splitter_bounds, mouse_x, mouse_y)) {
+            hit_splitter = MEM_CONSOLE_PANE_SPLITTER_LEFT_RIGHT;
         }
     }
 
@@ -450,6 +615,8 @@ int mem_console_pane_layout_begin_drag(MemConsoleState *state,
     state->pane_drag_anchor_y = mouse_y;
     state->pane_drag_start_left_ratio = state->pane_left_ratio;
     state->pane_drag_start_right_ratio = state->pane_right_split_ratio;
+    state->pane_drag_start_detail_ratio = state->pane_detail_split_ratio;
+    state->pane_drag_start_detail_top_ratio = state->pane_detail_top_split_ratio;
     return 1;
 }
 
@@ -529,6 +696,50 @@ int mem_console_pane_layout_update_drag(MemConsoleState *state,
                                                 dy) ? 1 : 0;
         if (changed) {
             state->pane_right_split_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_RIGHT_SPLIT].ratio_01;
+        }
+    } else if (state->pane_drag_splitter_id == MEM_CONSOLE_PANE_SPLITTER_DETAIL_STACK) {
+        pane_ratio_limits_for_span(state->pane_right_detail.height,
+                                   nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_SPLIT].constraints.min_size_a,
+                                   nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_SPLIT].constraints.min_size_b,
+                                   &min_ratio,
+                                   &max_ratio);
+        hit.active = true;
+        hit.node_index = MEM_CONSOLE_PANE_TREE_NODE_DETAIL_SPLIT;
+        hit.axis = CORE_PANE_AXIS_VERTICAL;
+        hit.ratio_01 = state->pane_drag_start_detail_ratio;
+        hit.parent_span = state->pane_right_detail.height;
+        hit.min_ratio_01 = min_ratio;
+        hit.max_ratio_01 = max_ratio;
+        nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_SPLIT].ratio_01 = state->pane_drag_start_detail_ratio;
+        changed = core_pane_apply_splitter_drag(nodes,
+                                                MEM_CONSOLE_PANE_TREE_NODE_COUNT,
+                                                &hit,
+                                                0.0f,
+                                                dy) ? 1 : 0;
+        if (changed) {
+            state->pane_detail_split_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_SPLIT].ratio_01;
+        }
+    } else if (state->pane_drag_splitter_id == MEM_CONSOLE_PANE_SPLITTER_DETAIL_TOP_ROW) {
+        pane_ratio_limits_for_span(state->pane_right_detail.width,
+                                   nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_TOP_SPLIT].constraints.min_size_a,
+                                   nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_TOP_SPLIT].constraints.min_size_b,
+                                   &min_ratio,
+                                   &max_ratio);
+        hit.active = true;
+        hit.node_index = MEM_CONSOLE_PANE_TREE_NODE_DETAIL_TOP_SPLIT;
+        hit.axis = CORE_PANE_AXIS_HORIZONTAL;
+        hit.ratio_01 = state->pane_drag_start_detail_top_ratio;
+        hit.parent_span = state->pane_right_detail.width;
+        hit.min_ratio_01 = min_ratio;
+        hit.max_ratio_01 = max_ratio;
+        nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_TOP_SPLIT].ratio_01 = state->pane_drag_start_detail_top_ratio;
+        changed = core_pane_apply_splitter_drag(nodes,
+                                                MEM_CONSOLE_PANE_TREE_NODE_COUNT,
+                                                &hit,
+                                                dx,
+                                                0.0f) ? 1 : 0;
+        if (changed) {
+            state->pane_detail_top_split_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_TOP_SPLIT].ratio_01;
         }
     }
 

@@ -79,7 +79,10 @@ int run_frame(KitRenderContext *render_ctx,
                                     &frame);
     if (result.code != CORE_OK) {
         fprintf(stderr, "mem_console: kit_render_begin_frame failed: %d\n", (int)result.code);
-        return 1;
+        if (result.code == CORE_ERR_IO) {
+            return MEM_CONSOLE_FRAME_RECOVERABLE;
+        }
+        return MEM_CONSOLE_FRAME_FATAL;
     }
 
     result = mem_console_ui_resolve_theme_color(render_ctx, CORE_THEME_COLOR_SURFACE_0, &clear_color);
@@ -231,8 +234,11 @@ int run_frame(KitRenderContext *render_ctx,
     result = kit_render_end_frame(render_ctx, &frame);
     if (result.code != CORE_OK) {
         fprintf(stderr, "mem_console: kit_render_end_frame failed: %d\n", (int)result.code);
-        return 1;
+        if (result.code == CORE_ERR_IO) {
+            return MEM_CONSOLE_FRAME_RECOVERABLE;
+        }
+        return MEM_CONSOLE_FRAME_FATAL;
     }
 
-    return 0;
+    return MEM_CONSOLE_FRAME_OK;
 }

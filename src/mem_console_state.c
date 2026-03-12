@@ -36,6 +36,22 @@ static const CoreFontPresetId k_mem_console_font_cycle_order[] = {
     CORE_FONT_PRESET_IDE
 };
 
+typedef struct MemConsoleGraphKindBitEntry {
+    const char *kind;
+    uint32_t bit;
+} MemConsoleGraphKindBitEntry;
+
+static const MemConsoleGraphKindBitEntry k_graph_kind_bit_entries[] = {
+    { "supports", 1u << 0 },
+    { "depends_on", 1u << 1 },
+    { "references", 1u << 2 },
+    { "summarizes", 1u << 3 },
+    { "related", 1u << 4 },
+    { "implements", 1u << 5 },
+    { "blocks", 1u << 6 },
+    { "contradicts", 1u << 7 }
+};
+
 int resolve_default_db_path(char *out_path, size_t out_cap) {
     const char *env_db_path = 0;
     const char *home_path = 0;
@@ -141,6 +157,7 @@ void set_default_detail(MemConsoleState *state) {
     }
 
     state->selected_item_id = 0;
+    state->graph_center_item_id = 0;
     state->selected_created_ns = 0;
     state->selected_pinned = 0;
     state->selected_canonical = 0;
@@ -419,8 +436,11 @@ void seed_state(MemConsoleState *state, const char *db_path) {
     state->project_filter_option_count = 0;
     state->selected_project_count = 0;
     state->graph_kind_filter[0] = '\0';
+    state->graph_kind_filter_mask = mem_console_graph_kind_filter_all_mask();
+    state->graph_kind_filter_all_override = 1;
     mem_console_graph_edge_limit_set(state, MEM_CONSOLE_GRAPH_EDGE_LIMIT);
     state->graph_query_hops = MEM_CONSOLE_GRAPH_HOPS_MIN;
+    state->graph_center_item_id = 0;
     sync_theme_name(state);
     sync_font_name(state);
     (void)snprintf(state->status_line,
@@ -447,12 +467,16 @@ void seed_state(MemConsoleState *state, const char *db_path) {
     state->redraw_last_frame_ms = 0u;
     state->pane_left_ratio = 0.0f;
     state->pane_right_split_ratio = 0.0f;
+    state->pane_detail_split_ratio = 0.0f;
+    state->pane_detail_top_split_ratio = 0.0f;
     state->pane_drag_active = 0;
     state->pane_drag_splitter_id = 0;
     state->pane_drag_anchor_x = 0.0f;
     state->pane_drag_anchor_y = 0.0f;
     state->pane_drag_start_left_ratio = 0.0f;
     state->pane_drag_start_right_ratio = 0.0f;
+    state->pane_drag_start_detail_ratio = 0.0f;
+    state->pane_drag_start_detail_top_ratio = 0.0f;
     state->pane_left_collapsed = 0;
     state->pane_right_detail_collapsed = 0;
     state->pane_prefs_dirty = 0;
@@ -489,6 +513,9 @@ void compute_layout(MemConsoleState *state, int frame_width, int frame_height) {
             pane_height
         };
         state->pane_right_detail = state->right_pane;
+        state->pane_right_detail_meta = state->right_pane;
+        state->pane_right_detail_connections = state->right_pane;
+        state->pane_right_detail_body = state->right_pane;
         state->pane_right_graph = state->right_pane;
     }
 }
@@ -524,6 +551,152 @@ int mem_console_graph_hops_clamp(int value) {
         return MEM_CONSOLE_GRAPH_HOPS_MAX;
     }
     return value;
+}
+
+uint32_t mem_console_graph_kind_filter_all_mask(void) {
+    uint32_t mask = 0u;
+    uint32_t i;
+
+    for (i = 0u; i < (uint32_t)(sizeof(k_graph_kind_bit_entries) / sizeof(k_graph_kind_bit_entries[0])); ++i) {
+        mask |= k_graph_kind_bit_entries[i].bit;
+    }
+    return mask;
+}
+
+uint32_t mem_console_graph_kind_filter_mask_for_kind(const char *kind) {
+    uint32_t i;
+
+    if (!kind || !kind[0]) {
+        return mem_console_graph_kind_filter_all_mask();
+    }
+    for (i = 0u; i < (uint32_t)(sizeof(k_graph_kind_bit_entries) / sizeof(k_graph_kind_bit_entries[0])); ++i) {
+        if (strcmp(kind, k_graph_kind_bit_entries[i].kind) == 0) {
+            return k_graph_kind_bit_entries[i].bit;
+        }
+    }
+    return 0u;
+}
+
+void mem_console_graph_kind_sync_text_filter(MemConsoleState *state) {
+    uint32_t all_mask;
+    uint32_t mask;
+    uint32_t i;
+    uint32_t selected_count = 0u;
+    const char *selected_kind = "";
+
+    if (!state) {
+        return;
+    }
+
+    all_mask = mem_console_graph_kind_filter_all_mask();
+    mask = state->graph_kind_filter_mask & all_mask;
+    state->graph_kind_filter_mask = mask;
+
+    if (state->graph_kind_filter_all_override) {
+        state->graph_kind_filter[0] = '\0';
+        return;
+    }
+
+    for (i = 0u; i < (uint32_t)(sizeof(k_graph_kind_bit_entries) / sizeof(k_graph_kind_bit_entries[0])); ++i) {
+        if ((mask & k_graph_kind_bit_entries[i].bit) != 0u) {
+            selected_count += 1u;
+            selected_kind = k_graph_kind_bit_entries[i].kind;
+        }
+    }
+
+    if (selected_count == 1u) {
+        (void)snprintf(state->graph_kind_filter, sizeof(state->graph_kind_filter), "%s", selected_kind);
+    } else {
+        state->graph_kind_filter[0] = '\0';
+    }
+}
+
+int mem_console_graph_kind_is_enabled(const MemConsoleState *state, const char *kind) {
+    uint32_t all_mask;
+    uint32_t kind_mask;
+
+    if (!state) {
+        return 1;
+    }
+    if (state->graph_kind_filter_all_override) {
+        return 1;
+    }
+
+    all_mask = mem_console_graph_kind_filter_all_mask();
+    kind_mask = mem_console_graph_kind_filter_mask_for_kind(kind);
+    if (kind_mask == 0u) {
+        return (state->graph_kind_filter_mask & all_mask) == all_mask ? 1 : 0;
+    }
+    if (kind_mask == all_mask) {
+        return (state->graph_kind_filter_mask & all_mask) == all_mask ? 1 : 0;
+    }
+    return (state->graph_kind_filter_mask & kind_mask) != 0u ? 1 : 0;
+}
+
+int mem_console_graph_kind_toggle_enabled(MemConsoleState *state, const char *kind) {
+    uint32_t all_mask;
+    uint32_t kind_mask;
+    uint32_t before_mask;
+
+    if (!state || !kind || !kind[0]) {
+        return 0;
+    }
+
+    all_mask = mem_console_graph_kind_filter_all_mask();
+    kind_mask = mem_console_graph_kind_filter_mask_for_kind(kind);
+    if (kind_mask == 0u || kind_mask == all_mask) {
+        return 0;
+    }
+
+    before_mask = state->graph_kind_filter_mask;
+    state->graph_kind_filter_mask = (state->graph_kind_filter_mask ^ kind_mask) & all_mask;
+    mem_console_graph_kind_sync_text_filter(state);
+    return before_mask != state->graph_kind_filter_mask ? 1 : 0;
+}
+
+void mem_console_graph_kind_select_all(MemConsoleState *state) {
+    if (!state) {
+        return;
+    }
+    state->graph_kind_filter_all_override = 1;
+    mem_console_graph_kind_sync_text_filter(state);
+}
+
+int mem_console_graph_kind_toggle_all_override(MemConsoleState *state) {
+    int before;
+
+    if (!state) {
+        return 0;
+    }
+    before = state->graph_kind_filter_all_override;
+    state->graph_kind_filter_all_override = state->graph_kind_filter_all_override ? 0 : 1;
+    mem_console_graph_kind_sync_text_filter(state);
+    return before != state->graph_kind_filter_all_override ? 1 : 0;
+}
+
+void mem_console_graph_kind_set_single(MemConsoleState *state, const char *kind) {
+    uint32_t all_mask;
+    uint32_t kind_mask;
+
+    if (!state) {
+        return;
+    }
+
+    all_mask = mem_console_graph_kind_filter_all_mask();
+    if (!kind || !kind[0]) {
+        state->graph_kind_filter_all_override = 1;
+        mem_console_graph_kind_sync_text_filter(state);
+        return;
+    }
+
+    kind_mask = mem_console_graph_kind_filter_mask_for_kind(kind);
+    if (kind_mask == 0u || kind_mask == all_mask) {
+        state->graph_kind_filter_all_override = 1;
+    } else {
+        state->graph_kind_filter_mask = kind_mask;
+        state->graph_kind_filter_all_override = 0;
+    }
+    mem_console_graph_kind_sync_text_filter(state);
 }
 
 int mem_console_graph_edge_limit_parse(const char *text, int fallback) {

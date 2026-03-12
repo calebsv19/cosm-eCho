@@ -16,6 +16,7 @@ typedef struct MemConsoleRefreshTask {
     char db_path[1024];
     char search_text[256];
     int64_t selected_item_id;
+    int64_t graph_center_item_id;
     int list_query_offset;
     int selected_project_count;
     char selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
@@ -31,6 +32,7 @@ typedef struct MemConsoleRefreshCompletion {
     char error_message[160];
     char search_text[256];
     int64_t selected_item_id;
+    int64_t graph_center_item_id;
     int list_query_offset;
     int selected_project_count;
     char selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
@@ -119,6 +121,7 @@ static void apply_refreshed_state(MemConsoleState *state, const MemConsoleState 
                    refreshed->project_filter_summary_line);
 
     state->selected_item_id = refreshed->selected_item_id;
+    state->graph_center_item_id = refreshed->graph_center_item_id;
     state->selected_created_ns = refreshed->selected_created_ns;
     state->selected_pinned = refreshed->selected_pinned;
     state->selected_canonical = refreshed->selected_canonical;
@@ -168,6 +171,7 @@ static void capture_intent_from_state(const MemConsoleState *state,
                                       char *out_search_text,
                                       size_t out_search_cap,
                                       int64_t *out_selected_item_id,
+                                      int64_t *out_graph_center_item_id,
                                       int *out_list_query_offset,
                                       char out_selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64],
                                       int *out_selected_project_count,
@@ -176,6 +180,7 @@ static void capture_intent_from_state(const MemConsoleState *state,
                                       int *out_graph_edge_limit,
                                       int *out_graph_hops) {
     if (!state || !out_search_text || out_search_cap == 0u || !out_selected_item_id ||
+        !out_graph_center_item_id ||
         !out_list_query_offset || !out_selected_project_keys || !out_selected_project_count ||
         !out_graph_kind_filter || out_graph_kind_filter_cap == 0u ||
         !out_graph_edge_limit || !out_graph_hops) {
@@ -183,6 +188,7 @@ static void capture_intent_from_state(const MemConsoleState *state,
     }
     (void)snprintf(out_search_text, out_search_cap, "%s", state->search_text);
     *out_selected_item_id = state->selected_item_id;
+    *out_graph_center_item_id = state->graph_center_item_id;
     *out_list_query_offset = state->list_query_offset;
     copy_selected_project_filters(out_selected_project_keys,
                                   out_selected_project_count,
@@ -195,6 +201,7 @@ static void capture_intent_from_state(const MemConsoleState *state,
 
 static int intent_matches(const char *search_text_a,
                           int64_t selected_item_id_a,
+                          int64_t graph_center_item_id_a,
                           int list_query_offset_a,
                           const char selected_project_keys_a[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64],
                           int selected_project_count_a,
@@ -203,6 +210,7 @@ static int intent_matches(const char *search_text_a,
                           int graph_hops_a,
                           const char *search_text_b,
                           int64_t selected_item_id_b,
+                          int64_t graph_center_item_id_b,
                           int list_query_offset_b,
                           const char selected_project_keys_b[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64],
                           int selected_project_count_b,
@@ -214,6 +222,7 @@ static int intent_matches(const char *search_text_a,
     }
     return strcmp(search_text_a, search_text_b) == 0 &&
            selected_item_id_a == selected_item_id_b &&
+           graph_center_item_id_a == graph_center_item_id_b &&
            list_query_offset_a == list_query_offset_b &&
            strcmp(graph_kind_filter_a, graph_kind_filter_b) == 0 &&
            graph_edge_limit_a == graph_edge_limit_b &&
@@ -246,6 +255,7 @@ static void *refresh_worker_task(void *task_ctx) {
     memset(completion, 0, sizeof(*completion));
     completion->request_id = task->request_id;
     completion->selected_item_id = task->selected_item_id;
+    completion->graph_center_item_id = task->graph_center_item_id;
     completion->list_query_offset = task->list_query_offset;
     (void)snprintf(completion->search_text, sizeof(completion->search_text), "%s", task->search_text);
     copy_selected_project_filters(completion->selected_project_keys,
@@ -261,6 +271,7 @@ static void *refresh_worker_task(void *task_ctx) {
 
     seed_state(&worker_state, task->db_path);
     worker_state.selected_item_id = task->selected_item_id;
+    worker_state.graph_center_item_id = task->graph_center_item_id;
     worker_state.list_query_offset = task->list_query_offset;
     worker_state.list_scroll = 0.0f;
     (void)snprintf(worker_state.search_text, sizeof(worker_state.search_text), "%s", task->search_text);
@@ -319,6 +330,7 @@ static CoreResult schedule_refresh(MemConsoleRuntime *runtime, const MemConsoleS
                               task->search_text,
                               sizeof(task->search_text),
                               &task->selected_item_id,
+                              &task->graph_center_item_id,
                               &task->list_query_offset,
                               task->selected_project_keys,
                               &task->selected_project_count,
@@ -342,6 +354,7 @@ static CoreResult schedule_refresh(MemConsoleRuntime *runtime, const MemConsoleS
                    "%s",
                    task->search_text);
     runtime->in_flight_selected_item_id = task->selected_item_id;
+    runtime->in_flight_graph_center_item_id = task->graph_center_item_id;
     runtime->in_flight_list_query_offset = task->list_query_offset;
     copy_selected_project_filters(runtime->in_flight_selected_project_keys,
                                   &runtime->in_flight_selected_project_count,
@@ -435,6 +448,7 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
     void *msg = 0;
     char current_search_text[256];
     int64_t current_selected_item_id = 0;
+    int64_t current_graph_center_item_id = 0;
     int current_list_query_offset = 0;
     char current_selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
     int current_selected_project_count = 0;
@@ -457,6 +471,7 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                               current_search_text,
                               sizeof(current_search_text),
                               &current_selected_item_id,
+                              &current_graph_center_item_id,
                               &current_list_query_offset,
                               current_selected_project_keys,
                               &current_selected_project_count,
@@ -472,6 +487,7 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
     if (runtime->refresh_in_flight &&
         !intent_matches(current_search_text,
                         current_selected_item_id,
+                        current_graph_center_item_id,
                         current_list_query_offset,
                         current_selected_project_keys,
                         current_selected_project_count,
@@ -480,6 +496,7 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                         current_graph_hops,
                         runtime->in_flight_search_text,
                         runtime->in_flight_selected_item_id,
+                        runtime->in_flight_graph_center_item_id,
                         runtime->in_flight_list_query_offset,
                         runtime->in_flight_selected_project_keys,
                         runtime->in_flight_selected_project_count,
@@ -489,6 +506,7 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
         if (!runtime->pending_intent_valid ||
             !intent_matches(current_search_text,
                             current_selected_item_id,
+                            current_graph_center_item_id,
                             current_list_query_offset,
                             current_selected_project_keys,
                             current_selected_project_count,
@@ -497,6 +515,7 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                             current_graph_hops,
                             runtime->pending_search_text,
                             runtime->pending_selected_item_id,
+                            runtime->pending_graph_center_item_id,
                             runtime->pending_list_query_offset,
                             runtime->pending_selected_project_keys,
                             runtime->pending_selected_project_count,
@@ -510,6 +529,7 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                            "%s",
                            current_search_text);
             runtime->pending_selected_item_id = current_selected_item_id;
+            runtime->pending_graph_center_item_id = current_graph_center_item_id;
             runtime->pending_list_query_offset = current_list_query_offset;
             copy_selected_project_filters(runtime->pending_selected_project_keys,
                                           &runtime->pending_selected_project_count,
@@ -556,6 +576,7 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
             continue;
         }
         if (completion->selected_item_id != state->selected_item_id ||
+            completion->graph_center_item_id != state->graph_center_item_id ||
             completion->list_query_offset != state->list_query_offset ||
             strcmp(completion->search_text, state->search_text) != 0 ||
             strcmp(completion->graph_kind_filter, state->graph_kind_filter) != 0 ||
@@ -602,6 +623,7 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                        "%s",
                        runtime->pending_search_text);
         pending_state.selected_item_id = runtime->pending_selected_item_id;
+        pending_state.graph_center_item_id = runtime->pending_graph_center_item_id;
         pending_state.list_query_offset = runtime->pending_list_query_offset;
         copy_selected_project_filters(pending_state.selected_project_keys,
                                       &pending_state.selected_project_count,
@@ -616,6 +638,7 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
 
         if (intent_matches(pending_state.search_text,
                            pending_state.selected_item_id,
+                           pending_state.graph_center_item_id,
                            pending_state.list_query_offset,
                            pending_state.selected_project_keys,
                            pending_state.selected_project_count,
@@ -624,6 +647,7 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                            pending_state.graph_query_hops,
                            state->search_text,
                            state->selected_item_id,
+                           state->graph_center_item_id,
                            state->list_query_offset,
                            state->selected_project_keys,
                            state->selected_project_count,

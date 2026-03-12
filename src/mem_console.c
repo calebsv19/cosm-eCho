@@ -81,6 +81,31 @@ static void apply_compact_ui_density(KitUiContext *ui_ctx) {
     }
 }
 
+static int recreate_swapchain_and_mark(VkRenderer *renderer,
+                                       SDL_Window *window,
+                                       MemConsoleState *state,
+                                       const char *reason) {
+    VkResult vk_result;
+
+    if (!renderer || !window || !state) {
+        return 0;
+    }
+
+    vk_result = vk_renderer_recreate_swapchain(renderer, window);
+    if (vk_result != VK_SUCCESS) {
+        (void)snprintf(state->status_line,
+                       sizeof(state->status_line),
+                       "%s (vk=%d).",
+                       reason ? reason : "Swapchain recreate failed",
+                       (int)vk_result);
+        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        return 0;
+    }
+
+    mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_LAYOUT | MEM_CONSOLE_REDRAW_REASON_BACKGROUND);
+    return 1;
+}
+
 static int handle_theme_shortcut(KitRenderContext *render_ctx,
                                  KitUiContext *ui_ctx,
                                  MemConsoleState *state,
@@ -817,6 +842,7 @@ int main(int argc, char **argv) {
         MemConsoleAction keyboard_action = MEM_CONSOLE_ACTION_NONE;
         MemConsoleAction ui_action = MEM_CONSOLE_ACTION_NONE;
         MemConsoleAction pending_action = MEM_CONSOLE_ACTION_NONE;
+        int frame_result = MEM_CONSOLE_FRAME_OK;
         uint32_t frame_reasons = 0u;
         uint32_t idle_wait_ms = 0u;
         uint64_t runtime_applied_before;
@@ -901,6 +927,10 @@ int main(int argc, char **argv) {
 
         SDL_GetWindowSize(window, &frame_width, &frame_height);
         if (frame_width != last_frame_width || frame_height != last_frame_height) {
+            (void)recreate_swapchain_and_mark(&renderer,
+                                              window,
+                                              &state,
+                                              "Swapchain refresh failed after resize");
             mem_console_redraw_mark(&state, MEM_CONSOLE_REDRAW_REASON_LAYOUT);
             last_frame_width = frame_width;
             last_frame_height = frame_height;
@@ -909,14 +939,24 @@ int main(int argc, char **argv) {
         frame_reasons = mem_console_redraw_pending(&state);
         if (frame_reasons != 0u) {
             frame_reasons = mem_console_redraw_take_pending(&state);
-            if (run_frame(&render_ctx,
-                          &ui_ctx,
-                          &state,
-                          &input,
-                          frame_width,
-                          frame_height,
-                          wheel_y,
-                          &ui_action) != 0) {
+            frame_result = run_frame(&render_ctx,
+                                     &ui_ctx,
+                                     &state,
+                                     &input,
+                                     frame_width,
+                                     frame_height,
+                                     wheel_y,
+                                     &ui_action);
+            if (frame_result == MEM_CONSOLE_FRAME_RECOVERABLE) {
+                if (!recreate_swapchain_and_mark(&renderer,
+                                                 window,
+                                                 &state,
+                                                 "Swapchain recover failed")) {
+                    goto cleanup_text_input;
+                }
+                continue;
+            }
+            if (frame_result == MEM_CONSOLE_FRAME_FATAL) {
                 goto cleanup_text_input;
             }
             mem_console_redraw_note_frame(&state, frame_reasons, SDL_GetTicks64());

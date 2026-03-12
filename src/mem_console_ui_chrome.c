@@ -92,5 +92,35 @@ CoreResult mem_console_ui_draw_root_chrome(const KitRenderContext *render_ctx,
         return result;
     }
 
+    seam_rect = (KitRenderRect){
+        state->pane_right_detail.x,
+        state->pane_right_detail_meta.y + state->pane_right_detail_meta.height - 0.5f,
+        state->pane_right_detail.width,
+        1.0f
+    };
+    result = draw_splitter_line(render_ctx,
+                                frame,
+                                seam_rect,
+                                seam_thickness,
+                                CORE_THEME_COLOR_SURFACE_2);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+
+    seam_rect = (KitRenderRect){
+        state->pane_right_detail_meta.x + state->pane_right_detail_meta.width - 0.5f,
+        state->pane_right_detail_meta.y,
+        1.0f,
+        state->pane_right_detail_meta.height
+    };
+    result = draw_splitter_line(render_ctx,
+                                frame,
+                                seam_rect,
+                                seam_thickness,
+                                CORE_THEME_COLOR_SURFACE_2);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+
     return core_result_ok();
 }

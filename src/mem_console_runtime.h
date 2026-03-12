@@ -32,6 +32,7 @@ typedef struct MemConsoleRuntime {
     uint64_t in_flight_request_id;
     char in_flight_search_text[256];
     int64_t in_flight_selected_item_id;
+    int64_t in_flight_graph_center_item_id;
     int in_flight_list_query_offset;
     int in_flight_selected_project_count;
     char in_flight_selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
@@ -41,6 +42,7 @@ typedef struct MemConsoleRuntime {
     int pending_intent_valid;
     char pending_search_text[256];
     int64_t pending_selected_item_id;
+    int64_t pending_graph_center_item_id;
     int pending_list_query_offset;
     int pending_selected_project_count;
     char pending_selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];

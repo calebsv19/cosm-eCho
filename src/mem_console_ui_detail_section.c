@@ -319,12 +319,11 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                                               int wheel_y,
                                               const MemConsoleLayoutConfig *layout_cfg,
                                               KitUiStackLayout *out_right_layout) {
-    KitUiStackLayout right_layout;
+    KitUiStackLayout meta_layout;
+    KitUiStackLayout body_layout;
     KitRenderRect row;
-    KitRenderRect detail_top_band;
     KitRenderRect detail_title_row;
-    KitRenderRect detail_meta_left;
-    KitRenderRect detail_meta_right;
+    KitRenderRect connections_panel;
     KitRenderRect summary_content;
     KitRenderRect body_panel;
     KitRenderRect body_content;
@@ -341,20 +340,20 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
 
     title_input_active = state->input_target == MEM_CONSOLE_INPUT_TITLE_EDIT;
 
-    result = kit_ui_stack_begin(&right_layout,
+    result = kit_ui_stack_begin(&meta_layout,
                                 KIT_UI_AXIS_VERTICAL,
                                 (KitRenderRect){
-                                    state->pane_right_detail.x + layout_cfg->panel_inner_padding,
-                                    state->pane_right_detail.y + layout_cfg->panel_inner_padding,
-                                    state->pane_right_detail.width - (layout_cfg->panel_inner_padding * 2.0f),
-                                    state->pane_right_detail.height - (layout_cfg->panel_inner_padding * 2.0f)
+                                    state->pane_right_detail_meta.x + layout_cfg->panel_inner_padding,
+                                    state->pane_right_detail_meta.y + layout_cfg->panel_inner_padding,
+                                    state->pane_right_detail_meta.width - (layout_cfg->panel_inner_padding * 2.0f),
+                                    state->pane_right_detail_meta.height - (layout_cfg->panel_inner_padding * 2.0f)
                                 },
                                 ui_ctx->style.gap);
     if (result.code != CORE_OK) {
         return result;
     }
 
-    result = kit_ui_stack_next(&right_layout, layout_cfg->right_header_h, 0.0f, &row);
+    result = kit_ui_stack_next(&meta_layout, layout_cfg->right_header_h, 0.0f, &row);
     if (result.code != CORE_OK) {
         return result;
     }
@@ -369,54 +368,14 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         return result;
     }
 
-    result = kit_ui_stack_next(&right_layout, layout_cfg->right_meta_h, 0.0f, &detail_top_band);
+    result = kit_ui_stack_next(&meta_layout, layout_cfg->right_meta_h, 0.0f, &row);
     if (result.code != CORE_OK) {
         return result;
     }
-    mem_console_ui_detail_build_connection_summary(state,
-                                                   state->detail_connection_summary_text,
-                                                   sizeof(state->detail_connection_summary_text));
-    {
-        const float gap = 4.0f;
-        const float min_left = 180.0f;
-        const float min_right = 190.0f;
-        float desired_right = detail_top_band.width * 0.46f;
-        float max_right = detail_top_band.width - min_left - gap;
-        float right_width;
-
-        if (max_right < min_right) {
-            max_right = detail_top_band.width * 0.5f;
-        }
-
-        right_width = desired_right;
-        if (right_width < min_right) {
-            right_width = min_right;
-        }
-        if (right_width > max_right) {
-            right_width = max_right;
-        }
-        if (right_width < 120.0f) {
-            right_width = 120.0f;
-        }
-        if (right_width > detail_top_band.width - gap - 88.0f) {
-            right_width = detail_top_band.width - gap - 88.0f;
-        }
-
-        detail_meta_right = detail_top_band;
-        detail_meta_right.width = right_width;
-        detail_meta_right.x = (state->pane_right_detail.x + state->pane_right_detail.width - 2.0f) - detail_meta_right.width;
-
-        detail_meta_left = detail_top_band;
-        detail_meta_left.width = detail_meta_right.x - detail_top_band.x - gap;
-        if (detail_meta_left.width < 100.0f) {
-            detail_meta_left.width = 100.0f;
-        }
-    }
-
     detail_title_row = (KitRenderRect){
-        detail_meta_left.x,
-        detail_meta_left.y + 2.0f,
-        detail_meta_left.width,
+        row.x,
+        row.y + 2.0f,
+        row.width,
         layout_cfg->right_title_h + 2.0f
     };
 
@@ -487,9 +446,9 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
     result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                   frame,
                                                   (KitRenderRect){
-                                                      detail_meta_left.x,
+                                                      row.x,
                                                       detail_title_row.y + detail_title_row.height + 4.0f,
-                                                      detail_meta_left.width,
+                                                      row.width,
                                                       18.0f
                                                   },
                                                   state->detail_meta_line,
@@ -500,9 +459,18 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         return result;
     }
 
+    mem_console_ui_detail_build_connection_summary(state,
+                                                   state->detail_connection_summary_text,
+                                                   sizeof(state->detail_connection_summary_text));
+    connections_panel = (KitRenderRect){
+        state->pane_right_detail_connections.x + layout_cfg->panel_inner_padding,
+        state->pane_right_detail_connections.y + layout_cfg->panel_inner_padding,
+        state->pane_right_detail_connections.width - (layout_cfg->panel_inner_padding * 2.0f),
+        state->pane_right_detail_connections.height - (layout_cfg->panel_inner_padding * 2.0f)
+    };
     result = mem_console_ui_push_themed_rect(render_ctx,
                                              frame,
-                                             detail_meta_right,
+                                             connections_panel,
                                              8.0f,
                                              CORE_THEME_COLOR_SURFACE_1);
     if (result.code != CORE_OK) {
@@ -510,10 +478,10 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
     }
 
     summary_content = (KitRenderRect){
-        detail_meta_right.x + 6.0f,
-        detail_meta_right.y + 5.0f,
-        detail_meta_right.width - 12.0f,
-        detail_meta_right.height - 10.0f
+        connections_panel.x + 6.0f,
+        connections_panel.y + 5.0f,
+        connections_panel.width - 12.0f,
+        connections_panel.height - 10.0f
     };
     result = detail_draw_scrollable_wrapped_text(ui_ctx,
                                                  frame,
@@ -532,7 +500,20 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         return result;
     }
 
-    result = kit_ui_stack_next(&right_layout, layout_cfg->right_section_h, 0.0f, &row);
+    result = kit_ui_stack_begin(&body_layout,
+                                KIT_UI_AXIS_VERTICAL,
+                                (KitRenderRect){
+                                    state->pane_right_detail_body.x + layout_cfg->panel_inner_padding,
+                                    state->pane_right_detail_body.y + layout_cfg->panel_inner_padding,
+                                    state->pane_right_detail_body.width - (layout_cfg->panel_inner_padding * 2.0f),
+                                    state->pane_right_detail_body.height - (layout_cfg->panel_inner_padding * 2.0f)
+                                },
+                                ui_ctx->style.gap);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+
+    result = kit_ui_stack_next(&body_layout, layout_cfg->right_section_h, 0.0f, &row);
     if (result.code != CORE_OK) {
         return result;
     }
@@ -548,14 +529,14 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
     }
 
     reserved_controls_h = detail_estimate_graph_controls_reserved_height(layout_cfg,
-                                                                          right_layout.gap,
+                                                                          body_layout.gap,
                                                                           state->graph_mode_enabled);
-    body_h = right_layout.bounds.height - right_layout.cursor - reserved_controls_h;
+    body_h = body_layout.bounds.height - body_layout.cursor - reserved_controls_h;
     if (body_h < 26.0f) {
         body_h = 26.0f;
     }
 
-    result = kit_ui_stack_next(&right_layout, body_h, 0.0f, &body_panel);
+    result = kit_ui_stack_next(&body_layout, body_h, 0.0f, &body_panel);
     if (result.code != CORE_OK) {
         return result;
     }
@@ -767,6 +748,6 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         }
     }
 
-    *out_right_layout = right_layout;
+    *out_right_layout = body_layout;
     return core_result_ok();
 }

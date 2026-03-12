@@ -51,7 +51,7 @@ INC = -Isrc -I$(CORE_MEMDB_DIR)/include -I$(CORE_PACK_DIR)/include -I$(CORE_TIME
 
 OBJ_DIR = build
 BIN = $(OBJ_DIR)/mem_console
-SRC = src/mem_console.c src/mem_console_state.c src/mem_console_pane_layout.c src/mem_console_layout_config.c src/mem_console_db.c src/mem_console_prefs.c src/mem_console_runtime.c src/mem_console_kernel_bridge.c src/mem_console_ui_common.c src/mem_console_ui_chrome.c src/mem_console_ui_graph.c src/mem_console_ui_left_panel.c src/mem_console_ui_detail_panel.c src/mem_console_ui_left_section.c src/mem_console_ui_detail_section.c src/mem_console_ui_graph_controls.c src/mem_console_ui_graph_panel.c src/mem_console_ui.c
+SRC = src/mem_console.c src/mem_console_state.c src/mem_console_pane_layout.c src/mem_console_layout_config.c src/mem_console_db.c src/mem_console_prefs.c src/mem_console_runtime.c src/mem_console_kernel_bridge.c src/mem_console_ui_common.c src/mem_console_ui_hud.c src/mem_console_ui_chrome.c src/mem_console_ui_graph.c src/mem_console_ui_left_panel.c src/mem_console_ui_detail_panel.c src/mem_console_ui_left_section.c src/mem_console_ui_detail_section.c src/mem_console_ui_graph_controls.c src/mem_console_ui_graph_panel.c src/mem_console_ui.c
 
 .PHONY: all clean run run-demo vk-renderer-lib
 

@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "mem_console_ui_common.h"
+#include "mem_console_ui_hud.h"
 
 static const CoreFontTextSizeTier k_graph_node_label_tiers[] = {
     CORE_FONT_TEXT_SIZE_CAPTION
@@ -102,69 +103,6 @@ static void transpose_layouts_to_horizontal_flow(KitRenderRect bounds,
         float old_y = layouts[i].rect.y;
         layouts[i].rect.x = bounds.x + (old_y - bounds.y);
         layouts[i].rect.y = bounds.y + (old_x - bounds.x);
-    }
-}
-
-static void sanitize_hud_text(const char *input, char *output, size_t output_cap) {
-    size_t w = 0u;
-    size_t i = 0u;
-    int last_was_space = 0;
-    int in_ansi_escape = 0;
-
-    if (!output || output_cap == 0u) {
-        return;
-    }
-    output[0] = '\0';
-    if (!input) {
-        return;
-    }
-
-    while (input[i] != '\0' && w + 1u < output_cap) {
-        unsigned char c = (unsigned char)input[i];
-        char out_ch = '?';
-
-        if (in_ansi_escape) {
-            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
-                in_ansi_escape = 0;
-            }
-            i += 1u;
-            continue;
-        }
-
-        if (c == 27u) {
-            in_ansi_escape = 1;
-            i += 1u;
-            continue;
-        }
-
-        if (c == '\n' || c == '\r' || c == '\t' || c == ' ') {
-            out_ch = ' ';
-        } else if (c >= 32u && c <= 126u) {
-            out_ch = (char)c;
-        } else {
-            i += 1u;
-            continue;
-        }
-
-        if (out_ch == ' ') {
-            if (!last_was_space) {
-                output[w++] = out_ch;
-                last_was_space = 1;
-            }
-        } else {
-            output[w++] = out_ch;
-            last_was_space = 0;
-        }
-        i += 1u;
-    }
-
-    while (w > 0u && output[w - 1u] == ' ') {
-        w -= 1u;
-    }
-    output[w] = '\0';
-    if (output[0] == '\0' && output_cap >= 2u) {
-        output[0] = '-';
-        output[1] = '\0';
     }
 }
 
@@ -941,11 +879,15 @@ static CoreResult compute_graph_preview_layout(const MemConsoleState *state,
         for (i = 0u; i < (uint32_t)state->graph_edge_count && edge_count < MEM_CONSOLE_GRAPH_EDGE_LIMIT; ++i) {
             int from_index = state->graph_edges[i].from_index;
             int to_index = state->graph_edges[i].to_index;
+            const char *edge_kind = state->graph_edges[i].kind[0] ? state->graph_edges[i].kind : "related";
 
             if (from_index < 0 || to_index < 0) {
                 continue;
             }
             if ((uint32_t)from_index >= node_count || (uint32_t)to_index >= node_count) {
+                continue;
+            }
+            if (!mem_console_graph_kind_is_enabled(state, edge_kind)) {
                 continue;
             }
 
@@ -1036,6 +978,10 @@ static uint64_t graph_preview_layout_signature(const MemConsoleState *state, Kit
     hash = graph_hash_bytes(hash, bounds_bits, sizeof(bounds_bits));
     hash = graph_hash_bytes(hash, viewport_bits, sizeof(viewport_bits));
     hash = graph_hash_bytes(hash, state->graph_kind_filter, strlen(state->graph_kind_filter));
+    hash = graph_hash_bytes(hash, &state->graph_kind_filter_mask, sizeof(state->graph_kind_filter_mask));
+    hash = graph_hash_bytes(hash,
+                            &state->graph_kind_filter_all_override,
+                            sizeof(state->graph_kind_filter_all_override));
     hash = graph_hash_bytes(hash, &state->font_preset_id, sizeof(state->font_preset_id));
 
     node_count = state->graph_node_count;
@@ -1296,42 +1242,41 @@ static CoreResult draw_graph_endpoint_markers(const KitRenderContext *render_ctx
 
 static CoreResult draw_graph_edge_legend(KitUiContext *ui_ctx,
                                          const KitRenderContext *render_ctx,
+                                         const KitUiInputState *input,
                                          KitRenderFrame *frame,
                                          KitRenderRect bounds,
-                                         const MemConsoleState *state) {
-    const GraphEdgeLegendEntry *rows[8];
-    int row_count = 0;
+                                         MemConsoleState *state,
+                                         int *out_click_consumed,
+                                         int *out_filter_changed) {
+    const GraphEdgeLegendEntry *rows[9];
+    int row_count = 1;
     int i;
-    float row_h = 11.0f;
+    float row_h = 13.0f;
     float title_h = 12.0f;
     float pad = 4.0f;
-    float legend_w = 132.0f;
+    float legend_w = 144.0f;
     float legend_h;
     KitRenderRect legend_outer;
     KitRenderRect legend_inner;
     CoreResult result;
+    int hovered_row = -1;
+    int clicked_row = -1;
 
     if (!ui_ctx || !render_ctx || !frame || !state) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid graph legend draw request" };
     }
+    if (out_click_consumed) {
+        *out_click_consumed = 0;
+    }
+    if (out_filter_changed) {
+        *out_filter_changed = 0;
+    }
 
-    for (i = 0; i < state->graph_edge_count; ++i) {
-        const char *kind = state->graph_edges[i].kind[0] ? state->graph_edges[i].kind : "related";
-        const GraphEdgeLegendEntry *entry = graph_edge_legend_entry_for_kind(kind);
-        int r;
-        int exists = 0;
+    rows[0] = 0; /* Row 0 is ALL. */
 
-        if (!entry) {
-            continue;
-        }
-        for (r = 0; r < row_count; ++r) {
-            if (rows[r] == entry) {
-                exists = 1;
-                break;
-            }
-        }
-        if (!exists && row_count < (int)(sizeof(rows) / sizeof(rows[0]))) {
-            rows[row_count++] = entry;
+    for (i = 0; i < (int)(sizeof(k_graph_edge_legend_entries) / sizeof(k_graph_edge_legend_entries[0])); ++i) {
+        if (row_count < (int)(sizeof(rows) / sizeof(rows[0]))) {
+            rows[row_count++] = &k_graph_edge_legend_entries[i];
         }
     }
 
@@ -1377,14 +1322,65 @@ static CoreResult draw_graph_edge_legend(KitUiContext *ui_ctx,
         return result;
     }
 
+    if (input && kit_ui_point_in_rect(legend_inner, input->mouse_x, input->mouse_y)) {
+        for (i = 0; i < row_count; ++i) {
+            float y = legend_inner.y + pad + title_h + 2.0f + ((float)i * row_h);
+            KitRenderRect row_rect = {
+                legend_inner.x + 4.0f,
+                y - 1.0f,
+                legend_inner.width - 8.0f,
+                row_h
+            };
+            if (kit_ui_point_in_rect(row_rect, input->mouse_x, input->mouse_y)) {
+                hovered_row = i;
+                break;
+            }
+        }
+    }
+
+    if (hovered_row >= 0 && input && input->mouse_released) {
+        clicked_row = hovered_row;
+        if (out_click_consumed) {
+            *out_click_consumed = 1;
+        }
+    }
+
     for (i = 0; i < row_count; ++i) {
         float y = legend_inner.y + pad + title_h + 2.0f + ((float)i * row_h);
+        KitRenderRect row_rect = {
+            legend_inner.x + 4.0f,
+            y - 1.0f,
+            legend_inner.width - 8.0f,
+            row_h
+        };
+        const char *label = "ALL";
+        KitRenderColor row_color = (KitRenderColor){ 188, 196, 210, 255 };
+        int row_selected = 0;
         KitRenderLineCommand swatch_line;
+        KitRenderLineCommand underline;
 
-        swatch_line.p0 = (KitRenderVec2){ legend_inner.x + 6.0f, y + (row_h * 0.5f) };
-        swatch_line.p1 = (KitRenderVec2){ legend_inner.x + 19.0f, y + (row_h * 0.5f) };
+        if (rows[i]) {
+            label = rows[i]->label;
+            row_color = rows[i]->color;
+        }
+
+        if (i == 0) {
+            row_selected = state->graph_kind_filter_all_override ? 1 : 0;
+        } else if (rows[i]) {
+            row_selected = mem_console_graph_kind_is_enabled(state, rows[i]->kind);
+        }
+
+        if (row_selected) {
+            result = draw_rect_outline(frame, row_rect, 1.0f, row_color);
+            if (result.code != CORE_OK) {
+                return result;
+            }
+        }
+
+        swatch_line.p0 = (KitRenderVec2){ legend_inner.x + 6.0f, y + (row_h * 0.5f) + 0.5f };
+        swatch_line.p1 = (KitRenderVec2){ legend_inner.x + 19.0f, y + (row_h * 0.5f) + 0.5f };
         swatch_line.thickness = 2.4f;
-        swatch_line.color = rows[i]->color;
+        swatch_line.color = row_color;
         swatch_line.transform = kit_render_identity_transform();
         result = kit_render_push_line(frame, &swatch_line);
         if (result.code != CORE_OK) {
@@ -1399,16 +1395,304 @@ static CoreResult draw_graph_edge_legend(KitUiContext *ui_ctx,
                                                           legend_inner.width - 28.0f,
                                                           row_h
                                                       },
-                                                      rows[i]->label,
+                                                      label,
                                                       CORE_THEME_COLOR_TEXT_MUTED,
                                                       CORE_FONT_ROLE_UI_REGULAR,
                                                       CORE_FONT_TEXT_SIZE_CAPTION);
         if (result.code != CORE_OK) {
             return result;
         }
+
+        if (i == hovered_row) {
+            underline.p0 = (KitRenderVec2){ legend_inner.x + 24.0f, y + row_h - 1.0f };
+            underline.p1 = (KitRenderVec2){ legend_inner.x + legend_inner.width - 6.0f, y + row_h - 1.0f };
+            underline.thickness = 1.0f;
+            underline.color = row_color;
+            underline.transform = kit_render_identity_transform();
+            result = kit_render_push_line(frame, &underline);
+            if (result.code != CORE_OK) {
+                return result;
+            }
+        }
+    }
+
+    if (clicked_row >= 0) {
+        uint32_t before_mask = state->graph_kind_filter_mask;
+        int before_all_override = state->graph_kind_filter_all_override;
+        if (clicked_row == 0) {
+            (void)mem_console_graph_kind_toggle_all_override(state);
+        } else if (rows[clicked_row]) {
+            (void)mem_console_graph_kind_toggle_enabled(state, rows[clicked_row]->kind);
+        }
+        if (before_mask != state->graph_kind_filter_mask ||
+            before_all_override != state->graph_kind_filter_all_override) {
+            if (out_filter_changed) {
+                *out_filter_changed = 1;
+            }
+        }
     }
 
     return core_result_ok();
+}
+
+static float graph_edge_route_hit_radius_for_zoom(const MemConsoleState *state) {
+    float zoom = 1.0f;
+    float radius = 9.5f;
+
+    if (state) {
+        zoom = state->graph_viewport.zoom;
+    }
+    if (zoom < 1.0f) {
+        radius += (1.0f - zoom) * 2.4f;
+    } else if (zoom > 1.4f) {
+        radius -= (zoom - 1.4f) * 1.6f;
+    }
+    if (radius < 6.0f) {
+        radius = 6.0f;
+    }
+    if (radius > 13.0f) {
+        radius = 13.0f;
+    }
+    return radius;
+}
+
+static int graph_find_edge_index_at_point(const MemConsoleState *state,
+                                          float mouse_x,
+                                          float mouse_y,
+                                          float route_hit_radius_px,
+                                          uint32_t *out_edge_index) {
+    CoreResult result;
+    KitGraphStructEdgeHit edge_hit;
+    KitGraphStructEdgeLabelHit label_hit;
+
+    if (!state || !out_edge_index || state->graph_layout_edge_count == 0u) {
+        return 0;
+    }
+
+    result = kit_graph_struct_hit_test_edge_labels(state->graph_layout_edge_label_layouts,
+                                                   state->graph_layout_edge_count,
+                                                   mouse_x,
+                                                   mouse_y,
+                                                   &label_hit);
+    if (result.code == CORE_OK &&
+        label_hit.active &&
+        label_hit.edge_index < state->graph_layout_edge_count) {
+        *out_edge_index = label_hit.edge_index;
+        return 1;
+    }
+
+    result = kit_graph_struct_hit_test_edge_routes(state->graph_layout_edge_routes,
+                                                   state->graph_layout_edge_count,
+                                                   mouse_x,
+                                                   mouse_y,
+                                                   route_hit_radius_px,
+                                                   &edge_hit);
+    if (result.code == CORE_OK &&
+        edge_hit.active &&
+        edge_hit.edge_index < state->graph_layout_edge_count) {
+        *out_edge_index = edge_hit.edge_index;
+        return 1;
+    }
+
+    return 0;
+}
+
+static int graph_resolve_layout_edge_node_indices(const MemConsoleState *state,
+                                                  uint32_t edge_index,
+                                                  int *out_from_index,
+                                                  int *out_to_index) {
+    int from_index = -1;
+    int to_index = -1;
+
+    if (!state || !out_from_index || !out_to_index ||
+        edge_index >= state->graph_layout_edge_count) {
+        return 0;
+    }
+
+    from_index = (int)state->graph_layout_edges[edge_index].from_id - 1;
+    to_index = (int)state->graph_layout_edges[edge_index].to_id - 1;
+    if (from_index < 0 || to_index < 0 ||
+        from_index >= state->graph_node_count ||
+        to_index >= state->graph_node_count) {
+        return 0;
+    }
+
+    *out_from_index = from_index;
+    *out_to_index = to_index;
+    return 1;
+}
+
+static uint64_t graph_hud_hash_u64(uint64_t seed, uint64_t value) {
+    uint64_t hash = seed;
+    uint32_t i;
+    for (i = 0u; i < 8u; ++i) {
+        hash ^= (value & 0xffu);
+        hash *= 1099511628211ull;
+        value >>= 8u;
+    }
+    return hash;
+}
+
+static int graph_build_node_hud_spec(MemConsoleState *state,
+                                     int hovered_node_index,
+                                     MemConsoleUiHudCardSpec *out_spec) {
+    const MemConsoleGraphNode *hovered_node;
+    const char *raw_body;
+
+    if (!state || !out_spec || hovered_node_index < 0 || hovered_node_index >= state->graph_node_count) {
+        return 0;
+    }
+    hovered_node = &state->graph_nodes[hovered_node_index];
+    raw_body = hovered_node->body_preview[0] ? hovered_node->body_preview : "(no body)";
+
+    memset(out_spec, 0, sizeof(*out_spec));
+    out_spec->width_ratio = 0.48f;
+    out_spec->min_width = 220.0f;
+    out_spec->max_width = 560.0f;
+    out_spec->edge_margin = 10.0f;
+    out_spec->row_count = 4;
+    out_spec->rows[0] = (MemConsoleUiHudRowSpec){
+        .text = state->graph_hud_id_line,
+        .token = CORE_THEME_COLOR_TEXT_MUTED,
+        .font_role = CORE_FONT_ROLE_UI_MEDIUM,
+        .text_tier = CORE_FONT_TEXT_SIZE_CAPTION,
+        .max_lines = 1
+    };
+    out_spec->rows[1] = (MemConsoleUiHudRowSpec){
+        .text = hovered_node->title[0] ? hovered_node->title : "UNTITLED",
+        .token = CORE_THEME_COLOR_TEXT_PRIMARY,
+        .font_role = CORE_FONT_ROLE_UI_BOLD,
+        .text_tier = CORE_FONT_TEXT_SIZE_PARAGRAPH,
+        .max_lines = 3
+    };
+    out_spec->rows[2] = (MemConsoleUiHudRowSpec){
+        .text = state->graph_hud_flags,
+        .token = CORE_THEME_COLOR_TEXT_MUTED,
+        .font_role = CORE_FONT_ROLE_UI_REGULAR,
+        .text_tier = CORE_FONT_TEXT_SIZE_CAPTION,
+        .max_lines = 2
+    };
+    out_spec->rows[3] = (MemConsoleUiHudRowSpec){
+        .text = raw_body,
+        .token = CORE_THEME_COLOR_TEXT_MUTED,
+        .font_role = CORE_FONT_ROLE_UI_REGULAR,
+        .text_tier = CORE_FONT_TEXT_SIZE_BASIC,
+        .max_lines = 8
+    };
+    (void)snprintf(state->graph_hud_id_line,
+                   sizeof(state->graph_hud_id_line),
+                   "ID %lld",
+                   (long long)hovered_node->item_id);
+    (void)snprintf(state->graph_hud_flags,
+                   sizeof(state->graph_hud_flags),
+                   "PIN %s | CAN %s",
+                   hovered_node->pinned ? "ON" : "OFF",
+                   hovered_node->canonical ? "ON" : "OFF");
+    out_spec->cache_key = graph_hud_hash_u64(1469598103934665603ull, state->graph_layout_signature);
+    out_spec->cache_key = graph_hud_hash_u64(out_spec->cache_key, (uint64_t)hovered_node->item_id);
+    out_spec->cache_key = graph_hud_hash_u64(out_spec->cache_key, 1ull);
+    return 1;
+}
+
+static int graph_build_edge_hud_spec(MemConsoleState *state,
+                                     int hovered_edge_index,
+                                     MemConsoleUiHudCardSpec *out_spec) {
+    int from_index = -1;
+    int to_index = -1;
+    const MemConsoleGraphNode *from_node;
+    const MemConsoleGraphNode *to_node;
+    const char *from_title;
+    const char *to_title;
+    const char *edge_kind_raw = "related";
+    const char *edge_kind_label = "RELATED";
+    int state_edge_index;
+
+    if (!state || !out_spec ||
+        hovered_edge_index < 0 ||
+        hovered_edge_index >= (int)state->graph_layout_edge_count) {
+        return 0;
+    }
+    if (!graph_resolve_layout_edge_node_indices(state,
+                                                (uint32_t)hovered_edge_index,
+                                                &from_index,
+                                                &to_index)) {
+        return 0;
+    }
+
+    from_node = &state->graph_nodes[from_index];
+    to_node = &state->graph_nodes[to_index];
+    from_title = from_node->title[0] ? from_node->title : "UNKNOWN";
+    to_title = to_node->title[0] ? to_node->title : "UNKNOWN";
+    state_edge_index = state->graph_layout_edge_state_indices[hovered_edge_index];
+    if (state_edge_index >= 0 &&
+        state_edge_index < state->graph_edge_count &&
+        state->graph_edges[state_edge_index].kind[0] != '\0') {
+        edge_kind_raw = state->graph_edges[state_edge_index].kind;
+    }
+    edge_kind_label = graph_edge_display_label_for_kind(edge_kind_raw);
+
+    (void)snprintf(state->graph_hud_id_line,
+                   sizeof(state->graph_hud_id_line),
+                   "EDGE %s",
+                   edge_kind_label);
+    (void)snprintf(state->graph_hud_flags,
+                   sizeof(state->graph_hud_flags),
+                   "%lld --%s--> %lld",
+                   (long long)from_node->item_id,
+                   edge_kind_label,
+                   (long long)to_node->item_id);
+    (void)snprintf(state->graph_hud_body,
+                   sizeof(state->graph_hud_body),
+                   "LINK: %s -> %s",
+                   from_title,
+                   to_title);
+
+    memset(out_spec, 0, sizeof(*out_spec));
+    out_spec->width_ratio = 0.52f;
+    out_spec->min_width = 240.0f;
+    out_spec->max_width = 620.0f;
+    out_spec->edge_margin = 10.0f;
+    out_spec->row_count = 5;
+    out_spec->rows[0] = (MemConsoleUiHudRowSpec){
+        .text = state->graph_hud_id_line,
+        .token = CORE_THEME_COLOR_TEXT_MUTED,
+        .font_role = CORE_FONT_ROLE_UI_MEDIUM,
+        .text_tier = CORE_FONT_TEXT_SIZE_CAPTION,
+        .max_lines = 1
+    };
+    out_spec->rows[1] = (MemConsoleUiHudRowSpec){
+        .text = from_title,
+        .token = CORE_THEME_COLOR_TEXT_PRIMARY,
+        .font_role = CORE_FONT_ROLE_UI_BOLD,
+        .text_tier = CORE_FONT_TEXT_SIZE_PARAGRAPH,
+        .max_lines = 8
+    };
+    out_spec->rows[2] = (MemConsoleUiHudRowSpec){
+        .text = state->graph_hud_flags,
+        .token = CORE_THEME_COLOR_TEXT_MUTED,
+        .font_role = CORE_FONT_ROLE_UI_REGULAR,
+        .text_tier = CORE_FONT_TEXT_SIZE_CAPTION,
+        .max_lines = 4
+    };
+    out_spec->rows[3] = (MemConsoleUiHudRowSpec){
+        .text = to_title,
+        .token = CORE_THEME_COLOR_TEXT_PRIMARY,
+        .font_role = CORE_FONT_ROLE_UI_BOLD,
+        .text_tier = CORE_FONT_TEXT_SIZE_PARAGRAPH,
+        .max_lines = 8
+    };
+    out_spec->rows[4] = (MemConsoleUiHudRowSpec){
+        .text = state->graph_hud_body,
+        .token = CORE_THEME_COLOR_TEXT_MUTED,
+        .font_role = CORE_FONT_ROLE_UI_REGULAR,
+        .text_tier = CORE_FONT_TEXT_SIZE_CAPTION,
+        .max_lines = 4
+    };
+    out_spec->cache_key = graph_hud_hash_u64(1469598103934665603ull, state->graph_layout_signature);
+    out_spec->cache_key = graph_hud_hash_u64(out_spec->cache_key, (uint64_t)from_node->item_id);
+    out_spec->cache_key = graph_hud_hash_u64(out_spec->cache_key, (uint64_t)to_node->item_id);
+    out_spec->cache_key = graph_hud_hash_u64(out_spec->cache_key, (uint64_t)(state_edge_index + 2));
+    return 1;
 }
 
 int mem_console_ui_graph_find_node_index_at_point(const MemConsoleState *state,
@@ -1435,10 +1719,7 @@ int mem_console_ui_graph_select_neighbor_from_edge_click(const MemConsoleState *
                                                          float mouse_x,
                                                          float mouse_y,
                                                          int64_t *out_item_id) {
-    CoreResult result;
-    KitGraphStructEdgeHit edge_hit;
-    KitGraphStructEdgeLabelHit label_hit;
-    int edge_index = -1;
+    uint32_t edge_index = 0u;
     int best_from_index = -1;
     int best_to_index = -1;
 
@@ -1446,35 +1727,18 @@ int mem_console_ui_graph_select_neighbor_from_edge_click(const MemConsoleState *
         return 0;
     }
 
-    result = kit_graph_struct_hit_test_edge_labels(state->graph_layout_edge_label_layouts,
-                                                   state->graph_layout_edge_count,
-                                                   mouse_x,
-                                                   mouse_y,
-                                                   &label_hit);
-    if (result.code == CORE_OK && label_hit.active) {
-        edge_index = (int)label_hit.edge_index;
-    }
-    if (edge_index < 0) {
-        result = kit_graph_struct_hit_test_edge_routes(state->graph_layout_edge_routes,
-                                                       state->graph_layout_edge_count,
-                                                       mouse_x,
-                                                       mouse_y,
-                                                       10.0f,
-                                                       &edge_hit);
-        if (result.code != CORE_OK || !edge_hit.active) {
-            return 0;
-        }
-        edge_index = (int)edge_hit.edge_index;
-    }
-    if (edge_index < 0 || (uint32_t)edge_index >= state->graph_layout_edge_count) {
+    if (!graph_find_edge_index_at_point(state,
+                                        mouse_x,
+                                        mouse_y,
+                                        graph_edge_route_hit_radius_for_zoom(state),
+                                        &edge_index)) {
         return 0;
     }
 
-    best_from_index = (int)state->graph_layout_edges[edge_index].from_id - 1;
-    best_to_index = (int)state->graph_layout_edges[edge_index].to_id - 1;
-    if (best_from_index < 0 || best_to_index < 0 ||
-        best_from_index >= state->graph_node_count ||
-        best_to_index >= state->graph_node_count) {
+    if (!graph_resolve_layout_edge_node_indices(state,
+                                                edge_index,
+                                                &best_from_index,
+                                                &best_to_index)) {
         return 0;
     }
 
@@ -1506,21 +1770,31 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
                                              const KitUiInputState *input,
                                              KitRenderFrame *frame,
                                              KitRenderRect bounds,
-                                             MemConsoleState *state) {
+                                             MemConsoleState *state,
+                                             int *out_legend_click_consumed,
+                                             int *out_graph_filter_changed) {
     CoreResult result;
     KitRenderColor edge_white;
     KitRenderColor node_base_color;
     KitRenderColor node_lane_color;
     KitRenderColor node_selected_color;
+    KitRenderColor node_center_outline_color;
     CoreResult color_result;
     uint32_t node_count = 0u;
     uint32_t edge_count = 0u;
     uint32_t i;
     int has_graph_data = 0;
     int hovered_node_index = -1;
+    int hovered_edge_index = -1;
 
     if (!render_ctx || !ui_ctx || !frame || !state) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid argument" };
+    }
+    if (out_legend_click_consumed) {
+        *out_legend_click_consumed = 0;
+    }
+    if (out_graph_filter_changed) {
+        *out_graph_filter_changed = 0;
     }
 
     result = mem_console_ui_graph_ensure_layout_cache(render_ctx, state, bounds);
@@ -1551,6 +1825,16 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
                 hovered_node_index = (int)hit.node_index;
             }
         }
+        if (hovered_node_index < 0 && edge_count > 0u) {
+            uint32_t edge_index = 0u;
+            if (graph_find_edge_index_at_point(state,
+                                               input->mouse_x,
+                                               input->mouse_y,
+                                               graph_edge_route_hit_radius_for_zoom(state),
+                                               &edge_index)) {
+                hovered_edge_index = (int)edge_index;
+            }
+        }
     }
 
     color_result = mem_console_ui_resolve_theme_color(render_ctx, CORE_THEME_COLOR_TEXT_PRIMARY, &edge_white);
@@ -1569,6 +1853,10 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
     if (color_result.code != CORE_OK) {
         return color_result;
     }
+    color_result = mem_console_ui_resolve_theme_color(render_ctx, CORE_THEME_COLOR_STATUS_OK, &node_center_outline_color);
+    if (color_result.code != CORE_OK) {
+        return color_result;
+    }
 
     for (i = 0u; i < edge_count; ++i) {
         KitRenderLineCommand line_cmd;
@@ -1583,6 +1871,7 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         const char *edge_kind_label = "RELATED";
         KitRenderColor edge_draw_color;
         KitRenderColor label_outline_color;
+        int is_hovered_edge = (int)i == hovered_edge_index;
         if (state_edge_index >= 0 &&
             state_edge_index < state->graph_edge_count &&
             state->graph_edges[state_edge_index].kind[0] != '\0') {
@@ -1599,8 +1888,11 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
             for (p = 0u; p + 1u < route->point_count; ++p) {
                 line_cmd.p0 = route->points[p];
                 line_cmd.p1 = route->points[p + 1u];
-                line_cmd.thickness = 2.2f;
+                line_cmd.thickness = is_hovered_edge ? 3.6f : 2.2f;
                 line_cmd.color = edge_draw_color;
+                if (is_hovered_edge) {
+                    line_cmd.color = mix_color(edge_draw_color, edge_white, 0.26f);
+                }
                 line_cmd.transform = kit_render_identity_transform();
                 result = kit_render_push_line(frame, &line_cmd);
                 if (result.code != CORE_OK) {
@@ -1616,6 +1908,9 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         line_cmd.p1 = label_attach;
         line_cmd.thickness = 1.4f;
         line_cmd.color = edge_draw_color;
+        if (is_hovered_edge) {
+            line_cmd.color = mix_color(edge_draw_color, edge_white, 0.22f);
+        }
         line_cmd.color.a = 220u;
         line_cmd.transform = kit_render_identity_transform();
         result = kit_render_push_line(frame, &line_cmd);
@@ -1632,6 +1927,9 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
             return result;
         }
         label_outline_color = edge_draw_color;
+        if (is_hovered_edge) {
+            label_outline_color = mix_color(label_outline_color, edge_white, 0.20f);
+        }
         label_outline_color.a = 230u;
         result = draw_rect_outline(frame, label_bg_rect, 1.0f, label_outline_color);
         if (result.code != CORE_OK) {
@@ -1690,12 +1988,13 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         if (has_graph_data) {
             const MemConsoleGraphNode *graph_node = &state->graph_nodes[i];
             if (graph_node->item_id == state->selected_item_id) {
-                fill_color = node_selected_color;
+                fill_color = mix_color(node_base_color, node_selected_color, 0.38f);
             } else if (graph_node->canonical || graph_node->pinned) {
                 fill_color = node_lane_color;
             }
             if ((int)i == hovered_node_index && graph_node->item_id != state->selected_item_id) {
-                fill_color = mix_color(fill_color, edge_white, 0.16f);
+                fill_color = mix_color(fill_color, node_selected_color, 0.10f);
+                fill_color = mix_color(fill_color, edge_white, 0.12f);
             }
         }
 
@@ -1706,6 +2005,31 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         result = kit_render_push_rect(frame, &rect_cmd);
         if (result.code != CORE_OK) {
             return result;
+        }
+
+        if (has_graph_data &&
+            i < (uint32_t)state->graph_node_count &&
+            state->graph_nodes[i].item_id == state->selected_item_id) {
+            KitRenderColor selected_outline = mix_color(node_selected_color, edge_white, 0.32f);
+            result = draw_rect_outline(frame,
+                                       state->graph_layout_node_layouts[i].rect,
+                                       1.4f,
+                                       selected_outline);
+            if (result.code != CORE_OK) {
+                return result;
+            }
+        }
+
+        if (has_graph_data &&
+            i < (uint32_t)state->graph_node_count &&
+            state->graph_nodes[i].item_id == state->graph_center_item_id) {
+            result = draw_rect_outline(frame,
+                                       state->graph_layout_node_layouts[i].rect,
+                                       2.0f,
+                                       node_center_outline_color);
+            if (result.code != CORE_OK) {
+                return result;
+            }
         }
 
         text_cmd.origin.x = state->graph_layout_node_layouts[i].rect.x + 4.0f;
@@ -1758,7 +2082,14 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
     if (result.code != CORE_OK) {
         return result;
     }
-    result = draw_graph_edge_legend(ui_ctx, render_ctx, frame, bounds, state);
+    result = draw_graph_edge_legend(ui_ctx,
+                                    render_ctx,
+                                    input,
+                                    frame,
+                                    bounds,
+                                    state,
+                                    out_legend_click_consumed,
+                                    out_graph_filter_changed);
     if (result.code != CORE_OK) {
         return result;
     }
@@ -1766,134 +2097,32 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
     if (has_graph_data &&
         hovered_node_index >= 0 &&
         hovered_node_index < state->graph_node_count) {
-        const MemConsoleGraphNode *hovered_node = &state->graph_nodes[hovered_node_index];
-        float hud_width = bounds.width * 0.48f;
-        KitRenderRect hud_outer;
-        KitRenderRect hud_inner;
-        KitRenderRect hud_row;
-        const char *raw_body = hovered_node->body_preview[0] ? hovered_node->body_preview : "(no body)";
-        const char *body_text = state->graph_hud_body;
-
-        if (hud_width < 260.0f) {
-            hud_width = 260.0f;
+        MemConsoleUiHudCardSpec hud_spec;
+        if (graph_build_node_hud_spec(state, hovered_node_index, &hud_spec)) {
+            result = mem_console_ui_hud_draw_cached(render_ctx,
+                                                    ui_ctx,
+                                                    frame,
+                                                    bounds,
+                                                    state,
+                                                    &hud_spec);
+            if (result.code != CORE_OK) {
+                return result;
+            }
         }
-        if (hud_width > (bounds.width - 20.0f)) {
-            hud_width = bounds.width - 20.0f;
-        }
-
-        hud_outer = (KitRenderRect){
-            bounds.x + 10.0f,
-            bounds.y + 10.0f,
-            hud_width,
-            154.0f
-        };
-        hud_inner = (KitRenderRect){
-            hud_outer.x + 6.0f,
-            hud_outer.y + 6.0f,
-            hud_outer.width - 12.0f,
-            hud_outer.height - 12.0f
-        };
-
-        result = mem_console_ui_push_themed_rect(render_ctx,
-                                                 frame,
-                                                 hud_outer,
-                                                 8.0f,
-                                                 CORE_THEME_COLOR_SURFACE_1);
-        if (result.code != CORE_OK) {
-            return result;
-        }
-        result = mem_console_ui_push_themed_rect(render_ctx,
-                                                 frame,
-                                                 hud_inner,
-                                                 6.0f,
-                                                 CORE_THEME_COLOR_SURFACE_0);
-        if (result.code != CORE_OK) {
-            return result;
-        }
-
-        (void)snprintf(state->graph_hud_id_line,
-                       sizeof(state->graph_hud_id_line),
-                       "ID %lld",
-                       (long long)hovered_node->item_id);
-        result = mem_console_ui_draw_info_line_custom(ui_ctx,
-                                                      frame,
-                                                      (KitRenderRect){
-                                                          hud_inner.x + 8.0f,
-                                                          hud_inner.y + 6.0f,
-                                                          hud_inner.width - 16.0f,
-                                                          20.0f
-                                                      },
-                                                      state->graph_hud_id_line,
-                                                      CORE_THEME_COLOR_TEXT_MUTED,
-                                                      CORE_FONT_ROLE_UI_MEDIUM,
-                                                      CORE_FONT_TEXT_SIZE_CAPTION);
-        if (result.code != CORE_OK) {
-            return result;
-        }
-
-        format_text_for_width(state->graph_hud_title_raw,
-                              sizeof(state->graph_hud_title_raw),
-                              hovered_node->title[0] ? hovered_node->title : "UNTITLED",
-                              hud_inner.width - 16.0f,
-                              CORE_FONT_TEXT_SIZE_BASIC);
-        sanitize_hud_text(state->graph_hud_title_raw,
-                          state->graph_hud_title,
-                          sizeof(state->graph_hud_title));
-        sanitize_hud_text(raw_body, state->graph_hud_body, sizeof(state->graph_hud_body));
-        result = mem_console_ui_draw_info_line_custom(ui_ctx,
-                                                      frame,
-                                                      (KitRenderRect){
-                                                          hud_inner.x + 8.0f,
-                                                          hud_inner.y + 28.0f,
-                                                          hud_inner.width - 16.0f,
-                                                          22.0f
-                                                      },
-                                                      state->graph_hud_title,
-                                                      CORE_THEME_COLOR_TEXT_PRIMARY,
-                                                      CORE_FONT_ROLE_UI_BOLD,
-                                                      CORE_FONT_TEXT_SIZE_PARAGRAPH);
-        if (result.code != CORE_OK) {
-            return result;
-        }
-
-        (void)snprintf(state->graph_hud_flags,
-                       sizeof(state->graph_hud_flags),
-                       "PIN %s | CAN %s",
-                       hovered_node->pinned ? "ON" : "OFF",
-                       hovered_node->canonical ? "ON" : "OFF");
-        result = mem_console_ui_draw_info_line_custom(ui_ctx,
-                                                      frame,
-                                                      (KitRenderRect){
-                                                          hud_inner.x + 8.0f,
-                                                          hud_inner.y + 50.0f,
-                                                          hud_inner.width - 16.0f,
-                                                          20.0f
-                                                      },
-                                                      state->graph_hud_flags,
-                                                      CORE_THEME_COLOR_TEXT_MUTED,
-                                                      CORE_FONT_ROLE_UI_REGULAR,
-                                                      CORE_FONT_TEXT_SIZE_CAPTION);
-        if (result.code != CORE_OK) {
-            return result;
-        }
-
-        hud_row = (KitRenderRect){
-            hud_inner.x + 8.0f,
-            hud_inner.y + 72.0f,
-            hud_inner.width - 16.0f,
-            hud_inner.height - 80.0f
-        };
-        result = mem_console_ui_draw_wrapped_text_block(ui_ctx,
-                                                        frame,
-                                                        state->graph_hud_wrapped_lines,
-                                                        4,
-                                                        hud_row,
-                                                        body_text,
-                                                        CORE_THEME_COLOR_TEXT_MUTED,
-                                                        CORE_FONT_TEXT_SIZE_BASIC,
-                                                        4);
-        if (result.code != CORE_OK) {
-            return result;
+    } else if (has_graph_data &&
+               hovered_edge_index >= 0 &&
+               hovered_edge_index < (int)state->graph_layout_edge_count) {
+        MemConsoleUiHudCardSpec hud_spec;
+        if (graph_build_edge_hud_spec(state, hovered_edge_index, &hud_spec)) {
+            result = mem_console_ui_hud_draw_cached(render_ctx,
+                                                    ui_ctx,
+                                                    frame,
+                                                    bounds,
+                                                    state,
+                                                    &hud_spec);
+            if (result.code != CORE_OK) {
+                return result;
+            }
         }
     }
 

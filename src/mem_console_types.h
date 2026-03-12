@@ -16,7 +16,9 @@ enum {
     MEM_CONSOLE_GRAPH_HOPS_MAX = 5,
     MEM_CONSOLE_SCOPE_FILTER_LIMIT = 8,
     MEM_CONSOLE_DETAIL_BODY_WRAP_LINE_LIMIT = 96,
-    MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT = 48
+    MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT = 48,
+    MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT = 12,
+    MEM_CONSOLE_GRAPH_HUD_LINE_LIMIT = 64
 };
 
 typedef enum MemConsoleAction {
@@ -120,6 +122,7 @@ typedef struct MemConsoleState {
     CoreThemePresetId theme_preset_id;
     CoreFontPresetId font_preset_id;
     int64_t selected_item_id;
+    int64_t graph_center_item_id;
     int64_t selected_created_ns;
     int64_t active_count;
     int64_t matching_count;
@@ -134,6 +137,8 @@ typedef struct MemConsoleState {
     int graph_mode_enabled;
     int graph_query_edge_limit;
     int graph_query_hops;
+    uint32_t graph_kind_filter_mask;
+    int graph_kind_filter_all_override;
     int list_query_offset;
     int visible_start_index;
     int visible_count;
@@ -185,30 +190,52 @@ typedef struct MemConsoleState {
     char graph_hud_title[176];
     char graph_hud_flags[96];
     char graph_hud_body[256];
-    char graph_hud_wrapped_lines[4][256];
+    char graph_hud_wrapped_lines[16][256];
+    int graph_hud_cache_valid;
+    uint64_t graph_hud_cache_signature;
+    KitRenderRect graph_hud_cache_outer;
+    KitRenderRect graph_hud_cache_inner;
+    int graph_hud_cache_row_count;
+    int graph_hud_cache_line_count;
+    int graph_hud_cache_row_first_line[MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT];
+    int graph_hud_cache_row_line_count[MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT];
+    CoreThemeColorToken graph_hud_cache_row_tokens[MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT];
+    CoreFontRoleId graph_hud_cache_row_roles[MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT];
+    CoreFontTextSizeTier graph_hud_cache_row_tiers[MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT];
+    float graph_hud_cache_row_line_steps[MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT];
+    char graph_hud_cache_lines[MEM_CONSOLE_GRAPH_HUD_LINE_LIMIT][256];
     char detail_connection_summary_text[640];
     char detail_connection_summary_lines[MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT][256];
     int graph_drag_active;
     int graph_drag_moved;
     int graph_click_armed;
+    uint64_t list_last_click_ms;
+    int64_t list_last_click_item_id;
     uint64_t graph_last_click_ms;
     int64_t graph_last_click_item_id;
     float graph_drag_last_x;
     float graph_drag_last_y;
     float pane_left_ratio;
     float pane_right_split_ratio;
+    float pane_detail_split_ratio;
+    float pane_detail_top_split_ratio;
     int pane_drag_active;
     int pane_drag_splitter_id;
     float pane_drag_anchor_x;
     float pane_drag_anchor_y;
     float pane_drag_start_left_ratio;
     float pane_drag_start_right_ratio;
+    float pane_drag_start_detail_ratio;
+    float pane_drag_start_detail_top_ratio;
     int pane_left_collapsed;
     int pane_right_detail_collapsed;
     int pane_prefs_dirty;
     KitRenderRect left_pane;
     KitRenderRect right_pane;
     KitRenderRect pane_right_detail;
+    KitRenderRect pane_right_detail_meta;
+    KitRenderRect pane_right_detail_connections;
+    KitRenderRect pane_right_detail_body;
     KitRenderRect pane_right_graph;
     KitGraphStructViewport graph_viewport;
 } MemConsoleState;

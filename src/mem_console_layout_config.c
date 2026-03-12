@@ -23,11 +23,11 @@ static const MemConsoleLayoutConfig k_default_layout = {
     .right_section_h = 12.0f,
     .right_body_h = 86.0f,
 
-    .graph_filter_h = 20.0f,
-    .graph_settings_h = 20.0f,
+    .graph_filter_h = 22.0f,
+    .graph_settings_h = 22.0f,
     .graph_collapsed_hint_h = 16.0f,
     .action_button_h = 18.0f,
-    .action_button_gap = 2.0f,
+    .action_button_gap = 3.0f,
     .action_block_pad = 3.0f,
     .graph_panel_min_h = 220.0f,
 

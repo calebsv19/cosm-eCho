@@ -28,6 +28,14 @@ int mem_console_graph_edge_limit_clamp(int value);
 int mem_console_graph_edge_limit_parse(const char *text, int fallback);
 void mem_console_graph_edge_limit_set(MemConsoleState *state, int value);
 int mem_console_graph_hops_clamp(int value);
+uint32_t mem_console_graph_kind_filter_all_mask(void);
+uint32_t mem_console_graph_kind_filter_mask_for_kind(const char *kind);
+int mem_console_graph_kind_is_enabled(const MemConsoleState *state, const char *kind);
+int mem_console_graph_kind_toggle_enabled(MemConsoleState *state, const char *kind);
+void mem_console_graph_kind_select_all(MemConsoleState *state);
+int mem_console_graph_kind_toggle_all_override(MemConsoleState *state);
+void mem_console_graph_kind_set_single(MemConsoleState *state, const char *kind);
+void mem_console_graph_kind_sync_text_filter(MemConsoleState *state);
 
 void format_text_for_width(char *out_text,
                            size_t out_cap,

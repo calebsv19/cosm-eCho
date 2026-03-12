@@ -151,7 +151,100 @@ CoreResult mem_console_ui_draw_button_custom(KitUiContext *ui_ctx,
                                              KitUiWidgetState state,
                                              CoreFontRoleId font_role,
                                              CoreFontTextSizeTier text_tier) {
-    return kit_ui_draw_button_custom(ui_ctx, frame, rect, text, state, font_role, text_tier);
+    CoreResult result;
+    KitRenderColor fill_color;
+    KitRenderColor outline_color;
+    CoreThemeColorToken fill_token = CORE_THEME_COLOR_SURFACE_2;
+    CoreThemeColorToken text_token = CORE_THEME_COLOR_TEXT_PRIMARY;
+
+    if (!ui_ctx || !frame || !text) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid button draw request" };
+    }
+
+    if (state == KIT_UI_STATE_DISABLED) {
+        fill_token = CORE_THEME_COLOR_SURFACE_0;
+        text_token = CORE_THEME_COLOR_TEXT_MUTED;
+    } else if (state == KIT_UI_STATE_HOVERED) {
+        fill_token = CORE_THEME_COLOR_SURFACE_1;
+    } else if (state == KIT_UI_STATE_ACTIVE) {
+        fill_token = CORE_THEME_COLOR_SURFACE_1;
+    }
+
+    result = mem_console_ui_resolve_theme_color(ui_ctx->render_ctx, fill_token, &fill_color);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+
+    result = kit_render_push_rect(frame,
+                                  &(KitRenderRectCommand){
+                                      rect,
+                                      6.0f,
+                                      fill_color,
+                                      kit_render_identity_transform()
+                                  });
+    if (result.code != CORE_OK) {
+        return result;
+    }
+
+    if (state == KIT_UI_STATE_ACTIVE || state == KIT_UI_STATE_HOVERED) {
+        float thickness = state == KIT_UI_STATE_ACTIVE ? 1.4f : 1.0f;
+        result = mem_console_ui_resolve_theme_color(ui_ctx->render_ctx,
+                                                    CORE_THEME_COLOR_ACCENT_PRIMARY,
+                                                    &outline_color);
+        if (result.code != CORE_OK) {
+            return result;
+        }
+        outline_color.a = state == KIT_UI_STATE_ACTIVE ? 220u : 128u;
+
+        result = kit_render_push_rect(frame,
+                                      &(KitRenderRectCommand){
+                                          (KitRenderRect){ rect.x, rect.y, rect.width, thickness },
+                                          0.0f,
+                                          outline_color,
+                                          kit_render_identity_transform()
+                                      });
+        if (result.code != CORE_OK) {
+            return result;
+        }
+        result = kit_render_push_rect(frame,
+                                      &(KitRenderRectCommand){
+                                          (KitRenderRect){ rect.x, rect.y + rect.height - thickness, rect.width, thickness },
+                                          0.0f,
+                                          outline_color,
+                                          kit_render_identity_transform()
+                                      });
+        if (result.code != CORE_OK) {
+            return result;
+        }
+        result = kit_render_push_rect(frame,
+                                      &(KitRenderRectCommand){
+                                          (KitRenderRect){ rect.x, rect.y, thickness, rect.height },
+                                          0.0f,
+                                          outline_color,
+                                          kit_render_identity_transform()
+                                      });
+        if (result.code != CORE_OK) {
+            return result;
+        }
+        result = kit_render_push_rect(frame,
+                                      &(KitRenderRectCommand){
+                                          (KitRenderRect){ rect.x + rect.width - thickness, rect.y, thickness, rect.height },
+                                          0.0f,
+                                          outline_color,
+                                          kit_render_identity_transform()
+                                      });
+        if (result.code != CORE_OK) {
+            return result;
+        }
+    }
+
+    return kit_ui_draw_label_custom(ui_ctx,
+                                    frame,
+                                    rect,
+                                    text,
+                                    text_token,
+                                    font_role,
+                                    text_tier);
 }
 
 CoreResult mem_console_ui_draw_editable_line(KitUiContext *ui_ctx,

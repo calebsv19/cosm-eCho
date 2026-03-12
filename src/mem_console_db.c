@@ -1143,6 +1143,7 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
     int has_row = 0;
     int edge_limit = MEM_CONSOLE_GRAPH_EDGE_LIMIT;
     int graph_hops = MEM_CONSOLE_GRAPH_HOPS_MIN;
+    int64_t center_item_id = 0;
 
     if (!db || !state) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid graph neighborhood request" };
@@ -1155,16 +1156,28 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
 
     state->graph_node_count = 0;
     state->graph_edge_count = 0;
-    if (state->selected_item_id == 0) {
+    center_item_id = state->graph_center_item_id;
+    if (center_item_id == 0) {
+        center_item_id = state->selected_item_id;
+    }
+    if (center_item_id == 0) {
         return core_result_ok();
     }
 
     {
         int selected_index = -1;
-        result = ensure_graph_node(db, state, state->selected_item_id, &selected_index);
-        if (result.code != CORE_OK) {
-            return result;
+        result = ensure_graph_node(db, state, center_item_id, &selected_index);
+        if (result.code != CORE_OK &&
+            state->selected_item_id != 0 &&
+            state->selected_item_id != center_item_id) {
+            center_item_id = state->selected_item_id;
+            result = ensure_graph_node(db, state, center_item_id, &selected_index);
         }
+        if (result.code != CORE_OK) {
+            state->graph_center_item_id = 0;
+            return core_result_ok();
+        }
+        state->graph_center_item_id = center_item_id;
     }
 
     result = core_memdb_prepare(db,
@@ -1204,7 +1217,7 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
         return result;
     }
 
-    result = core_memdb_stmt_bind_i64(&stmt, 1, state->selected_item_id);
+    result = core_memdb_stmt_bind_i64(&stmt, 1, center_item_id);
     if (result.code != CORE_OK) {
         goto cleanup;
     }
@@ -1335,12 +1348,17 @@ CoreResult refresh_state_from_db(CoreMemDb *db, MemConsoleState *state) {
 
     if (state->matching_count == 0) {
         state->selected_item_id = 0;
+        state->graph_center_item_id = 0;
         state->list_query_offset = 0;
         state->visible_start_index = 0;
         state->list_scroll = 0.0f;
         set_default_detail(state);
     } else if (state->selected_item_id == 0 && state->visible_count > 0) {
         state->selected_item_id = state->visible_items[0].id;
+    }
+
+    if (state->graph_center_item_id == 0 && state->selected_item_id != 0) {
+        state->graph_center_item_id = state->selected_item_id;
     }
 
     result = read_selected_detail(db, state);

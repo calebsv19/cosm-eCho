@@ -26,6 +26,8 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
                                              const KitUiInputState *input,
                                              KitRenderFrame *frame,
                                              KitRenderRect bounds,
-                                             MemConsoleState *state);
+                                             MemConsoleState *state,
+                                             int *out_legend_click_consumed,
+                                             int *out_graph_filter_changed);
 
 #endif

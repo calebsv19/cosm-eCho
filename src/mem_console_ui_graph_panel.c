@@ -64,6 +64,7 @@ static int handle_graph_node_click(MemConsoleState *state,
 
     if (is_double_click) {
         (void)apply_graph_node_preview_selection(state, hit_item_id);
+        state->graph_center_item_id = hit_item_id;
         kit_graph_struct_viewport_default(&state->graph_viewport);
         state->graph_layout_valid = 0;
         if (*io_action == MEM_CONSOLE_ACTION_NONE) {
@@ -93,6 +94,8 @@ CoreResult mem_console_ui_draw_graph_panel(KitRenderContext *render_ctx,
     KitRenderRect graph_view;
     KitRenderRect row;
     int suppress_graph_click_on_release = 0;
+    int legend_click_consumed = 0;
+    int graph_filter_changed = 0;
 
     if (!render_ctx || !ui_ctx || !frame || !state || !input || !layout_cfg || !right_layout || !io_action) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid graph panel draw request" };
@@ -152,7 +155,9 @@ CoreResult mem_console_ui_draw_graph_panel(KitRenderContext *render_ctx,
                                                    input,
                                                    frame,
                                                    graph_bounds,
-                                                   state);
+                                                   state,
+                                                   &legend_click_consumed,
+                                                   &graph_filter_changed);
         if (result.code != CORE_OK) {
             (void)kit_ui_clip_pop(ui_ctx, frame);
             return result;
@@ -163,7 +168,14 @@ CoreResult mem_console_ui_draw_graph_panel(KitRenderContext *render_ctx,
             return result;
         }
 
-        if (input->mouse_released && state->graph_click_armed && !suppress_graph_click_on_release) {
+        if (graph_filter_changed && *io_action == MEM_CONSOLE_ACTION_NONE) {
+            *io_action = MEM_CONSOLE_ACTION_REFRESH_GRAPH;
+        }
+
+        if (input->mouse_released &&
+            state->graph_click_armed &&
+            !suppress_graph_click_on_release &&
+            !legend_click_consumed) {
             if (state->graph_node_count > 0 &&
                 kit_ui_point_in_rect(graph_bounds, input->mouse_x, input->mouse_y)) {
                 KitGraphStructHit hit = {0};
@@ -250,5 +262,7 @@ CoreResult mem_console_ui_draw_graph_panel(KitRenderContext *render_ctx,
                                              input,
                                              frame,
                                              row,
-                                             state);
+                                             state,
+                                             0,
+                                             0);
 }
