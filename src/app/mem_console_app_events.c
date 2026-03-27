@@ -84,7 +84,14 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
                 int handled_shortcut = 0;
 
                 mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_INPUT);
-                if (ctrl_or_cmd && shift) {
+                if (ctrl_or_cmd) {
+                    handled_shortcut = mem_console_app_handle_text_zoom_shortcut(render_ctx,
+                                                                                  ui_ctx,
+                                                                                  state,
+                                                                                  prefs_path,
+                                                                                  event->key.keysym.sym);
+                }
+                if (!handled_shortcut && ctrl_or_cmd && shift) {
                     handled_shortcut = mem_console_app_handle_theme_shortcut(render_ctx,
                                                                              ui_ctx,
                                                                              state,
@@ -92,6 +99,7 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
                                                                              event->key.keysym.sym);
                     if (!handled_shortcut) {
                         handled_shortcut = mem_console_app_handle_font_shortcut(render_ctx,
+                                                                                ui_ctx,
                                                                                 state,
                                                                                 prefs_path,
                                                                                 event->key.keysym.sym);

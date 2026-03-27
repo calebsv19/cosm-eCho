@@ -17,6 +17,21 @@ static const CoreFontPresetId k_mem_console_font_cycle_order[] = {
     CORE_FONT_PRESET_IDE
 };
 
+enum {
+    MEM_CONSOLE_TEXT_ZOOM_STEP_MIN = -4,
+    MEM_CONSOLE_TEXT_ZOOM_STEP_MAX = 5
+};
+
+static int clamp_text_zoom_step(int step) {
+    if (step < MEM_CONSOLE_TEXT_ZOOM_STEP_MIN) {
+        return MEM_CONSOLE_TEXT_ZOOM_STEP_MIN;
+    }
+    if (step > MEM_CONSOLE_TEXT_ZOOM_STEP_MAX) {
+        return MEM_CONSOLE_TEXT_ZOOM_STEP_MAX;
+    }
+    return step;
+}
+
 void set_default_detail(MemConsoleState *state) {
     if (!state) {
         return;
@@ -180,6 +195,25 @@ int state_set_font_preset(MemConsoleState *state, CoreFontPresetId preset_id) {
     return 1;
 }
 
+int state_set_text_zoom_step(MemConsoleState *state, int step) {
+    if (!state) {
+        return 0;
+    }
+    state->text_zoom_step = clamp_text_zoom_step(step);
+    return 1;
+}
+
+int state_adjust_text_zoom_step(MemConsoleState *state, int delta) {
+    if (!state) {
+        return 0;
+    }
+    return state_set_text_zoom_step(state, state->text_zoom_step + delta);
+}
+
+int state_reset_text_zoom_step(MemConsoleState *state) {
+    return state_set_text_zoom_step(state, 0);
+}
+
 void seed_state(MemConsoleState *state, const char *db_path) {
     if (!state) {
         return;
@@ -194,6 +228,7 @@ void seed_state(MemConsoleState *state, const char *db_path) {
     state->db_path = state->db_path_storage;
     state->theme_preset_id = CORE_THEME_PRESET_DAW_DEFAULT;
     state->font_preset_id = CORE_FONT_PRESET_IDE;
+    state->text_zoom_step = 0;
     state->search_text[0] = '\0';
     state->graph_mode_enabled = 1;
     state->list_query_offset = 0;

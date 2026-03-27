@@ -32,3 +32,12 @@ Primary private plan:
   - `demo/*.sqlite`
 - scaffold completion commit naming policy:
   - after explicit user confirmation, use commit title: `Project Scaffold Standardization`
+
+## Post-Scaffold Font Size Pass (2026-03-27)
+- status: complete
+- implemented:
+  - text zoom shortcuts (`Cmd/Ctrl +`, `Cmd/Ctrl -`, `Cmd/Ctrl 0`)
+  - persisted zoom step (`text_zoom_step`) in prefs schema `v11`
+  - startup and DB-switch reapply of theme/font/zoom+density
+- wrap-up commit title policy for this pass:
+  - `Post-Scaffold Font Size Standardization`

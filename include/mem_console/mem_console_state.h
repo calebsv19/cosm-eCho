@@ -25,6 +25,9 @@ int cycle_theme_preset(MemConsoleState *state, int direction);
 int cycle_font_preset(MemConsoleState *state, int direction);
 int state_set_theme_preset(MemConsoleState *state, CoreThemePresetId preset_id);
 int state_set_font_preset(MemConsoleState *state, CoreFontPresetId preset_id);
+int state_set_text_zoom_step(MemConsoleState *state, int step);
+int state_adjust_text_zoom_step(MemConsoleState *state, int delta);
+int state_reset_text_zoom_step(MemConsoleState *state);
 
 void seed_state(MemConsoleState *state, const char *db_path);
 void compute_layout(MemConsoleState *state, int frame_width, int frame_height);

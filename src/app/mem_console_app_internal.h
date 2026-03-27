@@ -25,6 +25,8 @@ void mem_console_app_refresh_and_report(CoreMemDb *db,
 
 CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
                                             MemConsoleState *state,
+                                            KitRenderContext *render_ctx,
+                                            KitUiContext *ui_ctx,
                                             const char *next_db_path,
                                             const char *app_prefs_path,
                                             int app_prefs_path_valid,
@@ -34,7 +36,8 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
                                             int *prefs_signature_valid,
                                             uint64_t *prefs_last_saved_signature);
 
-void mem_console_app_apply_compact_ui_density(KitUiContext *ui_ctx);
+void mem_console_app_apply_compact_ui_density(KitUiContext *ui_ctx,
+                                              const KitRenderContext *render_ctx);
 
 int mem_console_app_handle_theme_shortcut(KitRenderContext *render_ctx,
                                           KitUiContext *ui_ctx,
@@ -43,9 +46,15 @@ int mem_console_app_handle_theme_shortcut(KitRenderContext *render_ctx,
                                           SDL_Keycode keycode);
 
 int mem_console_app_handle_font_shortcut(KitRenderContext *render_ctx,
+                                         KitUiContext *ui_ctx,
                                          MemConsoleState *state,
                                          const char *prefs_path,
                                          SDL_Keycode keycode);
+int mem_console_app_handle_text_zoom_shortcut(KitRenderContext *render_ctx,
+                                              KitUiContext *ui_ctx,
+                                              MemConsoleState *state,
+                                              const char *prefs_path,
+                                              SDL_Keycode keycode);
 
 void mem_console_app_apply_pending_action(CoreMemDb *db,
                                           MemConsoleState *state,

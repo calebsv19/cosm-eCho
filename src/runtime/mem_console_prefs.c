@@ -257,13 +257,50 @@ typedef struct MemConsoleUiPrefsV10 {
     float left_panel_top_ratio;
 } MemConsoleUiPrefsV10;
 
+typedef struct MemConsoleUiPrefsV11 {
+    uint32_t version;
+    int32_t theme_preset_id;
+    int32_t font_preset_id;
+    float pane_left_ratio;
+    float pane_right_split_ratio;
+    float pane_detail_split_ratio;
+    float pane_detail_top_split_ratio;
+    int32_t pane_left_collapsed;
+    int32_t pane_right_detail_collapsed;
+    int64_t selected_item_id;
+    int32_t list_query_offset;
+    int32_t selected_project_count;
+    char selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
+    char graph_kind_filter[32];
+    int32_t graph_edge_limit;
+    int32_t graph_hops;
+    int32_t graph_mode_enabled;
+    float graph_pan_x;
+    float graph_pan_y;
+    float graph_zoom;
+    char search_text[256];
+    int32_t graph_kind_filter_all_override;
+    int32_t graph_layout_mode;
+    int32_t graph_sort_mode;
+    uint32_t graph_node_kind_filter_mask;
+    int32_t graph_node_kind_filter_all_override;
+    int32_t graph_scope_full_mode_enabled;
+    uint32_t graph_kind_filter_mask;
+    int32_t graph_anchor_funnel_enabled;
+    int32_t graph_edge_labels_enabled;
+    int32_t graph_hidden_anchor_count;
+    int64_t graph_hidden_anchor_item_ids[MEM_CONSOLE_GRAPH_NODE_LIMIT];
+    float left_panel_top_ratio;
+    int32_t text_zoom_step;
+} MemConsoleUiPrefsV11;
+
 typedef struct MemConsoleAppPrefsV1 {
     uint32_t version;
     char last_db_path[1024];
 } MemConsoleAppPrefsV1;
 
 enum {
-    MEM_CONSOLE_UI_PREFS_VERSION = 10u,
+    MEM_CONSOLE_UI_PREFS_VERSION = 11u,
     MEM_CONSOLE_APP_PREFS_VERSION = 1u
 };
 
@@ -557,6 +594,20 @@ static void prefs_build_v10_from_state(const MemConsoleState *state, MemConsoleU
     out_prefs->left_panel_top_ratio = prefs_ratio_or_default(state->left_panel_top_ratio);
 }
 
+static void prefs_build_v11_from_state(const MemConsoleState *state, MemConsoleUiPrefsV11 *out_prefs) {
+    MemConsoleUiPrefsV10 v10_prefs = {0};
+
+    if (!state || !out_prefs) {
+        return;
+    }
+
+    memset(out_prefs, 0, sizeof(*out_prefs));
+    prefs_build_v10_from_state(state, &v10_prefs);
+    memcpy(out_prefs, &v10_prefs, sizeof(v10_prefs));
+    out_prefs->version = MEM_CONSOLE_UI_PREFS_VERSION;
+    out_prefs->text_zoom_step = (int32_t)state->text_zoom_step;
+}
+
 static int prefs_apply_v5_to_state(const MemConsoleUiPrefsV5 *prefs, MemConsoleState *state) {
     if (!prefs || !state) {
         return 0;
@@ -682,6 +733,17 @@ static int prefs_apply_v10_to_state(const MemConsoleUiPrefsV10 *prefs, MemConsol
     return 1;
 }
 
+static int prefs_apply_v11_to_state(const MemConsoleUiPrefsV11 *prefs, MemConsoleState *state) {
+    if (!prefs || !state) {
+        return 0;
+    }
+    if (!prefs_apply_v10_to_state((const MemConsoleUiPrefsV10 *)prefs, state)) {
+        return 0;
+    }
+    (void)state_set_text_zoom_step(state, (int)prefs->text_zoom_step);
+    return 1;
+}
+
 static int prefs_apply_v3_to_state(const MemConsoleUiPrefsV3 *prefs, MemConsoleState *state) {
     if (!prefs || !state) {
         return 0;
@@ -785,7 +847,7 @@ CoreResult mem_console_prefs_load(const char *prefs_path, MemConsoleState *state
     CorePackReader reader = {0};
     CorePackChunkInfo chunk = {0};
     CoreResult result;
-    MemConsoleUiPrefsV10 prefs = {0};
+    MemConsoleUiPrefsV11 prefs = {0};
     FILE *probe = 0;
     int loaded_any = 0;
 
@@ -819,7 +881,8 @@ CoreResult mem_console_prefs_load(const char *prefs_path, MemConsoleState *state
         chunk.size != (uint64_t)sizeof(MemConsoleUiPrefsV7) &&
         chunk.size != (uint64_t)sizeof(MemConsoleUiPrefsV8) &&
         chunk.size != (uint64_t)sizeof(MemConsoleUiPrefsV9) &&
-        chunk.size != (uint64_t)sizeof(MemConsoleUiPrefsV10)) {
+        chunk.size != (uint64_t)sizeof(MemConsoleUiPrefsV10) &&
+        chunk.size != (uint64_t)sizeof(MemConsoleUiPrefsV11)) {
         (void)core_pack_reader_close(&reader);
         return (CoreResult){ CORE_ERR_FORMAT, "invalid mem_console prefs payload size" };
     }
@@ -884,9 +947,14 @@ CoreResult mem_console_prefs_load(const char *prefs_path, MemConsoleState *state
         if (prefs_apply_v9_to_state((const MemConsoleUiPrefsV9 *)&prefs, state)) {
             loaded_any = 1;
         }
-    } else if (prefs.version == MEM_CONSOLE_UI_PREFS_VERSION &&
+    } else if (prefs.version == 10u &&
                chunk.size == (uint64_t)sizeof(MemConsoleUiPrefsV10)) {
-        if (prefs_apply_v10_to_state(&prefs, state)) {
+        if (prefs_apply_v10_to_state((const MemConsoleUiPrefsV10 *)&prefs, state)) {
+            loaded_any = 1;
+        }
+    } else if (prefs.version == MEM_CONSOLE_UI_PREFS_VERSION &&
+               chunk.size == (uint64_t)sizeof(MemConsoleUiPrefsV11)) {
+        if (prefs_apply_v11_to_state(&prefs, state)) {
             loaded_any = 1;
         }
     }
@@ -907,7 +975,7 @@ CoreResult mem_console_prefs_load(const char *prefs_path, MemConsoleState *state
 CoreResult mem_console_prefs_save(const char *prefs_path, const MemConsoleState *state) {
     CorePackWriter writer = {0};
     CoreResult result;
-    MemConsoleUiPrefsV10 prefs = {0};
+    MemConsoleUiPrefsV11 prefs = {0};
 
     if (!prefs_path || !state) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid prefs save request" };
@@ -916,7 +984,7 @@ CoreResult mem_console_prefs_save(const char *prefs_path, const MemConsoleState 
         return (CoreResult){ CORE_ERR_IO, "failed to create prefs directory" };
     }
 
-    prefs_build_v10_from_state(state, &prefs);
+    prefs_build_v11_from_state(state, &prefs);
 
     result = core_pack_writer_open(prefs_path, &writer);
     if (result.code != CORE_OK) {
@@ -1030,12 +1098,12 @@ CoreResult mem_console_app_prefs_save(const char *prefs_path, const char *db_pat
 }
 
 uint64_t mem_console_prefs_state_signature(const MemConsoleState *state) {
-    MemConsoleUiPrefsV10 prefs = {0};
+    MemConsoleUiPrefsV11 prefs = {0};
 
     if (!state) {
         return 0u;
     }
 
-    prefs_build_v10_from_state(state, &prefs);
+    prefs_build_v11_from_state(state, &prefs);
     return core_hash64_fnv1a(&prefs, sizeof(prefs));
 }

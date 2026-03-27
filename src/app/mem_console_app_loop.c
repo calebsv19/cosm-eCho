@@ -186,6 +186,8 @@ int mem_console_app_run_loop(MemConsoleAppLoopContext *ctx) {
             ctx->state->pending_db_path[0] = '\0';
             result = mem_console_app_switch_active_db(ctx->db,
                                                       ctx->state,
+                                                      ctx->render_ctx,
+                                                      ctx->ui_ctx,
                                                       next_db_path,
                                                       ctx->app_prefs_path,
                                                       ctx->app_prefs_path_valid,

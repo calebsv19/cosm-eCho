@@ -48,6 +48,14 @@ Last updated: 2026-03-27
 - `make -C mem_console run-headless-smoke`
 - `make -C mem_console visual-harness`
 
+## Post-Scaffold Font Size Pass (Current)
+- keyboard text zoom is implemented:
+  - `Cmd/Ctrl +` => zoom in
+  - `Cmd/Ctrl -` => zoom out
+  - `Cmd/Ctrl 0` => reset zoom
+- zoom state is persisted in UI prefs (`MCFG` schema `v11`) via `text_zoom_step`.
+- startup and DB-switch paths reapply theme/font/zoom and UI density consistently.
+
 ## Source Hygiene (Current)
 - historical `_backup` directories were removed from active `src/` lanes.
 - migration snapshots are preserved at:

@@ -263,6 +263,14 @@ static int mem_console_app_subsystems_init(MemConsoleAppMainContext *ctx) {
     }
     ctx->render_ctx_initialized = 1;
 
+    ctx->result = kit_render_set_text_zoom_step(&ctx->render_ctx, ctx->state.text_zoom_step);
+    if (ctx->result.code != CORE_OK) {
+        fprintf(stderr,
+                "mem_console: kit_render_set_text_zoom_step failed: %d\n",
+                (int)ctx->result.code);
+        return 0;
+    }
+
     ctx->result = kit_render_attach_external_backend(&ctx->render_ctx, &ctx->renderer);
     if (ctx->result.code != CORE_OK) {
         fprintf(stderr,
@@ -279,7 +287,7 @@ static int mem_console_app_subsystems_init(MemConsoleAppMainContext *ctx) {
         return 0;
     }
     (void)kit_ui_style_apply_theme_scale(&ctx->ui_ctx);
-    mem_console_app_apply_compact_ui_density(&ctx->ui_ctx);
+    mem_console_app_apply_compact_ui_density(&ctx->ui_ctx, &ctx->render_ctx);
 
     return mem_console_app_stage_transition(ctx,
                                             MEM_CONSOLE_APP_STAGE_STATE_SEEDED,

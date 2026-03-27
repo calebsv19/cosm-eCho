@@ -147,6 +147,7 @@ typedef struct MemConsoleState {
     char wrapped_body_lines[MEM_CONSOLE_DETAIL_BODY_WRAP_LINE_LIMIT][256];
     CoreThemePresetId theme_preset_id;
     CoreFontPresetId font_preset_id;
+    int text_zoom_step;
     int64_t selected_item_id;
     int64_t graph_center_item_id;
     int64_t selected_created_ns;

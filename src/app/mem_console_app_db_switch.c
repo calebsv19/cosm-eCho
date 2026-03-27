@@ -6,6 +6,8 @@
 
 CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
                                             MemConsoleState *state,
+                                            KitRenderContext *render_ctx,
+                                            KitUiContext *ui_ctx,
                                             const char *next_db_path,
                                             const char *app_prefs_path,
                                             int app_prefs_path_valid,
@@ -18,7 +20,7 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
     CoreMemDb next_db = {0};
     int kernel_bridge_enabled;
 
-    if (!db || !state || !next_db_path || !next_db_path[0] || !prefs_path ||
+    if (!db || !state || !render_ctx || !ui_ctx || !next_db_path || !next_db_path[0] || !prefs_path ||
         !prefs_path_valid || !prefs_signature_valid || !prefs_last_saved_signature) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid db switch request" };
     }
@@ -66,6 +68,20 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
         return result;
     }
     sync_edit_buffers_from_selection(state);
+    result = kit_render_set_theme_preset(render_ctx, state->theme_preset_id);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+    result = kit_render_set_font_preset(render_ctx, state->font_preset_id);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+    result = kit_render_set_text_zoom_step(render_ctx, state->text_zoom_step);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+    (void)kit_ui_style_apply_theme_scale(ui_ctx);
+    mem_console_app_apply_compact_ui_density(ui_ctx, render_ctx);
 
     if (*prefs_path_valid) {
         *prefs_last_saved_signature = mem_console_prefs_state_signature(state);
