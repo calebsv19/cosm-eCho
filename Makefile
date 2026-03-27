@@ -52,6 +52,7 @@ INC = -Isrc -Iinclude -Iinclude/mem_console -I$(CORE_MEMDB_DIR)/include -I$(CORE
 OBJ_DIR = build
 BIN = $(OBJ_DIR)/mem_console
 	SRC = src/app/mem_console.c \
+		src/app/mem_console_app_main.c \
 		src/app/mem_console_app_actions.c \
 		src/app/mem_console_app_db_switch.c \
 		src/app/mem_console_app_events.c \
@@ -91,7 +92,7 @@ BIN = $(OBJ_DIR)/mem_console
 	src/ui/graph/mem_console_ui_graph_types.c \
 	src/ui/graph/mem_console_ui_graph_panel.c
 
-.PHONY: all clean run run-demo vk-renderer-lib
+.PHONY: all clean run run-demo vk-renderer-lib test run-headless-smoke visual-harness
 
 all: $(BIN)
 
@@ -161,6 +162,15 @@ run: $(BIN)
 
 run-demo: $(BIN)
 	cd $(REPO_ROOT) && ./mem_console/$(BIN) --db $(DEMO_DB) $(RUN_ARGS)
+
+test: run-headless-smoke
+
+run-headless-smoke: $(BIN)
+	./tests/run_headless_smoke.sh
+
+visual-harness: $(BIN)
+	@echo "visual harness build gate ready: $(BIN)"
+	@echo "launch manual UI validation with: make -C mem_console run-demo"
 
 clean:
 	rm -rf $(OBJ_DIR)

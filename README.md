@@ -109,6 +109,13 @@ Shared runtime/modules are vendored in-repo at:
 
 - `third_party/codework_shared/`
 
+Scaffold docs lane:
+- `mem_console/docs/README.md`
+- `mem_console/docs/current_truth.md`
+- `mem_console/docs/future_intent.md`
+- `mem_console/docs/architecture.md`
+- `mem_console/docs/migration.md`
+
 ```sh
 make -C mem_console
 ```
@@ -145,6 +152,14 @@ Rebuild check:
 
 ```bash
 make -C mem_console clean && make -C mem_console
+```
+
+Verification gates:
+
+```bash
+make -C mem_console test
+make -C mem_console run-headless-smoke
+make -C mem_console visual-harness
 ```
 
 ## Run

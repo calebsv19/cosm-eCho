@@ -1,3 +1,6 @@
 build/
 .DS_Store
 data/
+tmp/
+ide_files/
+demo/*.sqlite
