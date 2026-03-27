@@ -7,7 +7,10 @@ It intentionally lives outside `build/` so `make clean` does not wipe the demo d
 Default showcase DB:
 - `mem_console/demo/demo_mem_console.sqlite`
 
-The `mem_console` binary now uses this file by default when no `--db` argument is provided.
+The `mem_console` binary does not use this file by default anymore.
+Use it explicitly with:
+- `make -C mem_console run-demo`
+- `./mem_console/build/mem_console --db ./mem_console/demo/demo_mem_console.sqlite`
 
 Large-list validation helpers:
 - `mem_console/demo/seed_large_list.sh`

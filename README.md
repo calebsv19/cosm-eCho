@@ -158,15 +158,22 @@ make -C mem_console clean && make -C mem_console
 Default behavior:
 - running without `--db` resolves in this order:
   1. `CODEWORK_MEMDB_PATH` (if set)
-  2. `~/Desktop/CodeWork/data/codework_mem_console.sqlite` (if `~/Desktop/CodeWork/data` exists)
-  3. fallback `mem_console/demo/demo_mem_console.sqlite`
+  2. last-used DB path from app prefs (`~/.local/share/mem_console/mem_console.app.pack` when available)
+  3. fallback default DB (`~/.local/share/mem_console/default.sqlite` when available, otherwise `mem_console/data/default.sqlite`)
+- parent directories are created automatically for the chosen DB path before opening/creating the SQLite file
+- passing `--db /path/to/file.sqlite` is the intended way to create or switch to a project-specific DB
+- the left pane now includes `LOAD DB` and `NEW DB` buttons that open an in-app path-entry modal
+  - the modal accepts a base filename/path and shows `.sqlite` as an implied suffix so users do not have to type it
+  - `~/...` paths are expanded to the current user home directory
+  - confirming the modal switches the active visual session to that DB, creating missing parent directories and the DB file when needed
 - UI preset prefs are read from/written to `<db_path>.ui.pack` for whichever DB path is active
   - includes theme/font preset selection plus pane layout ratios
+- app-level startup prefs are stored separately from DB UI prefs so the console can remember the last active DB path
 
-Local workspace behavior:
-- `make -C mem_console run` and `run-demo` prefer `~/Desktop/CodeWork/data/codework_mem_console.sqlite` when `~/Desktop/CodeWork/data` exists
-- demo helper scripts (`reset_demo_db.sh`, `seed_large_list.sh`) also prefer the same Data-path DB when available
-- `CODEWORK_MEMDB_PATH` can override all script defaults explicitly
+Run targets:
+- `make -C mem_console run` respects the normal startup resolution order, so it reopens the saved last-used DB when one exists
+- `make -C mem_console run-demo` uses `mem_console/demo/demo_mem_console.sqlite`
+- demo helper scripts default to the demo DB unless `CODEWORK_MEMDB_PATH` is set
 
 Runtime shortcuts:
 - `Cmd/Ctrl+Shift+T`: cycle theme preset forward

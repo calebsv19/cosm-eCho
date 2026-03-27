@@ -3,12 +3,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MEM_CLI="${ROOT_DIR}/shared/core/core_memdb/build/mem_cli"
-DEFAULT_DATA_DIR="${HOME:-}/Desktop/CodeWork/data"
 
 if [[ -n "${CODEWORK_MEMDB_PATH:-}" ]]; then
     DEFAULT_DB_PATH="${CODEWORK_MEMDB_PATH}"
-elif [[ -n "${HOME:-}" ]] && [[ -d "${DEFAULT_DATA_DIR}" ]]; then
-    DEFAULT_DB_PATH="${DEFAULT_DATA_DIR}/codework_mem_console.sqlite"
 else
     DEFAULT_DB_PATH="${ROOT_DIR}/mem_console/demo/demo_mem_console.sqlite"
 fi

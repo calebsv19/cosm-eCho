@@ -47,11 +47,49 @@ ifeq ($(strip $(SDL_TTF_LIBS)),)
 endif
 APPLE_FW := -framework Metal -framework QuartzCore -framework Cocoa -framework IOKit -framework CoreVideo
 
-INC = -Isrc -I$(CORE_MEMDB_DIR)/include -I$(CORE_PACK_DIR)/include -I$(CORE_TIME_DIR)/include -I$(CORE_QUEUE_DIR)/include -I$(CORE_SCHED_DIR)/include -I$(CORE_JOBS_DIR)/include -I$(CORE_WORKERS_DIR)/include -I$(CORE_WAKE_DIR)/include -I$(CORE_KERNEL_DIR)/include -I$(CORE_PANE_DIR)/include -I$(KIT_UI_DIR)/include -I$(KIT_GRAPH_STRUCT_DIR)/include -I$(KIT_RENDER_DIR)/include -I$(VK_RENDERER_DIR)/include -I$(CORE_BASE_DIR)/include -I$(CORE_THEME_DIR)/include -I$(CORE_FONT_DIR)/include $(VULKAN_CFLAGS) $(SDL_CFLAGS) $(SDL_TTF_CFLAGS)
+INC = -Isrc -Iinclude -Iinclude/mem_console -I$(CORE_MEMDB_DIR)/include -I$(CORE_PACK_DIR)/include -I$(CORE_TIME_DIR)/include -I$(CORE_QUEUE_DIR)/include -I$(CORE_SCHED_DIR)/include -I$(CORE_JOBS_DIR)/include -I$(CORE_WORKERS_DIR)/include -I$(CORE_WAKE_DIR)/include -I$(CORE_KERNEL_DIR)/include -I$(CORE_PANE_DIR)/include -I$(KIT_UI_DIR)/include -I$(KIT_GRAPH_STRUCT_DIR)/include -I$(KIT_RENDER_DIR)/include -I$(VK_RENDERER_DIR)/include -I$(CORE_BASE_DIR)/include -I$(CORE_THEME_DIR)/include -I$(CORE_FONT_DIR)/include $(VULKAN_CFLAGS) $(SDL_CFLAGS) $(SDL_TTF_CFLAGS)
 
 OBJ_DIR = build
 BIN = $(OBJ_DIR)/mem_console
-SRC = src/mem_console.c src/mem_console_state.c src/mem_console_pane_layout.c src/mem_console_layout_config.c src/mem_console_db.c src/mem_console_prefs.c src/mem_console_runtime.c src/mem_console_kernel_bridge.c src/mem_console_ui_common.c src/mem_console_ui_hud.c src/mem_console_ui_chrome.c src/mem_console_ui_graph.c src/mem_console_ui_left_panel.c src/mem_console_ui_detail_panel.c src/mem_console_ui_left_section.c src/mem_console_ui_detail_section.c src/mem_console_ui_graph_controls.c src/mem_console_ui_graph_panel.c src/mem_console_ui.c
+	SRC = src/app/mem_console.c \
+		src/app/mem_console_app_actions.c \
+		src/app/mem_console_app_db_switch.c \
+		src/app/mem_console_app_events.c \
+		src/app/mem_console_app_loop.c \
+		src/app/mem_console_app_theme.c \
+		src/app/mem_console_kernel_bridge.c \
+		src/db/mem_console_db.c \
+	src/db/mem_console_db_filters.c \
+	src/db/mem_console_db_mutations.c \
+	src/db/mem_console_db_reads.c \
+	src/runtime/mem_console_prefs.c \
+	src/runtime/mem_console_runtime.c \
+	src/runtime/mem_console_state.c \
+	src/runtime/mem_console_state_core.c \
+	src/runtime/mem_console_state_graph_filters.c \
+	src/runtime/mem_console_state_paths.c \
+	src/runtime/mem_console_state_project_filters.c \
+	src/layout/mem_console_layout_config.c \
+	src/layout/mem_console_pane_layout.c \
+	src/ui/mem_console_ui.c \
+	src/ui/mem_console_ui_chrome.c \
+	src/ui/mem_console_ui_common.c \
+	src/ui/mem_console_ui_detail_panel.c \
+	src/ui/mem_console_ui_detail_section.c \
+	src/ui/mem_console_ui_hud.c \
+	src/ui/mem_console_ui_left_panel.c \
+	src/ui/mem_console_ui_left_section.c \
+	src/ui/graph/mem_console_ui_graph.c \
+	src/ui/graph/mem_console_ui_graph_camera.c \
+	src/ui/graph/mem_console_ui_graph_controls.c \
+	src/ui/graph/mem_console_ui_graph_draw.c \
+	src/ui/graph/mem_console_ui_graph_geometry.c \
+	src/ui/graph/mem_console_ui_graph_hud.c \
+	src/ui/graph/mem_console_ui_graph_layout.c \
+	src/ui/graph/mem_console_ui_graph_overlay.c \
+	src/ui/graph/mem_console_ui_graph_project_pods.c \
+	src/ui/graph/mem_console_ui_graph_types.c \
+	src/ui/graph/mem_console_ui_graph_panel.c
 
 .PHONY: all clean run run-demo vk-renderer-lib
 
@@ -116,10 +154,10 @@ $(BIN): $(SRC) $(KIT_GRAPH_STRUCT_DIR)/build/libkit_graph_struct.a $(KIT_UI_DIR)
 
 RUN_ARGS ?=
 REPO_ROOT := ..
-DEMO_DB ?= $(if $(wildcard $(HOME)/Desktop/CodeWork/data),$(HOME)/Desktop/CodeWork/data/codework_mem_console.sqlite,mem_console/demo/demo_mem_console.sqlite)
+DEMO_DB ?= mem_console/demo/demo_mem_console.sqlite
 
 run: $(BIN)
-	cd $(REPO_ROOT) && ./mem_console/$(BIN) --db $(DEMO_DB) $(RUN_ARGS)
+	cd $(REPO_ROOT) && ./mem_console/$(BIN) $(RUN_ARGS)
 
 run-demo: $(BIN)
 	cd $(REPO_ROOT) && ./mem_console/$(BIN) --db $(DEMO_DB) $(RUN_ARGS)
