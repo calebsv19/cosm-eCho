@@ -51,6 +51,15 @@ INC = -Isrc -Iinclude -Iinclude/mem_console -I$(CORE_MEMDB_DIR)/include -I$(CORE
 
 OBJ_DIR = build
 BIN = $(OBJ_DIR)/mem_console
+DIST_DIR := dist
+PACKAGE_APP_NAME := MemConsole.app
+PACKAGE_APP_DIR := $(DIST_DIR)/$(PACKAGE_APP_NAME)
+PACKAGE_CONTENTS_DIR := $(PACKAGE_APP_DIR)/Contents
+PACKAGE_MACOS_DIR := $(PACKAGE_CONTENTS_DIR)/MacOS
+PACKAGE_RESOURCES_DIR := $(PACKAGE_CONTENTS_DIR)/Resources
+PACKAGE_INFO_PLIST_SRC := tools/packaging/macos/Info.plist
+PACKAGE_LAUNCHER_SRC := tools/packaging/macos/mem-console-launcher
+DESKTOP_APP_DIR ?= $(HOME)/Desktop/$(PACKAGE_APP_NAME)
 	SRC = src/app/mem_console.c \
 		src/app/mem_console_app_main.c \
 		src/app/mem_console_app_actions.c \
@@ -92,7 +101,7 @@ BIN = $(OBJ_DIR)/mem_console
 	src/ui/graph/mem_console_ui_graph_types.c \
 	src/ui/graph/mem_console_ui_graph_panel.c
 
-.PHONY: all clean run run-demo vk-renderer-lib test run-headless-smoke visual-harness
+.PHONY: all clean run run-demo vk-renderer-lib test run-headless-smoke visual-harness package-desktop package-desktop-smoke package-desktop-self-test package-desktop-copy-desktop package-desktop-sync package-desktop-open package-desktop-remove package-desktop-refresh
 
 all: $(BIN)
 
@@ -171,6 +180,59 @@ run-headless-smoke: $(BIN)
 visual-harness: $(BIN)
 	@echo "visual harness build gate ready: $(BIN)"
 	@echo "launch manual UI validation with: make -C mem_console run-demo"
+
+package-desktop: $(BIN)
+	@echo "Preparing desktop package..."
+	@rm -rf "$(PACKAGE_APP_DIR)"
+	@mkdir -p "$(PACKAGE_MACOS_DIR)" "$(PACKAGE_RESOURCES_DIR)"
+	@cp "$(PACKAGE_INFO_PLIST_SRC)" "$(PACKAGE_CONTENTS_DIR)/Info.plist"
+	@cp "$(BIN)" "$(PACKAGE_MACOS_DIR)/mem-console-bin"
+	@cp "$(PACKAGE_LAUNCHER_SRC)" "$(PACKAGE_MACOS_DIR)/mem-console-launcher"
+	@chmod +x "$(PACKAGE_MACOS_DIR)/mem-console-bin" "$(PACKAGE_MACOS_DIR)/mem-console-launcher"
+	@if [ -d "data" ]; then cp -R data "$(PACKAGE_RESOURCES_DIR)/"; else mkdir -p "$(PACKAGE_RESOURCES_DIR)/data"; fi
+	@mkdir -p "$(PACKAGE_RESOURCES_DIR)/data"
+	@mkdir -p "$(PACKAGE_RESOURCES_DIR)/shared/assets/fonts"
+	@cp -R "$(SHARED_ROOT)/assets/fonts/." "$(PACKAGE_RESOURCES_DIR)/shared/assets/fonts/"
+	@mkdir -p "$(PACKAGE_RESOURCES_DIR)/vk_renderer" "$(PACKAGE_RESOURCES_DIR)/shaders"
+	@cp -R "$(VK_RENDERER_DIR)/shaders" "$(PACKAGE_RESOURCES_DIR)/vk_renderer/"
+	@cp -R "$(VK_RENDERER_DIR)/shaders/." "$(PACKAGE_RESOURCES_DIR)/shaders/"
+	@echo "Desktop package ready: $(PACKAGE_APP_DIR)"
+
+package-desktop-smoke: package-desktop
+	@test -x "$(PACKAGE_MACOS_DIR)/mem-console-launcher" || (echo "Missing launcher"; exit 1)
+	@test -x "$(PACKAGE_MACOS_DIR)/mem-console-bin" || (echo "Missing app binary"; exit 1)
+	@test -f "$(PACKAGE_CONTENTS_DIR)/Info.plist" || (echo "Missing Info.plist"; exit 1)
+	@test -f "$(PACKAGE_RESOURCES_DIR)/data/default.sqlite" || (echo "Missing default sqlite"; exit 1)
+	@test -f "$(PACKAGE_RESOURCES_DIR)/shared/assets/fonts/Montserrat-Regular.ttf" || (echo "Missing shared font"; exit 1)
+	@test -f "$(PACKAGE_RESOURCES_DIR)/vk_renderer/shaders/textured.vert.spv" || (echo "Missing bundled vk shader"; exit 1)
+	@test -f "$(PACKAGE_RESOURCES_DIR)/shaders/textured.vert.spv" || (echo "Missing bundled runtime shader"; exit 1)
+	@echo "package-desktop-smoke passed."
+
+package-desktop-self-test: package-desktop-smoke
+	@"$(PACKAGE_MACOS_DIR)/mem-console-launcher" --self-test || (echo "package-desktop self-test failed."; exit 1)
+	@echo "package-desktop-self-test passed."
+
+package-desktop-copy-desktop: package-desktop
+	@mkdir -p "$(dir $(DESKTOP_APP_DIR))"
+	@rm -rf "$(DESKTOP_APP_DIR)"
+	@cp -R "$(PACKAGE_APP_DIR)" "$(DESKTOP_APP_DIR)"
+	@echo "Copied $(PACKAGE_APP_NAME) to $(DESKTOP_APP_DIR)"
+
+package-desktop-sync: package-desktop-copy-desktop
+	@echo "Desktop package synchronized: $(DESKTOP_APP_DIR)"
+
+package-desktop-open: package-desktop
+	@open "$(PACKAGE_APP_DIR)"
+
+package-desktop-remove:
+	@rm -rf "$(DESKTOP_APP_DIR)"
+	@echo "Removed desktop app copy: $(DESKTOP_APP_DIR)"
+
+package-desktop-refresh: package-desktop
+	@mkdir -p "$(dir $(DESKTOP_APP_DIR))"
+	@rm -rf "$(DESKTOP_APP_DIR)"
+	@cp -R "$(PACKAGE_APP_DIR)" "$(DESKTOP_APP_DIR)"
+	@echo "Refreshed $(PACKAGE_APP_NAME) at $(DESKTOP_APP_DIR)"
 
 clean:
 	rm -rf $(OBJ_DIR)

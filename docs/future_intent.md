@@ -1,6 +1,6 @@
 # mem_console Future Intent
 
-Last updated: 2026-03-27
+Last updated: 2026-04-01
 
 ## Scaffold Alignment Targets
 - lock lifecycle around a canonical app wrapper (`mem_console_app_main`) and named startup stages
@@ -28,3 +28,9 @@ Last updated: 2026-03-27
 - iterative program-by-program migration (no ecosystem big-bang rewrite)
 - copy-first, non-destructive structure changes
 - docs updated when behavior/structure meaning changes
+
+## Desktop Packaging Follow-Up
+- keep `.app` packaging lane aligned with scaffold packaging contract (`package-desktop*` targets + launcher diagnostics + resource smoke checks).
+- maintain Finder/launcher parity checks whenever runtime resource roots, DB bootstrap, or renderer shader layout changes.
+- rename sweep follow-up remains pending for canonical product naming:
+  - `MemConsole.app` -> `eCho.app`.

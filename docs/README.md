@@ -7,3 +7,4 @@ This directory tracks the scaffold-oriented documentation lanes for `mem_console
 - `future_intent.md`: near and medium-term intended structure/behavior.
 - `architecture.md`: subsystem ownership and lifecycle shape.
 - `migration.md`: scaffold standardization phase tracker and verification contract.
+- `desktop_packaging.md`: `.app` packaging contract, launcher behavior, and validation workflow.

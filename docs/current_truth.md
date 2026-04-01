@@ -1,6 +1,6 @@
 # mem_console Current Truth
 
-Last updated: 2026-03-27
+Last updated: 2026-04-01
 
 ## Program Identity
 - Repo/program directory: `mem_console`
@@ -47,6 +47,33 @@ Last updated: 2026-03-27
 - `make -C mem_console test`
 - `make -C mem_console run-headless-smoke`
 - `make -C mem_console visual-harness`
+- desktop packaging verification:
+  - `make -C mem_console package-desktop`
+  - `make -C mem_console package-desktop-smoke`
+  - `make -C mem_console package-desktop-self-test`
+  - `make -C mem_console package-desktop-refresh`
+
+## Desktop Packaging Contract (Current)
+- standardized package target lane is implemented:
+  - `package-desktop`
+  - `package-desktop-smoke`
+  - `package-desktop-self-test`
+  - `package-desktop-copy-desktop`
+  - `package-desktop-sync`
+  - `package-desktop-open`
+  - `package-desktop-remove`
+  - `package-desktop-refresh`
+- launcher entrypoint: `tools/packaging/macos/mem-console-launcher`
+- launcher diagnostics:
+  - `--print-config`
+  - `--self-test`
+  - startup logfile: `~/Library/Logs/MemConsole/launcher.log`
+- packaged runtime resource lanes:
+  - `Contents/Resources/data/default.sqlite` (seed DB)
+  - `Contents/Resources/shared/assets/fonts/*`
+  - `Contents/Resources/vk_renderer/shaders/*`
+  - `Contents/Resources/shaders/*`
+- launcher seeds writable user DB at `~/.local/share/mem_console/default.sqlite` from bundled `default.sqlite` on first launch (unless `CODEWORK_MEMDB_PATH` override is provided).
 
 ## Post-Scaffold Font Size Pass (Current)
 - keyboard text zoom is implemented:
