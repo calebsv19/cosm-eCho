@@ -1,6 +1,6 @@
 # mem_console Current Truth
 
-Last updated: 2026-04-01
+Last updated: 2026-04-02
 
 ## Program Identity
 - Repo/program directory: `mem_console`
@@ -41,6 +41,10 @@ Last updated: 2026-04-01
   - run-loop stage via `mem_console_app_run_loop(...)`
   - `mem_console_app_shutdown`
 - Stage-order guardrails are enforced through explicit lifecycle transitions.
+- wrapper diagnostics normalization is now active (`W2`):
+  - lifecycle stage-order violations now include both stage label and function context.
+  - wrapper-level error taxonomy is logged for lifecycle boundary failures.
+  - final wrapper exit summary now logs stage, exit code, dispatch status, and wrapper error code.
 
 ## Verification Contract (Current)
 - `make -C mem_console clean && make -C mem_console`
@@ -82,6 +86,14 @@ Last updated: 2026-04-01
   - `Cmd/Ctrl 0` => reset zoom
 - zoom state is persisted in UI prefs (`MCFG` schema `v11`) via `text_zoom_step`.
 - startup and DB-switch paths reapply theme/font/zoom and UI density consistently.
+
+## Wrapper Contract State
+- cross-program wrapper initiative status:
+  - `W0` complete
+  - `W1` complete for `mem_console`
+  - `W2` complete for `mem_console`
+- execution note:
+  - `../docs/private_program_docs/memory_console/2026-04-02_mem_console_w1_w2_wrapper_hardening.md`
 
 ## Source Hygiene (Current)
 - historical `_backup` directories were removed from active `src/` lanes.

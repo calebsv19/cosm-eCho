@@ -1,6 +1,6 @@
 # mem_console Future Intent
 
-Last updated: 2026-04-01
+Last updated: 2026-04-02
 
 ## Scaffold Alignment Targets
 - lock lifecycle around a canonical app wrapper (`mem_console_app_main`) and named startup stages
@@ -16,6 +16,13 @@ Last updated: 2026-04-01
   5. runtime start
   6. run loop
   7. shutdown
+
+## Cross-Program Wrapper Initiative
+- `W0` complete (canonical wrapper contract frozen)
+- `W1` complete for `mem_console` (typed stage/context wrapper shape already aligned)
+- `W2` complete for `mem_console` (structured wrapper diagnostics normalization + wrapper exit summary logging)
+- execution note:
+  - `../docs/private_program_docs/memory_console/2026-04-02_mem_console_w1_w2_wrapper_hardening.md`
 
 ## Optional Lane Policy
 - keep optional top-level lanes when needed and justified:

@@ -25,6 +25,16 @@ typedef enum MemConsoleAppStage {
     MEM_CONSOLE_APP_STAGE_SHUTDOWN_COMPLETED
 } MemConsoleAppStage;
 
+typedef enum MemConsoleWrapperError {
+    MEM_CONSOLE_WRAPPER_ERROR_NONE = 0,
+    MEM_CONSOLE_WRAPPER_ERROR_BOOTSTRAP_FAILED = 1,
+    MEM_CONSOLE_WRAPPER_ERROR_CONFIG_LOAD_FAILED = 2,
+    MEM_CONSOLE_WRAPPER_ERROR_STATE_SEED_FAILED = 3,
+    MEM_CONSOLE_WRAPPER_ERROR_SUBSYSTEMS_INIT_FAILED = 4,
+    MEM_CONSOLE_WRAPPER_ERROR_RUNTIME_START_FAILED = 5,
+    MEM_CONSOLE_WRAPPER_ERROR_RUN_LOOP_FAILED = 6
+} MemConsoleWrapperError;
+
 typedef struct MemConsoleAppMainContext {
     int argc;
     char **argv;
@@ -59,22 +69,40 @@ typedef struct MemConsoleAppMainContext {
     int runtime_initialized;
     int kernel_bridge_initialized;
     int text_input_started;
+    int dispatch_ran;
+    int dispatch_succeeded;
+    MemConsoleWrapperError wrapper_error;
     MemConsoleAppStage stage;
 } MemConsoleAppMainContext;
+
+static void mem_console_log_wrapper_error(const char *fn_name,
+                                          MemConsoleWrapperError wrapper_error,
+                                          MemConsoleAppStage stage,
+                                          int exit_code) {
+    fprintf(stderr,
+            "mem_console: wrapper error fn=%s code=%d stage=%d exit_code=%d\n",
+            fn_name ? fn_name : "unknown",
+            (int)wrapper_error,
+            (int)stage,
+            exit_code);
+}
 
 static int mem_console_app_stage_transition(MemConsoleAppMainContext *ctx,
                                             MemConsoleAppStage expected,
                                             MemConsoleAppStage next,
-                                            const char *stage_name) {
+                                            const char *stage_name,
+                                            const char *fn_name) {
     if (!ctx) {
         return 0;
     }
     if (ctx->stage != expected) {
         fprintf(stderr,
-                "mem_console: lifecycle stage order violation at %s (expected=%d actual=%d)\n",
+                "mem_console: lifecycle stage order violation fn=%s stage=%s expected=%d actual=%d next=%d\n",
+                fn_name ? fn_name : "unknown",
                 stage_name ? stage_name : "unknown",
                 (int)expected,
-                (int)ctx->stage);
+                (int)ctx->stage,
+                (int)next);
         return 0;
     }
     ctx->stage = next;
@@ -97,7 +125,8 @@ static int mem_console_app_bootstrap(MemConsoleAppMainContext *ctx,
     return mem_console_app_stage_transition(ctx,
                                             MEM_CONSOLE_APP_STAGE_INIT,
                                             MEM_CONSOLE_APP_STAGE_BOOTSTRAPPED,
-                                            "mem_console_app_bootstrap");
+                                            "mem_console_app_bootstrap",
+                                            __func__);
 }
 
 static int mem_console_app_config_load(MemConsoleAppMainContext *ctx) {
@@ -108,7 +137,8 @@ static int mem_console_app_config_load(MemConsoleAppMainContext *ctx) {
     if (!mem_console_app_stage_transition(ctx,
                                           MEM_CONSOLE_APP_STAGE_BOOTSTRAPPED,
                                           MEM_CONSOLE_APP_STAGE_BOOTSTRAPPED,
-                                          "mem_console_app_config_load.pre")) {
+                                          "mem_console_app_config_load.pre",
+                                          __func__)) {
         return 0;
     }
 
@@ -147,7 +177,8 @@ static int mem_console_app_config_load(MemConsoleAppMainContext *ctx) {
     return mem_console_app_stage_transition(ctx,
                                             MEM_CONSOLE_APP_STAGE_BOOTSTRAPPED,
                                             MEM_CONSOLE_APP_STAGE_CONFIG_LOADED,
-                                            "mem_console_app_config_load");
+                                            "mem_console_app_config_load",
+                                            __func__);
 }
 
 static int mem_console_app_state_seed(MemConsoleAppMainContext *ctx) {
@@ -157,7 +188,8 @@ static int mem_console_app_state_seed(MemConsoleAppMainContext *ctx) {
     if (!mem_console_app_stage_transition(ctx,
                                           MEM_CONSOLE_APP_STAGE_CONFIG_LOADED,
                                           MEM_CONSOLE_APP_STAGE_CONFIG_LOADED,
-                                          "mem_console_app_state_seed.pre")) {
+                                          "mem_console_app_state_seed.pre",
+                                          __func__)) {
         return 0;
     }
 
@@ -211,7 +243,8 @@ static int mem_console_app_state_seed(MemConsoleAppMainContext *ctx) {
     return mem_console_app_stage_transition(ctx,
                                             MEM_CONSOLE_APP_STAGE_CONFIG_LOADED,
                                             MEM_CONSOLE_APP_STAGE_STATE_SEEDED,
-                                            "mem_console_app_state_seed");
+                                            "mem_console_app_state_seed",
+                                            __func__);
 }
 
 static int mem_console_app_subsystems_init(MemConsoleAppMainContext *ctx) {
@@ -221,7 +254,8 @@ static int mem_console_app_subsystems_init(MemConsoleAppMainContext *ctx) {
     if (!mem_console_app_stage_transition(ctx,
                                           MEM_CONSOLE_APP_STAGE_STATE_SEEDED,
                                           MEM_CONSOLE_APP_STAGE_STATE_SEEDED,
-                                          "mem_console_app_subsystems_init.pre")) {
+                                          "mem_console_app_subsystems_init.pre",
+                                          __func__)) {
         return 0;
     }
 
@@ -292,7 +326,8 @@ static int mem_console_app_subsystems_init(MemConsoleAppMainContext *ctx) {
     return mem_console_app_stage_transition(ctx,
                                             MEM_CONSOLE_APP_STAGE_STATE_SEEDED,
                                             MEM_CONSOLE_APP_STAGE_SUBSYSTEMS_READY,
-                                            "mem_console_app_subsystems_init");
+                                            "mem_console_app_subsystems_init",
+                                            __func__);
 }
 
 static int mem_console_runtime_start(MemConsoleAppMainContext *ctx) {
@@ -302,7 +337,8 @@ static int mem_console_runtime_start(MemConsoleAppMainContext *ctx) {
     if (!mem_console_app_stage_transition(ctx,
                                           MEM_CONSOLE_APP_STAGE_SUBSYSTEMS_READY,
                                           MEM_CONSOLE_APP_STAGE_SUBSYSTEMS_READY,
-                                          "mem_console_runtime_start.pre")) {
+                                          "mem_console_runtime_start.pre",
+                                          __func__)) {
         return 0;
     }
 
@@ -349,7 +385,8 @@ static int mem_console_runtime_start(MemConsoleAppMainContext *ctx) {
     return mem_console_app_stage_transition(ctx,
                                             MEM_CONSOLE_APP_STAGE_SUBSYSTEMS_READY,
                                             MEM_CONSOLE_APP_STAGE_RUNTIME_STARTED,
-                                            "mem_console_runtime_start");
+                                            "mem_console_runtime_start",
+                                            __func__);
 }
 
 static int mem_console_app_run_loop_stage(MemConsoleAppMainContext *ctx) {
@@ -359,11 +396,14 @@ static int mem_console_app_run_loop_stage(MemConsoleAppMainContext *ctx) {
     if (!mem_console_app_stage_transition(ctx,
                                           MEM_CONSOLE_APP_STAGE_RUNTIME_STARTED,
                                           MEM_CONSOLE_APP_STAGE_RUNTIME_STARTED,
-                                          "mem_console_app_run_loop.pre")) {
+                                          "mem_console_app_run_loop.pre",
+                                          __func__)) {
         return 0;
     }
 
+    ctx->dispatch_ran = 1;
     ctx->exit_code = mem_console_app_run_loop(&ctx->loop_ctx);
+    ctx->dispatch_succeeded = (ctx->exit_code == 0);
 
     if (ctx->prefs_path_valid && ctx->state.pane_prefs_dirty) {
         ctx->result = mem_console_prefs_save(ctx->prefs_path, &ctx->state);
@@ -377,7 +417,8 @@ static int mem_console_app_run_loop_stage(MemConsoleAppMainContext *ctx) {
     return mem_console_app_stage_transition(ctx,
                                             MEM_CONSOLE_APP_STAGE_RUNTIME_STARTED,
                                             MEM_CONSOLE_APP_STAGE_LOOP_COMPLETED,
-                                            "mem_console_app_run_loop");
+                                            "mem_console_app_run_loop",
+                                            __func__);
 }
 
 static void mem_console_app_shutdown(MemConsoleAppMainContext *ctx) {
@@ -426,26 +467,54 @@ int mem_console_app_main(int argc, char **argv) {
     MemConsoleAppMainContext ctx;
 
     if (!mem_console_app_bootstrap(&ctx, argc, argv)) {
+        mem_console_log_wrapper_error(__func__,
+                                      MEM_CONSOLE_WRAPPER_ERROR_BOOTSTRAP_FAILED,
+                                      MEM_CONSOLE_APP_STAGE_INIT,
+                                      1);
         return 1;
     }
     if (!mem_console_app_config_load(&ctx)) {
+        ctx.wrapper_error = MEM_CONSOLE_WRAPPER_ERROR_CONFIG_LOAD_FAILED;
+        mem_console_log_wrapper_error(__func__, ctx.wrapper_error, ctx.stage, ctx.exit_code);
         mem_console_app_shutdown(&ctx);
         return ctx.exit_code;
     }
     if (!mem_console_app_state_seed(&ctx)) {
+        ctx.wrapper_error = MEM_CONSOLE_WRAPPER_ERROR_STATE_SEED_FAILED;
+        mem_console_log_wrapper_error(__func__, ctx.wrapper_error, ctx.stage, ctx.exit_code);
         mem_console_app_shutdown(&ctx);
         return ctx.exit_code;
     }
     if (!mem_console_app_subsystems_init(&ctx)) {
+        ctx.wrapper_error = MEM_CONSOLE_WRAPPER_ERROR_SUBSYSTEMS_INIT_FAILED;
+        mem_console_log_wrapper_error(__func__, ctx.wrapper_error, ctx.stage, ctx.exit_code);
         mem_console_app_shutdown(&ctx);
         return ctx.exit_code;
     }
     if (!mem_console_runtime_start(&ctx)) {
+        ctx.wrapper_error = MEM_CONSOLE_WRAPPER_ERROR_RUNTIME_START_FAILED;
+        mem_console_log_wrapper_error(__func__, ctx.wrapper_error, ctx.stage, ctx.exit_code);
         mem_console_app_shutdown(&ctx);
         return ctx.exit_code;
     }
 
-    (void)mem_console_app_run_loop_stage(&ctx);
+    if (!mem_console_app_run_loop_stage(&ctx)) {
+        ctx.wrapper_error = MEM_CONSOLE_WRAPPER_ERROR_RUN_LOOP_FAILED;
+        if (ctx.exit_code == 0) {
+            ctx.exit_code = 1;
+        }
+        mem_console_log_wrapper_error(__func__, ctx.wrapper_error, ctx.stage, ctx.exit_code);
+        mem_console_app_shutdown(&ctx);
+        return ctx.exit_code;
+    }
+
     mem_console_app_shutdown(&ctx);
+    fprintf(stderr,
+            "mem_console: wrapper exit stage=%d exit_code=%d dispatch_ran=%d dispatch_ok=%d wrapper_error=%d\n",
+            (int)ctx.stage,
+            ctx.exit_code,
+            ctx.dispatch_ran,
+            ctx.dispatch_succeeded,
+            (int)ctx.wrapper_error);
     return ctx.exit_code;
 }
