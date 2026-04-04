@@ -75,6 +75,26 @@ typedef struct MemConsoleInputDiagTotals {
     uint64_t invalidation_reason_bits_total;
 } MemConsoleInputDiagTotals;
 
+typedef struct MemConsoleRenderDeriveFrame {
+    KitUiInputState input;
+    int frame_width;
+    int frame_height;
+    int wheel_y;
+    uint32_t frame_reasons;
+} MemConsoleRenderDeriveFrame;
+
+typedef struct MemConsoleRenderSubmitOutcome {
+    int frame_result;
+    MemConsoleAction ui_action;
+} MemConsoleRenderSubmitOutcome;
+
+typedef struct MemConsoleRenderDiagTotals {
+    uint64_t frame_count;
+    uint64_t submit_ok_count;
+    uint64_t submit_recoverable_count;
+    uint64_t submit_fatal_count;
+} MemConsoleRenderDiagTotals;
+
 static int mem_console_env_flag_enabled(const char *name) {
     const char *value = NULL;
     if (!name) {
@@ -93,6 +113,50 @@ static int mem_console_env_flag_enabled(const char *name) {
 
 static int mem_console_ir1_diag_enabled(void) {
     return mem_console_env_flag_enabled("MEM_CONSOLE_IR1_DIAG");
+}
+
+static int mem_console_rs1_diag_enabled(void) {
+    return mem_console_env_flag_enabled("MEM_CONSOLE_RS1_DIAG");
+}
+
+static void mem_console_render_derive_frame(MemConsoleRenderDeriveFrame *out_derive,
+                                            const KitUiInputState *input,
+                                            int frame_width,
+                                            int frame_height,
+                                            int wheel_y,
+                                            uint32_t frame_reasons) {
+    if (!out_derive || !input) {
+        return;
+    }
+    memset(out_derive, 0, sizeof(*out_derive));
+    out_derive->input = *input;
+    out_derive->frame_width = frame_width;
+    out_derive->frame_height = frame_height;
+    out_derive->wheel_y = wheel_y;
+    out_derive->frame_reasons = frame_reasons;
+}
+
+static void mem_console_render_submit_frame(const MemConsoleAppLoopContext *ctx,
+                                            const MemConsoleRenderDeriveFrame *derive,
+                                            MemConsoleRenderSubmitOutcome *out_submit) {
+    if (!out_submit) {
+        return;
+    }
+    memset(out_submit, 0, sizeof(*out_submit));
+    out_submit->ui_action = MEM_CONSOLE_ACTION_NONE;
+    out_submit->frame_result = MEM_CONSOLE_FRAME_FATAL;
+    if (!ctx || !ctx->render_ctx || !ctx->ui_ctx || !ctx->state || !derive) {
+        return;
+    }
+
+    out_submit->frame_result = run_frame(ctx->render_ctx,
+                                         ctx->ui_ctx,
+                                         ctx->state,
+                                         &derive->input,
+                                         derive->frame_width,
+                                         derive->frame_height,
+                                         derive->wheel_y,
+                                         &out_submit->ui_action);
 }
 
 static void mem_console_input_frame_begin(MemConsoleInputFrame *frame) {
@@ -304,6 +368,7 @@ int mem_console_app_run_loop(MemConsoleAppLoopContext *ctx) {
     int last_frame_height = -1;
     KitUiInputState input = {0};
     MemConsoleInputDiagTotals ir1_diag_totals = {0};
+    MemConsoleRenderDiagTotals rs1_diag_totals = {0};
 
     if (!ctx || !ctx->window || !ctx->renderer || !ctx->render_ctx || !ctx->ui_ctx ||
         !ctx->db || !ctx->state || !ctx->runtime || !ctx->kernel_bridge ||
@@ -442,15 +507,38 @@ int mem_console_app_run_loop(MemConsoleAppLoopContext *ctx) {
 
         frame_reasons = mem_console_redraw_pending(ctx->state);
         if (frame_reasons != 0u) {
+            MemConsoleRenderDeriveFrame render_derive;
+            MemConsoleRenderSubmitOutcome render_submit;
+
             frame_reasons = mem_console_redraw_take_pending(ctx->state);
-            frame_result = run_frame(ctx->render_ctx,
-                                     ctx->ui_ctx,
-                                     ctx->state,
-                                     &input,
-                                     frame_width,
-                                     frame_height,
-                                     wheel_y,
-                                     &ui_action);
+            mem_console_render_derive_frame(&render_derive,
+                                            &input,
+                                            frame_width,
+                                            frame_height,
+                                            wheel_y,
+                                            frame_reasons);
+            mem_console_render_submit_frame(ctx, &render_derive, &render_submit);
+            frame_result = render_submit.frame_result;
+            ui_action = render_submit.ui_action;
+
+            rs1_diag_totals.frame_count += 1u;
+            if (frame_result == MEM_CONSOLE_FRAME_OK) {
+                rs1_diag_totals.submit_ok_count += 1u;
+            } else if (frame_result == MEM_CONSOLE_FRAME_RECOVERABLE) {
+                rs1_diag_totals.submit_recoverable_count += 1u;
+            } else {
+                rs1_diag_totals.submit_fatal_count += 1u;
+            }
+            if (mem_console_rs1_diag_enabled()) {
+                printf("[rs1] mem_console frame=%llu reasons=0x%x submit=%d totals(frames=%llu ok=%llu recoverable=%llu fatal=%llu)\n",
+                       (unsigned long long)rs1_diag_totals.frame_count,
+                       (unsigned int)render_derive.frame_reasons,
+                       frame_result,
+                       (unsigned long long)rs1_diag_totals.frame_count,
+                       (unsigned long long)rs1_diag_totals.submit_ok_count,
+                       (unsigned long long)rs1_diag_totals.submit_recoverable_count,
+                       (unsigned long long)rs1_diag_totals.submit_fatal_count);
+            }
             if (frame_result == MEM_CONSOLE_FRAME_RECOVERABLE) {
                 if (!mem_console_app_recreate_swapchain_and_mark(ctx->renderer,
                                                                  ctx->window,
