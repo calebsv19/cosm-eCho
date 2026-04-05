@@ -5,8 +5,14 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
 APP_CONTENTS_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
 RES_DIR="$APP_CONTENTS_DIR/Resources"
 APP_BUNDLE_DB="$RES_DIR/data/default.sqlite"
-APP_DB_DIR="${HOME}/.local/share/mem_console"
-APP_DB_PATH="$APP_DB_DIR/default.sqlite"
+RUNTIME_DIR_DEFAULT="${HOME}/Library/Application Support/MemConsole/runtime"
+RUNTIME_DIR="${MEM_CONSOLE_RUNTIME_DIR:-$RUNTIME_DIR_DEFAULT}"
+if ! mkdir -p "$RUNTIME_DIR" 2>/dev/null; then
+    RUNTIME_DIR="${TMPDIR:-/tmp}/MemConsole/runtime"
+    mkdir -p "$RUNTIME_DIR" 2>/dev/null || true
+fi
+mkdir -p "$RUNTIME_DIR/data" "$RUNTIME_DIR/vk" "$RUNTIME_DIR/config/shared/shaders" 2>/dev/null || true
+APP_DB_PATH="$RUNTIME_DIR/data/default.sqlite"
 LOG_DIR="${HOME}/Library/Logs/MemConsole"
 LOG_FILE="$LOG_DIR/launcher.log"
 
@@ -16,22 +22,48 @@ if ! touch "$LOG_FILE" 2>/dev/null; then
     touch "$LOG_FILE" 2>/dev/null || true
 fi
 
-mkdir -p "$APP_DB_DIR" 2>/dev/null || true
 if [ ! -f "$APP_DB_PATH" ] && [ -f "$APP_BUNDLE_DB" ]; then
     cp "$APP_BUNDLE_DB" "$APP_DB_PATH" 2>/dev/null || true
 fi
 
+if [ -L "$RUNTIME_DIR/vk_renderer" ] || [ ! -e "$RUNTIME_DIR/vk_renderer" ]; then
+    ln -sfn "$RES_DIR/vk_renderer" "$RUNTIME_DIR/vk_renderer"
+fi
+if [ -L "$RUNTIME_DIR/config/shared/shaders/vk_renderer" ] || [ ! -e "$RUNTIME_DIR/config/shared/shaders/vk_renderer" ]; then
+    ln -sfn "$RES_DIR/vk_renderer" "$RUNTIME_DIR/config/shared/shaders/vk_renderer"
+fi
+
+MOLTENVK_DYLIB="$APP_CONTENTS_DIR/Frameworks/libMoltenVK.dylib"
+ICD_FILE="$RUNTIME_DIR/vk/MoltenVK_icd.json"
+cat >"$ICD_FILE" <<EOF
+{
+  "file_format_version": "1.0.0",
+  "ICD": {
+    "library_path": "$MOLTENVK_DYLIB",
+    "api_version": "1.3.0"
+  }
+}
+EOF
+
 export CODEWORK_MEMDB_PATH="${CODEWORK_MEMDB_PATH:-$APP_DB_PATH}"
-export VK_RENDERER_SHADER_ROOT="${VK_RENDERER_SHADER_ROOT:-$RES_DIR}"
+export MEM_CONSOLE_RUNTIME_DIR="$RUNTIME_DIR"
+export VK_RENDERER_SHADER_ROOT="${VK_RENDERER_SHADER_ROOT:-$RUNTIME_DIR/vk_renderer}"
+export VK_ICD_FILENAMES="${VK_ICD_FILENAMES:-$ICD_FILE}"
+export VK_DRIVER_FILES="${VK_DRIVER_FILES:-$ICD_FILE}"
+export MOLTENVK_DYLIB
 
 if [ "${1:-}" = "--print-config" ]; then
     echo "APP_CONTENTS_DIR=$APP_CONTENTS_DIR"
     echo "RES_DIR=$RES_DIR"
     echo "LOG_FILE=$LOG_FILE"
+    echo "MEM_CONSOLE_RUNTIME_DIR=$MEM_CONSOLE_RUNTIME_DIR"
     echo "APP_BUNDLE_DB=$APP_BUNDLE_DB"
     echo "APP_DB_PATH=$APP_DB_PATH"
     echo "CODEWORK_MEMDB_PATH=$CODEWORK_MEMDB_PATH"
     echo "VK_RENDERER_SHADER_ROOT=$VK_RENDERER_SHADER_ROOT"
+    echo "VK_ICD_FILENAMES=$VK_ICD_FILENAMES"
+    echo "VK_DRIVER_FILES=$VK_DRIVER_FILES"
+    echo "MOLTENVK_DYLIB=$MOLTENVK_DYLIB"
     exit 0
 fi
 
@@ -39,17 +71,23 @@ if [ "${1:-}" = "--self-test" ]; then
     [ -x "$SCRIPT_DIR/mem-console-bin" ] || { echo "missing: mem-console-bin" >&2; exit 1; }
     [ -f "$APP_CONTENTS_DIR/Info.plist" ] || { echo "missing: Info.plist" >&2; exit 1; }
     [ -f "$APP_BUNDLE_DB" ] || { echo "missing: bundled default sqlite" >&2; exit 1; }
-    [ -d "$APP_DB_DIR" ] || { echo "missing: app db directory" >&2; exit 1; }
+    [ -d "$RUNTIME_DIR" ] || { echo "missing: runtime directory" >&2; exit 1; }
+    [ -f "$ICD_FILE" ] || { echo "missing: runtime MoltenVK ICD file" >&2; exit 1; }
+    [ -f "$MOLTENVK_DYLIB" ] || { echo "missing: bundled MoltenVK dylib" >&2; exit 1; }
     [ -f "$RES_DIR/shared/assets/fonts/Montserrat-Regular.ttf" ] || { echo "missing: shared font" >&2; exit 1; }
     [ -f "$RES_DIR/vk_renderer/shaders/textured.vert.spv" ] || { echo "missing: bundled vk shader" >&2; exit 1; }
     [ -f "$RES_DIR/shaders/textured.vert.spv" ] || { echo "missing: bundled runtime shader" >&2; exit 1; }
     echo "self-test: ok"
     echo "LOG_FILE=$LOG_FILE"
+    echo "MEM_CONSOLE_RUNTIME_DIR=$MEM_CONSOLE_RUNTIME_DIR"
     echo "CODEWORK_MEMDB_PATH=$CODEWORK_MEMDB_PATH"
     echo "VK_RENDERER_SHADER_ROOT=$VK_RENDERER_SHADER_ROOT"
+    echo "VK_ICD_FILENAMES=$VK_ICD_FILENAMES"
+    echo "VK_DRIVER_FILES=$VK_DRIVER_FILES"
+    echo "MOLTENVK_DYLIB=$MOLTENVK_DYLIB"
     exit 0
 fi
 
-cd "$RES_DIR"
-printf '%s launch begin pid=%s cwd=%s memdb=%s shader_root=%s args=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$$" "$RES_DIR" "$CODEWORK_MEMDB_PATH" "$VK_RENDERER_SHADER_ROOT" "$*" >>"$LOG_FILE" 2>/dev/null || true
+cd "$RUNTIME_DIR"
+printf '%s launch begin pid=%s cwd=%s runtime=%s memdb=%s shader_root=%s args=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$$" "$RUNTIME_DIR" "$MEM_CONSOLE_RUNTIME_DIR" "$CODEWORK_MEMDB_PATH" "$VK_RENDERER_SHADER_ROOT" "$*" >>"$LOG_FILE" 2>/dev/null || true
 exec "$SCRIPT_DIR/mem-console-bin" "$@" >>"$LOG_FILE" 2>&1

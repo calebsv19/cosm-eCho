@@ -1,6 +1,6 @@
 # mem_console Future Intent
 
-Last updated: 2026-04-02
+Last updated: 2026-04-04
 
 ## Scaffold Alignment Targets
 - lock lifecycle around a canonical app wrapper (`mem_console_app_main`) and named startup stages
@@ -37,7 +37,10 @@ Last updated: 2026-04-02
 - docs updated when behavior/structure meaning changes
 
 ## Desktop Packaging Follow-Up
-- keep `.app` packaging lane aligned with scaffold packaging contract (`package-desktop*` targets + launcher diagnostics + resource smoke checks).
-- maintain Finder/launcher parity checks whenever runtime resource roots, DB bootstrap, or renderer shader layout changes.
-- rename sweep follow-up remains pending for canonical product naming:
-  - `MemConsole.app` -> `eCho.app`.
+- release-readiness lane is now complete for `mem_console` (`MC-RL0` through `MC-RL5`):
+  - standardized `package-desktop*` + `release-*` targets are landed.
+  - launcher runtime model is hardened for writable runtime root + Vulkan ICD exports.
+  - bundle id and product naming are locked for release (`eCho`, `com.cosm.echo`).
+- next packaging posture:
+  - maintenance-only parity with ecosystem release contract updates.
+  - keep Desktop/Finder launch + `release-verify-notarized` evidence in packaging-affecting closeout gates.

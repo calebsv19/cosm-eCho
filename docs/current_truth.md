@@ -1,6 +1,6 @@
 # mem_console Current Truth
 
-Last updated: 2026-04-02
+Last updated: 2026-04-04
 
 ## Program Identity
 - Repo/program directory: `mem_console`
@@ -56,9 +56,14 @@ Last updated: 2026-04-02
   - `make -C mem_console package-desktop-smoke`
   - `make -C mem_console package-desktop-self-test`
   - `make -C mem_console package-desktop-refresh`
+- release readiness verification:
+  - `make -C mem_console release-contract`
+  - `make -C mem_console release-bundle-audit`
+  - `make -C mem_console release-verify APPLE_SIGN_IDENTITY="Developer ID Application: <Name> (<TEAMID>)"`
+  - `make -C mem_console release-distribute APPLE_SIGN_IDENTITY="Developer ID Application: <Name> (<TEAMID>)" APPLE_NOTARY_PROFILE="cosm-notary"`
 
 ## Desktop Packaging Contract (Current)
-- standardized package target lane is implemented:
+- standardized package + release-readiness lane is implemented:
   - `package-desktop`
   - `package-desktop-smoke`
   - `package-desktop-self-test`
@@ -67,7 +72,21 @@ Last updated: 2026-04-02
   - `package-desktop-open`
   - `package-desktop-remove`
   - `package-desktop-refresh`
+  - `release-contract`
+  - `release-clean`
+  - `release-build`
+  - `release-bundle-audit`
+  - `release-sign`
+  - `release-verify`
+  - `release-verify-signed`
+  - `release-notarize`
+  - `release-staple`
+  - `release-verify-notarized`
+  - `release-artifact`
+  - `release-distribute`
+  - `release-desktop-refresh`
 - launcher entrypoint: `tools/packaging/macos/mem-console-launcher`
+- dylib bundler entrypoint: `tools/packaging/macos/bundle-dylibs.sh`
 - launcher diagnostics:
   - `--print-config`
   - `--self-test`
@@ -77,7 +96,14 @@ Last updated: 2026-04-02
   - `Contents/Resources/shared/assets/fonts/*`
   - `Contents/Resources/vk_renderer/shaders/*`
   - `Contents/Resources/shaders/*`
-- launcher seeds writable user DB at `~/.local/share/mem_console/default.sqlite` from bundled `default.sqlite` on first launch (unless `CODEWORK_MEMDB_PATH` override is provided).
+- launcher runtime contract now uses writable runtime root:
+  - `~/Library/Application Support/MemConsole/runtime` (tmp fallback)
+  - seeded DB path: `<runtime>/data/default.sqlite`
+  - runtime Vulkan ICD path: `<runtime>/vk/MoltenVK_icd.json`
+- release identity:
+  - product app name: `eCho.app`
+  - bundle id: `com.cosm.echo`
+  - notarized artifact lane: `build/release/eCho-<version>-macOS-stable.zip`
 
 ## Post-Scaffold Font Size Pass (Current)
 - keyboard text zoom is implemented:
