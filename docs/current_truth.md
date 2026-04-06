@@ -1,6 +1,6 @@
 # mem_console Current Truth
 
-Last updated: 2026-04-04
+Last updated: 2026-04-05
 
 ## Program Identity
 - Repo/program directory: `mem_console`
@@ -61,6 +61,7 @@ Last updated: 2026-04-04
   - `make -C mem_console release-bundle-audit`
   - `make -C mem_console release-verify APPLE_SIGN_IDENTITY="Developer ID Application: <Name> (<TEAMID>)"`
   - `make -C mem_console release-distribute APPLE_SIGN_IDENTITY="Developer ID Application: <Name> (<TEAMID>)" APPLE_NOTARY_PROFILE="cosm-notary"`
+  - `make -C mem_console release-desktop-refresh APPLE_SIGN_IDENTITY="Developer ID Application: <Name> (<TEAMID>)" APPLE_NOTARY_PROFILE="cosm-notary"`
 
 ## Desktop Packaging Contract (Current)
 - standardized package + release-readiness lane is implemented:
@@ -104,6 +105,7 @@ Last updated: 2026-04-04
   - product app name: `eCho.app`
   - bundle id: `com.cosm.echo`
   - notarized artifact lane: `build/release/eCho-<version>-macOS-stable.zip`
+  - release chain hardening: `release-staple` now depends on `release-notarize` to guarantee ticket availability before stapling.
 
 ## Post-Scaffold Font Size Pass (Current)
 - keyboard text zoom is implemented:

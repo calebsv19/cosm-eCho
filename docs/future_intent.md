@@ -1,6 +1,6 @@
 # mem_console Future Intent
 
-Last updated: 2026-04-04
+Last updated: 2026-04-05
 
 ## Scaffold Alignment Targets
 - lock lifecycle around a canonical app wrapper (`mem_console_app_main`) and named startup stages
@@ -41,6 +41,8 @@ Last updated: 2026-04-04
   - standardized `package-desktop*` + `release-*` targets are landed.
   - launcher runtime model is hardened for writable runtime root + Vulkan ICD exports.
   - bundle id and product naming are locked for release (`eCho`, `com.cosm.echo`).
+  - notarization evidence refreshed: `eCho-0.1.0-macOS-stable.zip` accepted (submission `a2d52469-89db-4117-b263-f30b7d94e7b0`).
+  - release dependency hardening: `release-staple` requires `release-notarize`.
 - next packaging posture:
   - maintenance-only parity with ecosystem release contract updates.
   - keep Desktop/Finder launch + `release-verify-notarized` evidence in packaging-affecting closeout gates.

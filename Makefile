@@ -339,7 +339,7 @@ release-notarize: release-sign
 	@rg -q '"status"[[:space:]]*:[[:space:]]*"Accepted"' "$(RELEASE_DIR)/notary_submit.json" || (cat "$(RELEASE_DIR)/notary_submit.json" && echo "Notary submission was not accepted" && exit 1)
 	@echo "release-notarize passed."
 
-release-staple:
+release-staple: release-notarize
 	@attempt=1; \
 	while [ $$attempt -le $(STAPLE_MAX_ATTEMPTS) ]; do \
 		if xcrun stapler staple "$(PACKAGE_APP_DIR)" && xcrun stapler validate "$(PACKAGE_APP_DIR)"; then \
