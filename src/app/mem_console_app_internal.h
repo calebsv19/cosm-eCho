@@ -59,6 +59,8 @@ int mem_console_app_handle_text_zoom_shortcut(KitRenderContext *render_ctx,
 void mem_console_app_apply_pending_action(CoreMemDb *db,
                                           MemConsoleState *state,
                                           MemConsoleRuntime *runtime,
+                                          const char *app_prefs_path,
+                                          int app_prefs_path_valid,
                                           MemConsoleAction action);
 
 void mem_console_app_process_sdl_event(const SDL_Event *event,

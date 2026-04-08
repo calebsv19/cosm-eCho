@@ -9,10 +9,26 @@
 
 #include <SDL2/SDL.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "mem_console_app_internal.h"
 #include "mem_console_prefs.h"
+
+static int mem_console_build_legacy_app_prefs_path(char *out_path, size_t out_cap) {
+    const char *home_path = getenv("HOME");
+    int written = 0;
+
+    if (!out_path || out_cap == 0u || !home_path || !home_path[0]) {
+        return 0;
+    }
+    written = snprintf(out_path, out_cap, "%s/.local/share/mem_console/mem_console.app.pack", home_path);
+    if (written <= 0 || (size_t)written >= out_cap) {
+        out_path[0] = '\0';
+        return 0;
+    }
+    return 1;
+}
 
 typedef enum MemConsoleAppStage {
     MEM_CONSOLE_APP_STAGE_INIT = 0,
@@ -41,8 +57,15 @@ typedef struct MemConsoleAppMainContext {
     const char *db_path;
     const char *db_flag;
     char app_prefs_path[1200];
+    char app_prefs_legacy_path[1200];
     char app_prefs_db_path[1024];
+    char app_prefs_input_root[1024];
+    char app_prefs_output_root[1024];
+    char app_prefs_active_db_path[1024];
     char default_db_path[1024];
+    char input_root[1024];
+    char output_root[1024];
+    char active_db_path[1024];
     char prefs_path[1200];
     SDL_Window *window;
     VkRenderer renderer;
@@ -120,6 +143,9 @@ static int mem_console_app_bootstrap(MemConsoleAppMainContext *ctx,
     ctx->argc = argc;
     ctx->argv = argv;
     ctx->db_path = k_mem_console_default_db_path;
+    ctx->input_root[0] = '\0';
+    ctx->output_root[0] = '\0';
+    ctx->active_db_path[0] = '\0';
     ctx->exit_code = 1;
 
     return mem_console_app_stage_transition(ctx,
@@ -130,6 +156,10 @@ static int mem_console_app_bootstrap(MemConsoleAppMainContext *ctx,
 }
 
 static int mem_console_app_config_load(MemConsoleAppMainContext *ctx) {
+    char default_output_root[1024];
+    int app_prefs_loaded = 0;
+    int loaded_from_default_path = 0;
+
     if (!ctx) {
         return 0;
     }
@@ -149,24 +179,65 @@ static int mem_console_app_config_load(MemConsoleAppMainContext *ctx) {
 
     ctx->db_flag = find_flag_value(ctx->argc, ctx->argv, "--db");
     ctx->kernel_bridge_requested = has_flag(ctx->argc, ctx->argv, "--kernel-bridge");
-    if (ctx->db_flag) {
-        ctx->db_path = ctx->db_flag;
-    } else if (mem_console_build_app_prefs_path(ctx->app_prefs_path, sizeof(ctx->app_prefs_path))) {
+    default_output_root[0] = '\0';
+    if (mem_console_resolve_app_data_dir(default_output_root, sizeof(default_output_root)) &&
+        mem_console_build_app_prefs_path_for_output_root(default_output_root,
+                                                         ctx->app_prefs_path,
+                                                         sizeof(ctx->app_prefs_path))) {
         ctx->app_prefs_path_valid = 1;
         ctx->result = mem_console_app_prefs_load(ctx->app_prefs_path,
                                                  ctx->app_prefs_db_path,
-                                                 sizeof(ctx->app_prefs_db_path));
-        if (ctx->result.code == CORE_OK &&
-            ctx->result.message &&
-            strcmp(ctx->result.message, "app prefs loaded") == 0) {
-            ctx->db_path = ctx->app_prefs_db_path;
-        } else if (resolve_default_db_path(ctx->default_db_path, sizeof(ctx->default_db_path))) {
-            ctx->db_path = ctx->default_db_path;
-        }
+                                                 sizeof(ctx->app_prefs_db_path),
+                                                 ctx->app_prefs_input_root,
+                                                 sizeof(ctx->app_prefs_input_root),
+                                                 ctx->app_prefs_output_root,
+                                                 sizeof(ctx->app_prefs_output_root),
+                                                 ctx->app_prefs_active_db_path,
+                                                 sizeof(ctx->app_prefs_active_db_path));
+        loaded_from_default_path = ctx->result.code == CORE_OK &&
+                                   ctx->result.message &&
+                                   strcmp(ctx->result.message, "app prefs loaded") == 0;
+        app_prefs_loaded = loaded_from_default_path ? 1 : 0;
+    }
+    if (!loaded_from_default_path &&
+        mem_console_build_legacy_app_prefs_path(ctx->app_prefs_legacy_path, sizeof(ctx->app_prefs_legacy_path))) {
+        ctx->result = mem_console_app_prefs_load(ctx->app_prefs_legacy_path,
+                                                 ctx->app_prefs_db_path,
+                                                 sizeof(ctx->app_prefs_db_path),
+                                                 ctx->app_prefs_input_root,
+                                                 sizeof(ctx->app_prefs_input_root),
+                                                 ctx->app_prefs_output_root,
+                                                 sizeof(ctx->app_prefs_output_root),
+                                                 ctx->app_prefs_active_db_path,
+                                                 sizeof(ctx->app_prefs_active_db_path));
+        app_prefs_loaded = ctx->result.code == CORE_OK &&
+                           ctx->result.message &&
+                           strcmp(ctx->result.message, "app prefs loaded") == 0;
+    }
+    if (ctx->db_flag) {
+        ctx->db_path = ctx->db_flag;
+    } else if (app_prefs_loaded) {
+        ctx->db_path = ctx->app_prefs_db_path;
     } else if (resolve_default_db_path(ctx->default_db_path, sizeof(ctx->default_db_path))) {
         ctx->db_path = ctx->default_db_path;
     }
 
+    if (!mem_console_path_contract_normalize(ctx->app_prefs_input_root,
+                                             ctx->app_prefs_output_root,
+                                             ctx->db_path,
+                                             ctx->input_root,
+                                             sizeof(ctx->input_root),
+                                             ctx->output_root,
+                                             sizeof(ctx->output_root),
+                                             ctx->active_db_path,
+                                             sizeof(ctx->active_db_path))) {
+        fprintf(stderr, "mem_console: failed to normalize runtime path contract.\n");
+        return 0;
+    }
+    ctx->db_path = ctx->active_db_path;
+    ctx->app_prefs_path_valid = mem_console_build_app_prefs_path_for_output_root(ctx->output_root,
+                                                                                  ctx->app_prefs_path,
+                                                                                  sizeof(ctx->app_prefs_path));
     if (!mem_console_ensure_parent_directory(ctx->db_path)) {
         fprintf(stderr,
                 "mem_console: failed to create parent directory for DB path: %s\n",
@@ -194,6 +265,7 @@ static int mem_console_app_state_seed(MemConsoleAppMainContext *ctx) {
     }
 
     seed_state(&ctx->state, ctx->db_path);
+    mem_console_state_set_path_contract(&ctx->state, ctx->input_root, ctx->output_root, ctx->db_path);
     ctx->prefs_path_valid = mem_console_build_prefs_path(ctx->db_path,
                                                          ctx->prefs_path,
                                                          sizeof(ctx->prefs_path));
@@ -231,7 +303,11 @@ static int mem_console_app_state_seed(MemConsoleAppMainContext *ctx) {
         ctx->state.pane_prefs_dirty = 0;
     }
     if (ctx->app_prefs_path_valid) {
-        ctx->result = mem_console_app_prefs_save(ctx->app_prefs_path, ctx->state.db_path);
+        ctx->result = mem_console_app_prefs_save(ctx->app_prefs_path,
+                                                 ctx->state.db_path,
+                                                 ctx->state.input_root,
+                                                 ctx->state.output_root,
+                                                 ctx->state.active_db_path);
         if (ctx->result.code != CORE_OK) {
             (void)snprintf(ctx->state.status_line,
                            sizeof(ctx->state.status_line),

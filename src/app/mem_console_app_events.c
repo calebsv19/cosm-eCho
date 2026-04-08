@@ -118,6 +118,14 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
                     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
                     break;
                 }
+                if (!state->db_modal_open && ctrl_or_cmd && event->key.keysym.sym == SDLK_i) {
+                    *keyboard_action = MEM_CONSOLE_ACTION_BEGIN_INPUT_ROOT_PICKER;
+                    break;
+                }
+                if (!state->db_modal_open && ctrl_or_cmd && event->key.keysym.sym == SDLK_b) {
+                    *keyboard_action = MEM_CONSOLE_ACTION_PICK_INPUT_ROOT_FOLDER;
+                    break;
+                }
 
                 if (event->key.keysym.sym == SDLK_ESCAPE) {
                     if (state->db_modal_open) {

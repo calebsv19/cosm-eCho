@@ -188,7 +188,11 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
     resolved_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + 140.0f, modal.width - 36.0f, 36.0f };
     buttons_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + modal.height - 50.0f, modal.width - 36.0f, 32.0f };
 
-    title_text = state->db_modal_create_mode ? "Create Or Switch Database" : "Load Or Switch Database";
+    if (state->db_modal_input_root_mode) {
+        title_text = "Set Input Root";
+    } else {
+        title_text = state->db_modal_create_mode ? "Create Or Switch Database" : "Load Or Switch Database";
+    }
     result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                   frame,
                                                   title_rect,
@@ -205,7 +209,11 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
                                                     state->detail_connection_summary_lines,
                                                     MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT,
                                                     hint_rect,
-                                                    "Enter any location and database name. Missing directories and the SQLite file will be created automatically.",
+                                                    state->db_modal_input_root_mode
+                                                        ? "Enter or browse the database input root directory. Folder will be created if missing."
+                                                        : (state->db_modal_create_mode
+                                                               ? "Create mode: enter DB name (saved under input root) or explicit path. Missing directories and DB file are created."
+                                                               : "Load/switch mode: enter exact DB path. Path is used directly with no hidden rewrite."),
                                                     CORE_THEME_COLOR_TEXT_MUTED,
                                                     CORE_FONT_TEXT_SIZE_CAPTION,
                                                     2);
@@ -218,8 +226,11 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
         return result;
     }
 
-    show_suffix = strlen(state->db_modal_text) < 7u ||
-                  strcmp(state->db_modal_text + (strlen(state->db_modal_text) - 7u), ".sqlite") != 0;
+    show_suffix = 0;
+    if (!state->db_modal_input_root_mode && state->db_modal_create_mode) {
+        show_suffix = strlen(state->db_modal_text) < 7u ||
+                      strcmp(state->db_modal_text + (strlen(state->db_modal_text) - 7u), ".sqlite") != 0;
+    }
     suffix_width = mem_console_ui_measure_text_width_px(render_ctx,
                                                         CORE_FONT_ROLE_UI_REGULAR,
                                                         CORE_FONT_TEXT_SIZE_PARAGRAPH,
@@ -356,7 +367,7 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
     if (state->db_modal_resolved_path[0] != '\0') {
         (void)snprintf(state->db_modal_resolved_line,
                        sizeof(state->db_modal_resolved_line),
-                       "Resolved: %s",
+                       state->db_modal_input_root_mode ? "Resolved Root: %s" : "Resolved: %s",
                        state->db_modal_resolved_path);
         result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                       frame,
@@ -396,7 +407,9 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
     result = mem_console_ui_draw_button_custom(ui_ctx,
                                                frame,
                                                apply_rect,
-                                               state->db_modal_create_mode ? "CREATE / LOAD" : "LOAD / SWITCH",
+                                               state->db_modal_input_root_mode
+                                                   ? "APPLY ROOT"
+                                                   : (state->db_modal_create_mode ? "CREATE / LOAD" : "LOAD / SWITCH"),
                                                button_result.state,
                                                CORE_FONT_ROLE_UI_MEDIUM,
                                                CORE_FONT_TEXT_SIZE_CAPTION);

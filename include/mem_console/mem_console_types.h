@@ -42,7 +42,9 @@ typedef enum MemConsoleAction {
     MEM_CONSOLE_ACTION_BEGIN_DB_PICKER = 15,
     MEM_CONSOLE_ACTION_BEGIN_DB_CREATE = 16,
     MEM_CONSOLE_ACTION_CANCEL_DB_PICKER = 17,
-    MEM_CONSOLE_ACTION_CONFIRM_DB_PICKER = 18
+    MEM_CONSOLE_ACTION_CONFIRM_DB_PICKER = 18,
+    MEM_CONSOLE_ACTION_BEGIN_INPUT_ROOT_PICKER = 19,
+    MEM_CONSOLE_ACTION_PICK_INPUT_ROOT_FOLDER = 20
 } MemConsoleAction;
 
 typedef enum MemConsoleInputTarget {
@@ -103,6 +105,9 @@ typedef struct MemConsoleGraphEdge {
 typedef struct MemConsoleState {
     const char *db_path;
     char db_path_storage[1024];
+    char input_root[1024];
+    char output_root[1024];
+    char active_db_path[1024];
     char pending_db_path[1024];
     char search_text[256];
     char db_modal_text[896];
@@ -159,6 +164,7 @@ typedef struct MemConsoleState {
     int body_edit_mode;
     int db_modal_open;
     int db_modal_create_mode;
+    int db_modal_input_root_mode;
     int search_cursor;
     int title_edit_cursor;
     int body_edit_cursor;

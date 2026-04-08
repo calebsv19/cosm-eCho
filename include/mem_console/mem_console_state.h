@@ -9,10 +9,21 @@ extern const char *k_mem_console_default_db_path;
 
 int mem_console_path_is_directory(const char *path);
 int mem_console_path_exists(const char *path);
+int mem_console_path_parent(const char *path, char *out_path, size_t out_cap);
 int mem_console_ensure_directory(const char *path);
 int mem_console_ensure_parent_directory(const char *path);
+int mem_console_path_is_mutable_root_safe(const char *path);
 int mem_console_resolve_app_data_dir(char *out_path, size_t out_cap);
 int resolve_default_db_path(char *out_path, size_t out_cap);
+int mem_console_path_contract_normalize(const char *input_root_hint,
+                                        const char *output_root_hint,
+                                        const char *active_db_hint,
+                                        char *out_input_root,
+                                        size_t out_input_root_cap,
+                                        char *out_output_root,
+                                        size_t out_output_root_cap,
+                                        char *out_active_db_path,
+                                        size_t out_active_db_path_cap);
 void print_usage(const char *argv0);
 const char *find_flag_value(int argc, char **argv, const char *flag);
 int has_flag(int argc, char **argv, const char *flag);
@@ -30,6 +41,10 @@ int state_adjust_text_zoom_step(MemConsoleState *state, int delta);
 int state_reset_text_zoom_step(MemConsoleState *state);
 
 void seed_state(MemConsoleState *state, const char *db_path);
+void mem_console_state_set_path_contract(MemConsoleState *state,
+                                         const char *input_root,
+                                         const char *output_root,
+                                         const char *active_db_path);
 void compute_layout(MemConsoleState *state, int frame_width, int frame_height);
 void build_like_pattern(const char *search_text, char *out_pattern, size_t out_cap);
 int mem_console_graph_edge_limit_clamp(int value);
@@ -73,6 +88,7 @@ void cancel_title_edit_mode(MemConsoleState *state);
 void begin_body_edit_mode(MemConsoleState *state);
 void cancel_body_edit_mode(MemConsoleState *state);
 void begin_db_picker_mode(MemConsoleState *state, int create_mode);
+void begin_input_root_picker_mode(MemConsoleState *state);
 void cancel_db_picker_mode(MemConsoleState *state);
 int mem_console_db_picker_build_path(const MemConsoleState *state,
                                      char *out_path,

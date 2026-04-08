@@ -349,6 +349,67 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
         if (result.code != CORE_OK) return result;
         (void)snprintf(state->schema_summary_line,
                        sizeof(state->schema_summary_line),
+                       "Input Root: %s",
+                       state->input_root[0] ? state->input_root : "(unset)");
+        format_text_for_width(state->status_draw_line,
+                              sizeof(state->status_draw_line),
+                              state->schema_summary_line,
+                              row.width - (ui_ctx->style.padding * 2.0f),
+                              CORE_FONT_TEXT_SIZE_CAPTION);
+        result = mem_console_ui_draw_info_line_custom(ui_ctx,
+                                                      frame,
+                                                      row,
+                                                      state->status_draw_line,
+                                                      CORE_THEME_COLOR_TEXT_MUTED,
+                                                      CORE_FONT_ROLE_UI_REGULAR,
+                                                      CORE_FONT_TEXT_SIZE_CAPTION);
+        if (result.code != CORE_OK) return result;
+    }
+
+    {
+        KitRenderRect button_row;
+        KitRenderRect edit_rect;
+        KitRenderRect folder_rect;
+        float gap = 6.0f;
+        float half_width;
+        CoreResult result = kit_ui_stack_next(&top_layout, layout_cfg->left_reload_h, 0.0f, &button_row);
+        if (result.code != CORE_OK) return result;
+        half_width = (button_row.width - gap) * 0.5f;
+        edit_rect = (KitRenderRect){ button_row.x, button_row.y, half_width, button_row.height };
+        folder_rect = (KitRenderRect){ button_row.x + half_width + gap, button_row.y, button_row.width - half_width - gap, button_row.height };
+
+        button_result = kit_ui_eval_button(edit_rect, input, 1103);
+        if (button_result.clicked && *io_action == MEM_CONSOLE_ACTION_NONE) {
+            *io_action = MEM_CONSOLE_ACTION_BEGIN_INPUT_ROOT_PICKER;
+        }
+        result = mem_console_ui_draw_button_custom(ui_ctx,
+                                                   frame,
+                                                   edit_rect,
+                                                   "EDIT ROOT",
+                                                   button_result.state,
+                                                   CORE_FONT_ROLE_UI_MEDIUM,
+                                                   CORE_FONT_TEXT_SIZE_CAPTION);
+        if (result.code != CORE_OK) return result;
+
+        button_result = kit_ui_eval_button(folder_rect, input, 1104);
+        if (button_result.clicked && *io_action == MEM_CONSOLE_ACTION_NONE) {
+            *io_action = MEM_CONSOLE_ACTION_PICK_INPUT_ROOT_FOLDER;
+        }
+        result = mem_console_ui_draw_button_custom(ui_ctx,
+                                                   frame,
+                                                   folder_rect,
+                                                   "BROWSE ROOT",
+                                                   button_result.state,
+                                                   CORE_FONT_ROLE_UI_MEDIUM,
+                                                   CORE_FONT_TEXT_SIZE_CAPTION);
+        if (result.code != CORE_OK) return result;
+    }
+
+    {
+        CoreResult result = kit_ui_stack_next(&top_layout, layout_cfg->left_info_row_h, 0.0f, &row);
+        if (result.code != CORE_OK) return result;
+        (void)snprintf(state->schema_summary_line,
+                       sizeof(state->schema_summary_line),
                        "v%s | Active %lld | %s",
                        state->schema_version[0] ? state->schema_version : "?",
                        (long long)state->active_count,

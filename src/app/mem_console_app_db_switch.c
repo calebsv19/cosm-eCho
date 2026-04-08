@@ -19,6 +19,8 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
     CoreResult result;
     CoreMemDb next_db = {0};
     int kernel_bridge_enabled;
+    char input_root[1024];
+    char output_root[1024];
 
     if (!db || !state || !render_ctx || !ui_ctx || !next_db_path || !next_db_path[0] || !prefs_path ||
         !prefs_path_valid || !prefs_signature_valid || !prefs_last_saved_signature) {
@@ -26,6 +28,8 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
     }
 
     kernel_bridge_enabled = state->kernel_bridge_enabled;
+    (void)snprintf(input_root, sizeof(input_root), "%s", state->input_root);
+    (void)snprintf(output_root, sizeof(output_root), "%s", state->output_root);
 
     if (!mem_console_ensure_parent_directory(next_db_path)) {
         return (CoreResult){ CORE_ERR_IO, "failed to create DB directory" };
@@ -51,6 +55,7 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
     }
 
     seed_state(state, next_db_path);
+    mem_console_state_set_path_contract(state, input_root, output_root, next_db_path);
     state->kernel_bridge_enabled = kernel_bridge_enabled;
 
     *prefs_path_valid = mem_console_build_prefs_path(state->db_path, prefs_path, prefs_path_cap);
@@ -92,7 +97,11 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
     }
 
     if (app_prefs_path_valid) {
-        result = mem_console_app_prefs_save(app_prefs_path, state->db_path);
+        result = mem_console_app_prefs_save(app_prefs_path,
+                                            state->db_path,
+                                            state->input_root,
+                                            state->output_root,
+                                            state->active_db_path);
         if (result.code != CORE_OK) {
             return result;
         }

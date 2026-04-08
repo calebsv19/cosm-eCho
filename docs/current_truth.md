@@ -1,6 +1,6 @@
 # mem_console Current Truth
 
-Last updated: 2026-04-05
+Last updated: 2026-04-08
 
 ## Program Identity
 - Repo/program directory: `mem_console`
@@ -114,6 +114,25 @@ Last updated: 2026-04-05
   - `Cmd/Ctrl 0` => reset zoom
 - zoom state is persisted in UI prefs (`MCFG` schema `v11`) via `text_zoom_step`.
 - startup and DB-switch paths reapply theme/font/zoom and UI density consistently.
+
+## Data Path Contract Progress (Current)
+- `S1` foundation is active:
+  - explicit runtime contract fields: `input_root`, `output_root`, `active_db_path`
+  - app prefs (`MCAP`) now persist roots + active DB with v1 backward compatibility
+  - startup and DB-switch keep these lanes synchronized
+- `S2` input-root control lane is active:
+  - left-pane root status line + `EDIT ROOT` / `BROWSE ROOT` controls
+  - keyboard-first controls:
+    - `Cmd/Ctrl+I` => open input-root edit modal
+    - `Cmd/Ctrl+B` => open native folder chooser for input root
+- `S3` DB open/create matrix is active:
+  - open/switch (`LOAD DB`) = `reference` mode (exact entered path)
+  - create (`NEW DB`) supports:
+    - bare DB name => create under `input_root` with `.sqlite`
+    - explicit path => create at explicit path (`.sqlite` implied when missing)
+- `S4` output-root migration is active:
+  - app prefs path now resolves from active `output_root` (`<output_root>/mem_console.app.pack`)
+  - startup load keeps compatibility fallback to legacy `~/.local/share/mem_console/mem_console.app.pack` if present
 
 ## Wrapper Contract State
 - cross-program wrapper initiative status:

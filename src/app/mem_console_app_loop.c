@@ -559,7 +559,12 @@ int mem_console_app_run_loop(MemConsoleAppLoopContext *ctx) {
         } else {
             pending_action = ui_action;
         }
-        mem_console_app_apply_pending_action(ctx->db, ctx->state, ctx->runtime, pending_action);
+        mem_console_app_apply_pending_action(ctx->db,
+                                             ctx->state,
+                                             ctx->runtime,
+                                             ctx->app_prefs_path,
+                                             ctx->app_prefs_path_valid,
+                                             pending_action);
 
         if (ctx->state->pending_db_path[0] != '\0') {
             CoreResult result;

@@ -2,8 +2,42 @@
 
 #include <SDL2/SDL.h>
 #include <stdio.h>
+#include <string.h>
 
+#include "mem_console_prefs.h"
 #include "mem_console_ui_graph.h"
+
+static int mem_console_pick_folder_macos(char *out_path, size_t out_cap) {
+#if defined(__APPLE__)
+    FILE *pipe = 0;
+    size_t len = 0u;
+    int c = 0;
+
+    if (!out_path || out_cap == 0u) {
+        return 0;
+    }
+    out_path[0] = '\0';
+    pipe = popen("/usr/bin/osascript -e 'POSIX path of (choose folder with prompt \"Choose MemConsole Input Root\")'",
+                 "r");
+    if (!pipe) {
+        return 0;
+    }
+    while ((c = fgetc(pipe)) != EOF && len + 1u < out_cap) {
+        out_path[len++] = (char)c;
+    }
+    out_path[len] = '\0';
+    (void)pclose(pipe);
+    while (len > 0u && (out_path[len - 1u] == '\n' || out_path[len - 1u] == '\r')) {
+        out_path[len - 1u] = '\0';
+        len -= 1u;
+    }
+    return out_path[0] != '\0';
+#else
+    (void)out_path;
+    (void)out_cap;
+    return 0;
+#endif
+}
 
 void mem_console_app_set_action_error_status(MemConsoleState *state,
                                              const char *prefix,
@@ -44,6 +78,8 @@ void mem_console_app_refresh_and_report(CoreMemDb *db,
 void mem_console_app_apply_pending_action(CoreMemDb *db,
                                           MemConsoleState *state,
                                           MemConsoleRuntime *runtime,
+                                          const char *app_prefs_path,
+                                          int app_prefs_path_valid,
                                           MemConsoleAction action) {
     CoreResult result;
 
@@ -298,36 +334,109 @@ void mem_console_app_apply_pending_action(CoreMemDb *db,
 
     if (action == MEM_CONSOLE_ACTION_BEGIN_DB_PICKER) {
         begin_db_picker_mode(state, 0);
-        (void)snprintf(state->status_line, sizeof(state->status_line), "Enter a DB path to load or switch.");
+        (void)snprintf(state->status_line,
+                       sizeof(state->status_line),
+                       "Enter DB path to load/switch (reference mode: exact path).");
         mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
         return;
     }
 
     if (action == MEM_CONSOLE_ACTION_BEGIN_DB_CREATE) {
         begin_db_picker_mode(state, 1);
-        (void)snprintf(state->status_line, sizeof(state->status_line), "Enter a DB path to create or switch.");
+        (void)snprintf(state->status_line,
+                       sizeof(state->status_line),
+                       "Enter DB name/path to create (name -> input root, path -> explicit).");
         mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
         return;
     }
 
     if (action == MEM_CONSOLE_ACTION_CANCEL_DB_PICKER) {
+        int canceling_input_root = state->db_modal_input_root_mode;
         cancel_db_picker_mode(state);
-        (void)snprintf(state->status_line, sizeof(state->status_line), "Database change cancelled.");
+        (void)snprintf(state->status_line,
+                       sizeof(state->status_line),
+                       canceling_input_root ? "Input root change cancelled." : "Database change cancelled.");
         mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
         return;
     }
 
     if (action == MEM_CONSOLE_ACTION_CONFIRM_DB_PICKER) {
         char next_db_path[1024];
+        int create_mode = state->db_modal_create_mode ? 1 : 0;
 
         if (!mem_console_db_picker_build_path(state, next_db_path, sizeof(next_db_path))) {
             (void)snprintf(state->status_line, sizeof(state->status_line), "Enter a valid DB path first.");
             mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
             return;
         }
+        if (state->db_modal_input_root_mode) {
+            CoreResult save_result = core_result_ok();
+            if (!mem_console_ensure_directory(next_db_path)) {
+                (void)snprintf(state->status_line, sizeof(state->status_line), "Input root must be a valid directory.");
+                mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+                return;
+            }
+            (void)snprintf(state->input_root, sizeof(state->input_root), "%s", next_db_path);
+            cancel_db_picker_mode(state);
+            if (app_prefs_path_valid && app_prefs_path && app_prefs_path[0]) {
+                save_result = mem_console_app_prefs_save(app_prefs_path,
+                                                         state->db_path,
+                                                         state->input_root,
+                                                         state->output_root,
+                                                         state->active_db_path);
+            }
+            if (save_result.code != CORE_OK) {
+                (void)snprintf(state->status_line, sizeof(state->status_line), "Input root set; app prefs save failed.");
+            } else {
+                (void)snprintf(state->status_line, sizeof(state->status_line), "Input root set to %s.", state->input_root);
+            }
+            mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+            return;
+        }
         cancel_db_picker_mode(state);
         (void)snprintf(state->pending_db_path, sizeof(state->pending_db_path), "%s", next_db_path);
-        (void)snprintf(state->status_line, sizeof(state->status_line), "Switching DB to %s...", state->pending_db_path);
+        (void)snprintf(state->status_line,
+                       sizeof(state->status_line),
+                       create_mode ? "Creating/switching DB to %s..." : "Switching DB to %s...",
+                       state->pending_db_path);
+        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        return;
+    }
+
+    if (action == MEM_CONSOLE_ACTION_BEGIN_INPUT_ROOT_PICKER) {
+        begin_input_root_picker_mode(state);
+        (void)snprintf(state->status_line, sizeof(state->status_line), "Enter input root path and press Enter.");
+        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        return;
+    }
+
+    if (action == MEM_CONSOLE_ACTION_PICK_INPUT_ROOT_FOLDER) {
+        char picked_root[1024];
+        CoreResult save_result = core_result_ok();
+
+        if (!mem_console_pick_folder_macos(picked_root, sizeof(picked_root))) {
+            (void)snprintf(state->status_line, sizeof(state->status_line), "Folder dialog canceled/unavailable.");
+            mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+            return;
+        }
+        if (!mem_console_ensure_directory(picked_root)) {
+            (void)snprintf(state->status_line, sizeof(state->status_line), "Failed to use selected input root.");
+            mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+            return;
+        }
+        (void)snprintf(state->input_root, sizeof(state->input_root), "%s", picked_root);
+        if (app_prefs_path_valid && app_prefs_path && app_prefs_path[0]) {
+            save_result = mem_console_app_prefs_save(app_prefs_path,
+                                                     state->db_path,
+                                                     state->input_root,
+                                                     state->output_root,
+                                                     state->active_db_path);
+        }
+        if (save_result.code != CORE_OK) {
+            (void)snprintf(state->status_line, sizeof(state->status_line), "Input root set; app prefs save failed.");
+        } else {
+            (void)snprintf(state->status_line, sizeof(state->status_line), "Input root updated from folder dialog.");
+        }
         mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
         return;
     }

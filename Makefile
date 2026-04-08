@@ -123,7 +123,7 @@ STAPLE_RETRY_DELAY_SEC ?= 15
 	src/ui/graph/mem_console_ui_graph_types.c \
 	src/ui/graph/mem_console_ui_graph_panel.c
 
-.PHONY: all clean run run-demo vk-renderer-lib test run-headless-smoke visual-harness package-desktop package-desktop-smoke package-desktop-self-test package-desktop-copy-desktop package-desktop-sync package-desktop-open package-desktop-remove package-desktop-refresh release-contract release-clean release-build release-bundle-audit release-sign release-verify release-verify-signed release-notarize release-staple release-verify-notarized release-artifact release-distribute release-desktop-refresh
+.PHONY: all clean run run-demo vk-renderer-lib test run-headless-smoke run-data-path-contract-checks visual-harness package-desktop package-desktop-smoke package-desktop-self-test package-desktop-copy-desktop package-desktop-sync package-desktop-open package-desktop-remove package-desktop-refresh release-contract release-clean release-build release-bundle-audit release-sign release-verify release-verify-signed release-notarize release-staple release-verify-notarized release-artifact release-distribute release-desktop-refresh
 
 all: $(BIN)
 
@@ -194,10 +194,13 @@ run: $(BIN)
 run-demo: $(BIN)
 	cd $(REPO_ROOT) && ./mem_console/$(BIN) --db $(DEMO_DB) $(RUN_ARGS)
 
-test: run-headless-smoke
+test: run-headless-smoke run-data-path-contract-checks
 
 run-headless-smoke: $(BIN)
 	./tests/run_headless_smoke.sh
+
+run-data-path-contract-checks:
+	./tests/run_data_path_contract_checks.sh
 
 visual-harness: $(BIN)
 	@echo "visual harness build gate ready: $(BIN)"

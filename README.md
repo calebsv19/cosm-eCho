@@ -173,17 +173,25 @@ make -C mem_console visual-harness
 Default behavior:
 - running without `--db` resolves in this order:
   1. `CODEWORK_MEMDB_PATH` (if set)
-  2. last-used DB path from app prefs (`~/.local/share/mem_console/mem_console.app.pack` when available)
-  3. fallback default DB (`~/.local/share/mem_console/default.sqlite` when available, otherwise `mem_console/data/default.sqlite`)
+  2. last-used DB path from app prefs (`~/Library/Application Support/MemConsole/runtime/mem_console.app.pack` on macOS)
+  3. fallback default DB (`~/Library/Application Support/MemConsole/runtime/default.sqlite` on macOS, otherwise `mem_console/data/default.sqlite`)
 - parent directories are created automatically for the chosen DB path before opening/creating the SQLite file
 - passing `--db /path/to/file.sqlite` is the intended way to create or switch to a project-specific DB
 - the left pane now includes `LOAD DB` and `NEW DB` buttons that open an in-app path-entry modal
-  - the modal accepts a base filename/path and shows `.sqlite` as an implied suffix so users do not have to type it
+  - `LOAD DB` is reference mode: entered path is used directly (no hidden rewrite)
+  - `NEW DB` accepts either:
+    - a bare name (`my_db`) -> created at `<input_root>/my_db.sqlite`
+    - an explicit path (`/path/to/my_db` or `~/path/to/my_db`) -> created at that explicit path (`.sqlite` implied if missing)
   - `~/...` paths are expanded to the current user home directory
   - confirming the modal switches the active visual session to that DB, creating missing parent directories and the DB file when needed
 - UI preset prefs are read from/written to `<db_path>.ui.pack` for whichever DB path is active
   - includes theme/font preset selection plus pane layout ratios
 - app-level startup prefs are stored separately from DB UI prefs so the console can remember the last active DB path
+  - app prefs default path follows output-root: `<output_root>/mem_console.app.pack`
+  - legacy fallback read is preserved for `~/.local/share/mem_console/mem_console.app.pack`
+- input-root controls are available in the left pane and via keyboard:
+  - `Cmd/Ctrl+I`: open input-root path modal (edit/apply)
+  - `Cmd/Ctrl+B`: open native folder chooser and set input root
 
 Run targets:
 - `make -C mem_console run` respects the normal startup resolution order, so it reopens the saved last-used DB when one exists
@@ -195,6 +203,8 @@ Runtime shortcuts:
 - `Cmd/Ctrl+Shift+Y`: cycle theme preset backward
 - `Cmd/Ctrl+Shift+U`: cycle font preset forward
 - `Cmd/Ctrl+Shift+I`: cycle font preset backward
+- `Cmd/Ctrl+I`: open input-root editor modal
+- `Cmd/Ctrl+B`: open native input-root folder chooser
 
 Large-list scroll audit helpers:
 - `mem_console/demo/seed_large_list.sh`

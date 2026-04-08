@@ -214,18 +214,79 @@ int state_reset_text_zoom_step(MemConsoleState *state) {
     return state_set_text_zoom_step(state, 0);
 }
 
+void mem_console_state_set_path_contract(MemConsoleState *state,
+                                         const char *input_root,
+                                         const char *output_root,
+                                         const char *active_db_path) {
+    char fallback_input_root[1024];
+    char fallback_output_root[1024];
+    char fallback_active_db_path[1024];
+
+    if (!state) {
+        return;
+    }
+
+    fallback_input_root[0] = '\0';
+    fallback_output_root[0] = '\0';
+    fallback_active_db_path[0] = '\0';
+    if (!mem_console_path_contract_normalize(input_root,
+                                             output_root,
+                                             active_db_path,
+                                             fallback_input_root,
+                                             sizeof(fallback_input_root),
+                                             fallback_output_root,
+                                             sizeof(fallback_output_root),
+                                             fallback_active_db_path,
+                                             sizeof(fallback_active_db_path))) {
+        fallback_input_root[0] = '\0';
+        fallback_output_root[0] = '\0';
+        fallback_active_db_path[0] = '\0';
+        if (active_db_path && active_db_path[0]) {
+            (void)snprintf(fallback_active_db_path, sizeof(fallback_active_db_path), "%s", active_db_path);
+            (void)mem_console_path_parent(active_db_path, fallback_input_root, sizeof(fallback_input_root));
+        }
+    }
+
+    if (fallback_active_db_path[0]) {
+        (void)snprintf(state->active_db_path, sizeof(state->active_db_path), "%s", fallback_active_db_path);
+    } else {
+        state->active_db_path[0] = '\0';
+    }
+    if (fallback_input_root[0]) {
+        (void)snprintf(state->input_root, sizeof(state->input_root), "%s", fallback_input_root);
+    } else {
+        state->input_root[0] = '\0';
+    }
+    if (fallback_output_root[0]) {
+        (void)snprintf(state->output_root, sizeof(state->output_root), "%s", fallback_output_root);
+    } else {
+        state->output_root[0] = '\0';
+    }
+
+    if (state->active_db_path[0]) {
+        (void)snprintf(state->db_path_storage, sizeof(state->db_path_storage), "%s", state->active_db_path);
+    } else {
+        state->db_path_storage[0] = '\0';
+    }
+    state->db_path = state->db_path_storage;
+}
+
 void seed_state(MemConsoleState *state, const char *db_path) {
+    char initial_input_root[1024];
+    char initial_output_root[1024];
+
     if (!state) {
         return;
     }
 
     memset(state, 0, sizeof(*state));
-    if (db_path) {
-        (void)snprintf(state->db_path_storage, sizeof(state->db_path_storage), "%s", db_path);
-    } else {
-        state->db_path_storage[0] = '\0';
+    initial_input_root[0] = '\0';
+    initial_output_root[0] = '\0';
+    if (db_path && db_path[0]) {
+        (void)mem_console_path_parent(db_path, initial_input_root, sizeof(initial_input_root));
     }
-    state->db_path = state->db_path_storage;
+    (void)mem_console_resolve_app_data_dir(initial_output_root, sizeof(initial_output_root));
+    mem_console_state_set_path_contract(state, initial_input_root, initial_output_root, db_path);
     state->theme_preset_id = CORE_THEME_PRESET_DAW_DEFAULT;
     state->font_preset_id = CORE_FONT_PRESET_IDE;
     state->text_zoom_step = 0;
@@ -240,6 +301,7 @@ void seed_state(MemConsoleState *state, const char *db_path) {
     state->body_edit_mode = 0;
     state->db_modal_open = 0;
     state->db_modal_create_mode = 0;
+    state->db_modal_input_root_mode = 0;
     state->input_target = MEM_CONSOLE_INPUT_SEARCH;
     state->search_cursor = 0;
     state->title_edit_cursor = 0;
