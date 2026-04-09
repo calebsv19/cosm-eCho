@@ -119,6 +119,9 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
     KitRenderRect input_rect;
     KitRenderRect suffix_rect;
     KitRenderRect resolved_rect;
+    KitRenderRect list_header_rect;
+    KitRenderRect list_rect;
+    KitRenderRect list_body_rect;
     KitRenderRect buttons_rect;
     KitRenderRect cancel_rect;
     KitRenderRect apply_rect;
@@ -131,6 +134,12 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
     float suffix_width;
     float editable_width;
     float text_origin_x;
+    float list_row_h = 22.0f;
+    float list_row_gap = 4.0f;
+    int list_max_rows = 0;
+    int list_rows_drawn = 0;
+    int list_start_index = 0;
+    int list_index = 0;
     int visible_cursor_index = 0;
     int visible_start = 0;
     int visible_bias = 0;
@@ -146,10 +155,10 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
 
     overlay = (KitRenderRect){ 0.0f, 0.0f, frame->width_px, frame->height_px };
     modal = (KitRenderRect){
-        (frame->width_px * 0.5f) - 260.0f,
-        (frame->height_px * 0.5f) - 120.0f,
-        520.0f,
-        240.0f
+        (frame->width_px * 0.5f) - 300.0f,
+        (frame->height_px * 0.5f) - 180.0f,
+        600.0f,
+        state->db_modal_input_root_mode ? 260.0f : 420.0f
     };
     if (modal.x < 24.0f) modal.x = 24.0f;
     if (modal.y < 24.0f) modal.y = 24.0f;
@@ -182,11 +191,19 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
         return result;
     }
 
-    title_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + 14.0f, modal.width - 36.0f, 28.0f };
-    hint_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + 44.0f, modal.width - 36.0f, 40.0f };
-    input_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + 92.0f, modal.width - 36.0f, 40.0f };
-    resolved_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + 140.0f, modal.width - 36.0f, 36.0f };
-    buttons_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + modal.height - 50.0f, modal.width - 36.0f, 32.0f };
+    title_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + 12.0f, modal.width - 36.0f, 26.0f };
+    hint_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + 38.0f, modal.width - 36.0f, 38.0f };
+    input_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + 82.0f, modal.width - 36.0f, 36.0f };
+    resolved_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + 122.0f, modal.width - 36.0f, 28.0f };
+    list_header_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + 156.0f, modal.width - 36.0f, 20.0f };
+    list_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + 178.0f, modal.width - 36.0f, modal.height - 236.0f };
+    buttons_rect = (KitRenderRect){ modal.x + 18.0f, modal.y + modal.height - 44.0f, modal.width - 36.0f, 28.0f };
+    list_body_rect = (KitRenderRect){
+        list_rect.x + 6.0f,
+        list_rect.y + 24.0f,
+        list_rect.width - 12.0f,
+        list_rect.height - 30.0f
+    };
 
     if (state->db_modal_input_root_mode) {
         title_text = "Set Input Root";
@@ -369,6 +386,10 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
                        sizeof(state->db_modal_resolved_line),
                        state->db_modal_input_root_mode ? "Resolved Root: %s" : "Resolved: %s",
                        state->db_modal_resolved_path);
+        result = kit_ui_clip_push(ui_ctx, frame, resolved_rect);
+        if (result.code != CORE_OK) {
+            return result;
+        }
         result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                       frame,
                                                       resolved_rect,
@@ -376,8 +397,135 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
                                                       CORE_THEME_COLOR_TEXT_MUTED,
                                                       CORE_FONT_ROLE_UI_REGULAR,
                                                       CORE_FONT_TEXT_SIZE_CAPTION);
+        if (result.code == CORE_OK) {
+            result = kit_ui_clip_pop(ui_ctx, frame);
+        } else {
+            (void)kit_ui_clip_pop(ui_ctx, frame);
+        }
         if (result.code != CORE_OK) {
             return result;
+        }
+    }
+
+    if (!state->db_modal_input_root_mode) {
+        KitRenderRect active_db_rect = {
+            list_rect.x + 6.0f,
+            list_rect.y + 4.0f,
+            list_rect.width - 12.0f,
+            18.0f
+        };
+        result = mem_console_ui_push_themed_rect(render_ctx, frame, list_rect, 8.0f, CORE_THEME_COLOR_SURFACE_0);
+        if (result.code != CORE_OK) {
+            return result;
+        }
+        result = mem_console_ui_draw_info_line_custom(ui_ctx,
+                                                      frame,
+                                                      list_header_rect,
+                                                      "Databases In Input Root",
+                                                      CORE_THEME_COLOR_TEXT_MUTED,
+                                                      CORE_FONT_ROLE_UI_MEDIUM,
+                                                      CORE_FONT_TEXT_SIZE_CAPTION);
+        if (result.code != CORE_OK) {
+            return result;
+        }
+        (void)snprintf(state->db_modal_active_line,
+                       sizeof(state->db_modal_active_line),
+                       "Active DB: %s",
+                       state->db_path ? state->db_path : "(none)");
+        result = kit_ui_clip_push(ui_ctx, frame, active_db_rect);
+        if (result.code != CORE_OK) {
+            return result;
+        }
+        result = mem_console_ui_draw_info_line_custom(ui_ctx,
+                                                      frame,
+                                                      active_db_rect,
+                                                      state->db_modal_active_line,
+                                                      CORE_THEME_COLOR_TEXT_MUTED,
+                                                      CORE_FONT_ROLE_UI_REGULAR,
+                                                      CORE_FONT_TEXT_SIZE_CAPTION);
+        if (result.code == CORE_OK) {
+            result = kit_ui_clip_pop(ui_ctx, frame);
+        } else {
+            (void)kit_ui_clip_pop(ui_ctx, frame);
+        }
+        if (result.code != CORE_OK) {
+            return result;
+        }
+        list_max_rows = (int)((list_body_rect.height + list_row_gap) / (list_row_h + list_row_gap));
+        if (list_max_rows < 1) {
+            list_max_rows = 1;
+        }
+        if (state->db_picker_entry_count <= 0) {
+            result = kit_ui_clip_push(ui_ctx, frame, list_body_rect);
+            if (result.code != CORE_OK) {
+                return result;
+            }
+            result = mem_console_ui_draw_info_line_custom(ui_ctx,
+                                                          frame,
+                                                          list_body_rect,
+                                                          "No .sqlite DBs found in input root.",
+                                                          CORE_THEME_COLOR_TEXT_MUTED,
+                                                          CORE_FONT_ROLE_UI_REGULAR,
+                                                          CORE_FONT_TEXT_SIZE_CAPTION);
+            if (result.code == CORE_OK) {
+                result = kit_ui_clip_pop(ui_ctx, frame);
+            } else {
+                (void)kit_ui_clip_pop(ui_ctx, frame);
+            }
+            if (result.code != CORE_OK) {
+                return result;
+            }
+        } else {
+            if (state->db_picker_selected_index >= list_max_rows) {
+                list_start_index = state->db_picker_selected_index - list_max_rows + 1;
+            }
+            result = kit_ui_clip_push(ui_ctx, frame, list_body_rect);
+            if (result.code != CORE_OK) {
+                return result;
+            }
+            for (list_index = list_start_index;
+                 list_index < state->db_picker_entry_count && list_rows_drawn < list_max_rows;
+                 ++list_index, ++list_rows_drawn) {
+                KitRenderRect row_rect = {
+                    list_rect.x + 6.0f,
+                    list_rect.y + 26.0f + (float)list_rows_drawn * (list_row_h + list_row_gap),
+                    list_rect.width - 12.0f,
+                    list_row_h
+                };
+                int button_id = 4200 + list_index;
+                int selected = list_index == state->db_picker_selected_index;
+                KitUiWidgetState draw_state;
+                button_result = kit_ui_eval_button(row_rect, input, button_id);
+                if (button_result.clicked) {
+                    state->db_picker_selected_index = list_index;
+                    (void)snprintf(state->db_modal_text, sizeof(state->db_modal_text), "%s", state->db_picker_entry_paths[list_index]);
+                    state->db_modal_cursor = (int)strlen(state->db_modal_text);
+                    state->db_modal_selection_anchor = 0;
+                    state->db_modal_selection_start = 0;
+                    state->db_modal_selection_end = state->db_modal_cursor;
+                }
+                draw_state = button_result.state;
+                if (selected && draw_state == KIT_UI_STATE_NORMAL) {
+                    draw_state = KIT_UI_STATE_ACTIVE;
+                }
+                result = mem_console_ui_draw_button_custom(ui_ctx,
+                                                           frame,
+                                                           row_rect,
+                                                           state->db_picker_entry_names[list_index][0]
+                                                               ? state->db_picker_entry_names[list_index]
+                                                               : state->db_picker_entry_paths[list_index],
+                                                           draw_state,
+                                                           CORE_FONT_ROLE_UI_REGULAR,
+                                                           CORE_FONT_TEXT_SIZE_CAPTION);
+                if (result.code != CORE_OK) {
+                    (void)kit_ui_clip_pop(ui_ctx, frame);
+                    return result;
+                }
+            }
+            result = kit_ui_clip_pop(ui_ctx, frame);
+            if (result.code != CORE_OK) {
+                return result;
+            }
         }
     }
 

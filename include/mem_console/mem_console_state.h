@@ -93,6 +93,8 @@ void cancel_db_picker_mode(MemConsoleState *state);
 int mem_console_db_picker_build_path(const MemConsoleState *state,
                                      char *out_path,
                                      size_t out_cap);
+void mem_console_db_picker_rescan_entries(MemConsoleState *state);
+int mem_console_db_picker_move_selection(MemConsoleState *state, int delta);
 int mem_console_db_picker_has_selection(const MemConsoleState *state);
 void mem_console_db_picker_select_all(MemConsoleState *state);
 void mem_console_db_picker_begin_selection(MemConsoleState *state, int cursor_index);

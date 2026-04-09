@@ -43,4 +43,16 @@ check_contains "MEM_CONSOLE_ACTION_BEGIN_INPUT_ROOT_PICKER" \
 check_contains "MEM_CONSOLE_ACTION_PICK_INPUT_ROOT_FOLDER" \
     "${ROOT_DIR}/src/app/mem_console_app_events.c"
 
-echo "data-path contract checks ok: S1-S4 invariants present"
+# S6 list-picker behavior for LOAD DB.
+check_contains "void mem_console_db_picker_rescan_entries(" \
+    "${ROOT_DIR}/src/runtime/mem_console_state.c"
+check_contains "int mem_console_db_picker_move_selection(" \
+    "${ROOT_DIR}/src/runtime/mem_console_state.c"
+check_contains "db_picker_entry_names" \
+    "${ROOT_DIR}/include/mem_console/mem_console_types.h"
+check_contains "db_picker_entry_paths" \
+    "${ROOT_DIR}/include/mem_console/mem_console_types.h"
+check_contains "No .sqlite DBs found in input root." \
+    "${ROOT_DIR}/src/ui/mem_console_ui.c"
+
+echo "data-path contract checks ok: S1-S6 invariants present"

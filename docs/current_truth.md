@@ -133,6 +133,10 @@ Last updated: 2026-04-08
 - `S4` output-root migration is active:
   - app prefs path now resolves from active `output_root` (`<output_root>/mem_console.app.pack`)
   - startup load keeps compatibility fallback to legacy `~/.local/share/mem_console/mem_console.app.pack` if present
+- `S6` DB picker usability refinement is active:
+  - `LOAD DB` modal includes discovered `.sqlite` list from `input_root`
+  - active DB summary visible in modal
+  - click and `Up/Down` selection supported before confirm
 
 ## Wrapper Contract State
 - cross-program wrapper initiative status:

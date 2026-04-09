@@ -354,6 +354,7 @@ void seed_state(MemConsoleState *state, const char *db_path) {
     state->db_modal_resolved_path[0] = '\0';
     state->db_modal_visible_text[0] = '\0';
     state->db_modal_resolved_line[0] = '\0';
+    state->db_modal_active_line[0] = '\0';
     state->pending_db_path[0] = '\0';
     state->redraw_pending_reasons = MEM_CONSOLE_REDRAW_REASON_BACKGROUND;
     state->redraw_last_reasons = MEM_CONSOLE_REDRAW_REASON_NONE;

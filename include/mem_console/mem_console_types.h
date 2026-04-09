@@ -20,7 +20,8 @@ enum {
     MEM_CONSOLE_DETAIL_BODY_WRAP_LINE_LIMIT = 96,
     MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT = 48,
     MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT = 12,
-    MEM_CONSOLE_GRAPH_HUD_LINE_LIMIT = 64
+    MEM_CONSOLE_GRAPH_HUD_LINE_LIMIT = 64,
+    MEM_CONSOLE_DB_PICKER_LIST_LIMIT = 64
 };
 
 typedef enum MemConsoleAction {
@@ -114,6 +115,9 @@ typedef struct MemConsoleState {
     char db_modal_resolved_path[1024];
     char db_modal_visible_text[896];
     char db_modal_resolved_line[1100];
+    char db_modal_active_line[1100];
+    char db_picker_entry_names[MEM_CONSOLE_DB_PICKER_LIST_LIMIT][128];
+    char db_picker_entry_paths[MEM_CONSOLE_DB_PICKER_LIST_LIMIT][1024];
     char db_summary_line[384];
     char db_summary_draw_line[384];
     char schema_version[32];
@@ -173,6 +177,8 @@ typedef struct MemConsoleState {
     int db_modal_selection_start;
     int db_modal_selection_end;
     int db_modal_drag_select_active;
+    int db_picker_entry_count;
+    int db_picker_selected_index;
     int graph_edge_limit_cursor;
     int graph_mode_enabled;
     int graph_query_edge_limit;

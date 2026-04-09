@@ -179,6 +179,7 @@ Default behavior:
 - passing `--db /path/to/file.sqlite` is the intended way to create or switch to a project-specific DB
 - the left pane now includes `LOAD DB` and `NEW DB` buttons that open an in-app path-entry modal
   - `LOAD DB` is reference mode: entered path is used directly (no hidden rewrite)
+  - `LOAD DB` now also lists discovered `.sqlite` files from `input_root` for click/keyboard selection (`Up/Down`)
   - `NEW DB` accepts either:
     - a bare name (`my_db`) -> created at `<input_root>/my_db.sqlite`
     - an explicit path (`/path/to/my_db` or `~/path/to/my_db`) -> created at that explicit path (`.sqlite` implied if missing)

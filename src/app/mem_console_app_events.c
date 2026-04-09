@@ -183,6 +183,22 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
                     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
                     break;
                 }
+                if (state->db_modal_open &&
+                    !state->db_modal_input_root_mode &&
+                    event->key.keysym.sym == SDLK_UP) {
+                    if (mem_console_db_picker_move_selection(state, -1)) {
+                        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+                    }
+                    break;
+                }
+                if (state->db_modal_open &&
+                    !state->db_modal_input_root_mode &&
+                    event->key.keysym.sym == SDLK_DOWN) {
+                    if (mem_console_db_picker_move_selection(state, 1)) {
+                        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+                    }
+                    break;
+                }
                 if (event->key.keysym.sym == SDLK_HOME) {
                     move_active_input_cursor_home(state);
                     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);

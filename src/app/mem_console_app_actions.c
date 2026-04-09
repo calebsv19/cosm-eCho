@@ -336,7 +336,7 @@ void mem_console_app_apply_pending_action(CoreMemDb *db,
         begin_db_picker_mode(state, 0);
         (void)snprintf(state->status_line,
                        sizeof(state->status_line),
-                       "Enter DB path to load/switch (reference mode: exact path).");
+                       "Select .sqlite from input root list or enter exact DB path.");
         mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
         return;
     }

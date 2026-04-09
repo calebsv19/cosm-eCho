@@ -2,6 +2,7 @@
 #include "mem_console_layout_config.h"
 #include "mem_console_pane_layout.h"
 
+#include <dirent.h>
 #include <SDL2/SDL.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -180,7 +181,34 @@ static int path_has_directory_separator(const char *path) {
     return strchr(path, '/') != 0;
 }
 
-static void db_picker_set_text_from_path(MemConsoleState *state, const char *path) {
+static void sanitize_db_label(const char *src, char *dst, size_t dst_cap) {
+    size_t read_i = 0u;
+    size_t write_i = 0u;
+
+    if (!dst || dst_cap == 0u) {
+        return;
+    }
+    dst[0] = '\0';
+    if (!src) {
+        return;
+    }
+
+    while (src[read_i] != '\0' && write_i + 1u < dst_cap) {
+        unsigned char c = (unsigned char)src[read_i];
+        if (c >= 32u && c <= 126u) {
+            dst[write_i] = (char)c;
+        } else {
+            dst[write_i] = '_';
+        }
+        read_i += 1u;
+        write_i += 1u;
+    }
+    dst[write_i] = '\0';
+}
+
+static void db_picker_set_text_from_path(MemConsoleState *state,
+                                         const char *path,
+                                         int strip_sqlite_suffix) {
     size_t len;
 
     if (!state) {
@@ -193,7 +221,7 @@ static void db_picker_set_text_from_path(MemConsoleState *state, const char *pat
     }
 
     len = strlen(path);
-    if (path_has_sqlite_suffix(path)) {
+    if (strip_sqlite_suffix && path_has_sqlite_suffix(path)) {
         len -= 7u;
     }
     if (len >= sizeof(state->db_modal_text)) {
@@ -201,6 +229,23 @@ static void db_picker_set_text_from_path(MemConsoleState *state, const char *pat
     }
     memcpy(state->db_modal_text, path, len);
     state->db_modal_text[len] = '\0';
+}
+
+static void db_picker_set_text_from_selected_entry(MemConsoleState *state) {
+    if (!state) {
+        return;
+    }
+    if (state->db_picker_selected_index < 0 || state->db_picker_selected_index >= state->db_picker_entry_count) {
+        return;
+    }
+    db_picker_set_text_from_path(state,
+                                 state->db_picker_entry_paths[state->db_picker_selected_index],
+                                 state->db_modal_create_mode ? 1 : 0);
+    state->db_modal_cursor = (int)strlen(state->db_modal_text);
+    state->db_modal_selection_anchor = 0;
+    state->db_modal_selection_start = 0;
+    state->db_modal_selection_end = state->db_modal_cursor;
+    state->db_modal_drag_select_active = 0;
 }
 
 static int clamp_cursor_to_text(const char *text, int cursor);
@@ -431,18 +476,21 @@ void begin_db_picker_mode(MemConsoleState *state, int create_mode) {
     state->db_modal_resolved_path[0] = '\0';
     state->input_target = MEM_CONSOLE_INPUT_DB_PATH;
 
-    if (state->db_modal_create_mode) {
+    mem_console_db_picker_rescan_entries(state);
+    if (!state->db_modal_create_mode && state->db_picker_entry_count > 0) {
+        db_picker_set_text_from_selected_entry(state);
+    } else if (state->db_modal_create_mode) {
         if (state->input_root[0] &&
             snprintf(default_db_path, sizeof(default_db_path), "%s/default.sqlite", state->input_root) > 0 &&
             strlen(default_db_path) < sizeof(default_db_path)) {
-            db_picker_set_text_from_path(state, default_db_path);
+            db_picker_set_text_from_path(state, default_db_path, 1);
         } else if (resolve_default_db_path(default_db_path, sizeof(default_db_path))) {
-            db_picker_set_text_from_path(state, default_db_path);
+            db_picker_set_text_from_path(state, default_db_path, 1);
         } else {
-            db_picker_set_text_from_path(state, state->db_path);
+            db_picker_set_text_from_path(state, state->db_path, 1);
         }
     } else {
-        db_picker_set_text_from_path(state, state->db_path);
+        db_picker_set_text_from_path(state, state->db_path, 0);
     }
     state->db_modal_cursor = (int)strlen(state->db_modal_text);
     state->db_modal_selection_anchor = 0;
@@ -464,7 +512,7 @@ void begin_input_root_picker_mode(MemConsoleState *state) {
     state->pending_db_path[0] = '\0';
     state->db_modal_resolved_path[0] = '\0';
     state->input_target = MEM_CONSOLE_INPUT_DB_PATH;
-    db_picker_set_text_from_path(state, state->input_root[0] ? state->input_root : state->output_root);
+    db_picker_set_text_from_path(state, state->input_root[0] ? state->input_root : state->output_root, 0);
     state->db_modal_cursor = (int)strlen(state->db_modal_text);
     state->db_modal_selection_anchor = 0;
     state->db_modal_selection_start = 0;
@@ -484,6 +532,7 @@ void cancel_db_picker_mode(MemConsoleState *state) {
     state->db_modal_resolved_path[0] = '\0';
     state->db_modal_visible_text[0] = '\0';
     state->db_modal_resolved_line[0] = '\0';
+    state->db_modal_active_line[0] = '\0';
     state->pending_db_path[0] = '\0';
     state->db_modal_cursor = 0;
     state->db_modal_selection_anchor = 0;
@@ -581,6 +630,96 @@ int mem_console_db_picker_build_path(const MemConsoleState *state,
         memcpy(out_path + len, ".sqlite", 8u);
     }
 
+    return 1;
+}
+
+void mem_console_db_picker_rescan_entries(MemConsoleState *state) {
+    DIR *dir = 0;
+    struct dirent *entry = 0;
+    int write_index = 0;
+    size_t input_root_len = 0u;
+
+    if (!state) {
+        return;
+    }
+
+    state->db_picker_entry_count = 0;
+    state->db_picker_selected_index = -1;
+    if (!state->input_root[0] || !mem_console_path_is_directory(state->input_root)) {
+        return;
+    }
+
+    dir = opendir(state->input_root);
+    if (!dir) {
+        return;
+    }
+    input_root_len = strlen(state->input_root);
+
+    while ((entry = readdir(dir)) != 0 && write_index < MEM_CONSOLE_DB_PICKER_LIST_LIMIT) {
+        size_t name_len = 0u;
+        int path_written = 0;
+        int name_written = 0;
+
+        if (entry->d_name[0] == '.') {
+            continue;
+        }
+        name_len = strlen(entry->d_name);
+        if (name_len < 7u || strcmp(entry->d_name + name_len - 7u, ".sqlite") != 0) {
+            continue;
+        }
+        path_written = snprintf(state->db_picker_entry_paths[write_index],
+                                sizeof(state->db_picker_entry_paths[write_index]),
+                                (input_root_len > 0u && state->input_root[input_root_len - 1u] == '/') ? "%s%s" : "%s/%s",
+                                state->input_root,
+                                entry->d_name);
+        if (path_written <= 0 || (size_t)path_written >= sizeof(state->db_picker_entry_paths[write_index])) {
+            continue;
+        }
+        name_written = snprintf(state->db_picker_entry_names[write_index],
+                                sizeof(state->db_picker_entry_names[write_index]),
+                                "%.*s",
+                                (int)(name_len - 7u),
+                                entry->d_name);
+        if (name_written <= 0 || (size_t)name_written >= sizeof(state->db_picker_entry_names[write_index])) {
+            continue;
+        }
+        sanitize_db_label(state->db_picker_entry_names[write_index],
+                          state->db_picker_entry_names[write_index],
+                          sizeof(state->db_picker_entry_names[write_index]));
+        if (state->db_path && strcmp(state->db_picker_entry_paths[write_index], state->db_path) == 0) {
+            state->db_picker_selected_index = write_index;
+        }
+        write_index += 1;
+    }
+
+    closedir(dir);
+    state->db_picker_entry_count = write_index;
+    if (state->db_picker_entry_count > 0 && state->db_picker_selected_index < 0) {
+        state->db_picker_selected_index = 0;
+    }
+}
+
+int mem_console_db_picker_move_selection(MemConsoleState *state, int delta) {
+    int next_index = 0;
+
+    if (!state || state->db_picker_entry_count <= 0 || delta == 0) {
+        return 0;
+    }
+    if (state->db_picker_selected_index < 0 || state->db_picker_selected_index >= state->db_picker_entry_count) {
+        state->db_picker_selected_index = 0;
+    }
+    next_index = state->db_picker_selected_index + delta;
+    if (next_index < 0) {
+        next_index = 0;
+    }
+    if (next_index >= state->db_picker_entry_count) {
+        next_index = state->db_picker_entry_count - 1;
+    }
+    if (next_index == state->db_picker_selected_index) {
+        return 0;
+    }
+    state->db_picker_selected_index = next_index;
+    db_picker_set_text_from_selected_entry(state);
     return 1;
 }
 
