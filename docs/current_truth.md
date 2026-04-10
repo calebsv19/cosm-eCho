@@ -1,11 +1,11 @@
 # mem_console Current Truth
 
-Last updated: 2026-04-08
+Last updated: 2026-04-10
 
 ## Program Identity
 - Repo/program directory: `mem_console`
 - Canonical symbol/file prefix: `mem_console`
-- Private planning bucket: `docs/private_program_docs/memory_console/`
+- Private planning bucket: `../../docs/private_program_docs/memory_console/`
 
 ## Top-Level Layout (Current)
 - required scaffold floor:
@@ -49,6 +49,7 @@ Last updated: 2026-04-08
 ## Verification Contract (Current)
 - `make -C mem_console clean && make -C mem_console`
 - `make -C mem_console test`
+- `make -C mem_console run-data-path-contract-checks`
 - `make -C mem_console run-headless-smoke`
 - `make -C mem_console visual-harness`
 - desktop packaging verification:
@@ -133,6 +134,9 @@ Last updated: 2026-04-08
 - `S4` output-root migration is active:
   - app prefs path now resolves from active `output_root` (`<output_root>/mem_console.app.pack`)
   - startup load keeps compatibility fallback to legacy `~/.local/share/mem_console/mem_console.app.pack` if present
+- `S5` verification closeout lane is active:
+  - deterministic contract checker: `tests/run_data_path_contract_checks.sh`
+  - checker is wired into `make -C mem_console test`
 - `S6` DB picker usability refinement is active:
   - `LOAD DB` modal includes discovered `.sqlite` list from `input_root`
   - active DB summary visible in modal
@@ -144,7 +148,7 @@ Last updated: 2026-04-08
   - `W1` complete for `mem_console`
   - `W2` complete for `mem_console`
 - execution note:
-  - `../docs/private_program_docs/memory_console/2026-04-02_mem_console_w1_w2_wrapper_hardening.md`
+  - `../../docs/private_program_docs/memory_console/2026-04-02_mem_console_w1_w2_wrapper_hardening.md`
 
 ## Source Hygiene (Current)
 - historical `_backup` directories were removed from active `src/` lanes.
@@ -157,3 +161,6 @@ Last updated: 2026-04-08
   - `tmp/`
   - `ide_files/`
   - `demo/*.sqlite`
+- large-file decomposition follow-up (2026-04-09) split oversized lanes into helper modules:
+  - `src/runtime/mem_console_prefs_app_io.c` + `src/runtime/mem_console_prefs_app_io_internal.h` now own app-prefs path/load/save I/O helpers.
+  - `src/ui/graph/mem_console_ui_graph_layout_focus_helpers.c` + `.h` now own focus-anchor layout and visible-edge filtering helpers.

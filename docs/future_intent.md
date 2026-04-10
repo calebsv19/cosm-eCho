@@ -1,6 +1,6 @@
 # mem_console Future Intent
 
-Last updated: 2026-04-05
+Last updated: 2026-04-10
 
 ## Scaffold Alignment Targets
 - lock lifecycle around a canonical app wrapper (`mem_console_app_main`) and named startup stages
@@ -22,7 +22,7 @@ Last updated: 2026-04-05
 - `W1` complete for `mem_console` (typed stage/context wrapper shape already aligned)
 - `W2` complete for `mem_console` (structured wrapper diagnostics normalization + wrapper exit summary logging)
 - execution note:
-  - `../docs/private_program_docs/memory_console/2026-04-02_mem_console_w1_w2_wrapper_hardening.md`
+  - `../../docs/private_program_docs/memory_console/2026-04-02_mem_console_w1_w2_wrapper_hardening.md`
 
 ## Optional Lane Policy
 - keep optional top-level lanes when needed and justified:
@@ -46,3 +46,7 @@ Last updated: 2026-04-05
 - next packaging posture:
   - maintenance-only parity with ecosystem release contract updates.
   - keep Desktop/Finder launch + `release-verify-notarized` evidence in packaging-affecting closeout gates.
+
+## Large-File Maintenance Posture
+- continue behavior-preserving helper extraction when modules exceed readability/size thresholds.
+- keep function ownership docs in sync when helper modules move between `src/runtime/` and `src/ui/graph/`.

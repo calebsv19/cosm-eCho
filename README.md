@@ -1,6 +1,6 @@
 # mem_console
 
-`mem_console` is the planned standalone Memory Console host for the Memory DB system.
+`mem_console` is the standalone Memory Console host for the Memory DB system.
 
 This is a top-level program host, not a reusable shared kit.
 
@@ -74,34 +74,20 @@ Right now it proves:
 It does not yet provide a full multiline editor widget or richer styling controls.
 
 Current source layout:
-- `src/mem_console.c`:
-  - app lifecycle + SDL event loop + action dispatch
-- `src/mem_console_types.h`:
-  - shared state/types/constants
-- `src/mem_console_state.h/.c`:
-  - argument parsing, theme/font cycles, layout/search/text helpers, redraw invalidation reason tracking
-- `src/mem_console_pane_layout.h/.c`:
-  - app-local pane layout adapter for three-pane bounds (`left_nav`, `right_detail`, `right_graph`) used as the 15C bridge to shared pane extraction
-- `src/mem_console_db.h/.c`:
-  - DB reads/writes and graph neighborhood load
-- `src/mem_console_runtime.h/.c`:
-  - background refresh scheduling + worker completion handoff
-- `src/mem_console_layout_config.h/.c`:
-  - centralized UI density/layout metrics for pane sizing and section heights
-- `src/mem_console_ui.h/.c`:
-  - top-level frame orchestration only (`run_frame`)
-- `src/mem_console_ui_chrome.h/.c`:
-  - root pane chrome pass (single-owner pane seams + base pane surfaces)
-- `src/mem_console_ui_left_section.h/.c`:
-  - left pane rendering (status/search/project chips/results list)
-- `src/mem_console_ui_detail_section.h/.c`:
-  - detail metadata/title/body rendering + edit caret behavior
-- `src/mem_console_ui_graph_controls.h/.c`:
-  - graph filter/settings controls + grouped memory/graph action rows
-- `src/mem_console_ui_graph_panel.h/.c`:
-  - graph viewport panel rendering + node/edge hit interactions + graph-off placeholder state
-- `src/mem_console_ui_common.h/.c`:
-  - shared UI text/theme/button helper primitives
+- `src/app/`:
+  - lifecycle/bootstrap/loop and event/action dispatch (`mem_console.c`, `mem_console_app_main.c`, `mem_console_app_loop.c`)
+- `src/runtime/`:
+  - runtime state/path/prefs/worker lanes (`mem_console_state*.c`, `mem_console_prefs.c`, `mem_console_prefs_app_io.c`, `mem_console_runtime.c`)
+- `src/db/`:
+  - DB query/filter/read/mutation paths (`mem_console_db*.c`)
+- `src/layout/`:
+  - pane split and density config (`mem_console_pane_layout.c`, `mem_console_layout_config.c`)
+- `src/ui/`:
+  - frame/chrome/left/detail/hud composition
+- `src/ui/graph/`:
+  - graph viewport/camera/draw/controls/layout/overlay/pods (`mem_console_ui_graph_layout_focus_helpers.c` included)
+- `include/mem_console/`:
+  - public state/types/runtime contracts used across lanes
 
 ## Build
 

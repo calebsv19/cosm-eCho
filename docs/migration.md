@@ -1,9 +1,9 @@
 # mem_console Scaffold Migration
 
-Last updated: 2026-03-27
+Last updated: 2026-04-10
 
 Primary private plan:
-- `docs/private_program_docs/memory_console/2026-03-26_mem_console_scaffold_standardization_switchover_plan.md`
+- `../../docs/private_program_docs/memory_console/2026-03-26_mem_console_scaffold_standardization_switchover_plan.md`
 
 ## Phase Status
 | Phase | Status | Notes |
