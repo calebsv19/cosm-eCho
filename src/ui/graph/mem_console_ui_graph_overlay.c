@@ -299,10 +299,28 @@ CoreResult draw_graph_edge_legend(KitUiContext *ui_ctx,
         }
     }
 
-    if (hovered_row >= 0 && input && input->mouse_released) {
+    if (hovered_row >= 0 &&
+        input &&
+        (input->mouse_pressed || input->mouse_released)) {
         clicked_row = hovered_row;
         if (out_click_consumed) {
             *out_click_consumed = 1;
+        }
+    }
+
+    if (clicked_row >= 0) {
+        uint32_t before_mask = state->graph_kind_filter_mask;
+        int before_all_override = state->graph_kind_filter_all_override;
+        if (clicked_row == 0) {
+            (void)mem_console_graph_kind_toggle_all_override(state);
+        } else if (rows[clicked_row]) {
+            (void)mem_console_graph_kind_toggle_enabled(state, rows[clicked_row]->kind);
+        }
+        if (before_mask != state->graph_kind_filter_mask ||
+            before_all_override != state->graph_kind_filter_all_override) {
+            if (out_filter_changed) {
+                *out_filter_changed = 1;
+            }
         }
     }
 
@@ -373,22 +391,6 @@ CoreResult draw_graph_edge_legend(KitUiContext *ui_ctx,
             result = kit_render_push_line(frame, &underline);
             if (result.code != CORE_OK) {
                 return result;
-            }
-        }
-    }
-
-    if (clicked_row >= 0) {
-        uint32_t before_mask = state->graph_kind_filter_mask;
-        int before_all_override = state->graph_kind_filter_all_override;
-        if (clicked_row == 0) {
-            (void)mem_console_graph_kind_toggle_all_override(state);
-        } else if (rows[clicked_row]) {
-            (void)mem_console_graph_kind_toggle_enabled(state, rows[clicked_row]->kind);
-        }
-        if (before_mask != state->graph_kind_filter_mask ||
-            before_all_override != state->graph_kind_filter_all_override) {
-            if (out_filter_changed) {
-                *out_filter_changed = 1;
             }
         }
     }

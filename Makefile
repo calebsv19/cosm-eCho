@@ -62,6 +62,9 @@ PACKAGE_INFO_PLIST_SRC := tools/packaging/macos/Info.plist
 PACKAGE_LAUNCHER_SRC := tools/packaging/macos/mem-console-launcher
 PACKAGE_DYLIB_BUNDLER := tools/packaging/macos/bundle-dylibs.sh
 DESKTOP_APP_DIR ?= $(HOME)/Desktop/$(PACKAGE_APP_NAME)
+DEPRECATED_APP_NAME := MemConsole.app
+DEPRECATED_PACKAGE_APP_DIR := $(DIST_DIR)/$(DEPRECATED_APP_NAME)
+DEPRECATED_DESKTOP_APP_DIR := $(HOME)/Desktop/$(DEPRECATED_APP_NAME)
 PACKAGE_ADHOC_SIGN_IDENTITY ?= -
 RELEASE_VERSION_FILE ?= VERSION
 RELEASE_VERSION ?= $(strip $(shell cat "$(RELEASE_VERSION_FILE)" 2>/dev/null))
@@ -91,10 +94,12 @@ STAPLE_RETRY_DELAY_SEC ?= 15
 		src/app/mem_console_app_theme.c \
 		src/app/mem_console_kernel_bridge.c \
 		src/db/mem_console_db.c \
+		src/db/mem_console_db_graph_sort.c \
 	src/db/mem_console_db_filters.c \
 	src/db/mem_console_db_mutations.c \
 	src/db/mem_console_db_reads.c \
 	src/runtime/mem_console_prefs.c \
+	src/runtime/mem_console_prefs_app_io.c \
 	src/runtime/mem_console_runtime.c \
 	src/runtime/mem_console_state.c \
 	src/runtime/mem_console_state_core.c \
@@ -118,68 +123,71 @@ STAPLE_RETRY_DELAY_SEC ?= 15
 	src/ui/graph/mem_console_ui_graph_geometry.c \
 	src/ui/graph/mem_console_ui_graph_hud.c \
 	src/ui/graph/mem_console_ui_graph_layout.c \
+	src/ui/graph/mem_console_ui_graph_layout_focus_helpers.c \
 	src/ui/graph/mem_console_ui_graph_overlay.c \
 	src/ui/graph/mem_console_ui_graph_project_pods.c \
 	src/ui/graph/mem_console_ui_graph_types.c \
 	src/ui/graph/mem_console_ui_graph_panel.c
 
-.PHONY: all clean run run-demo vk-renderer-lib test run-headless-smoke run-data-path-contract-checks visual-harness package-desktop package-desktop-smoke package-desktop-self-test package-desktop-copy-desktop package-desktop-sync package-desktop-open package-desktop-remove package-desktop-refresh release-contract release-clean release-build release-bundle-audit release-sign release-verify release-verify-signed release-notarize release-staple release-verify-notarized release-artifact release-distribute release-desktop-refresh
+.PHONY: all clean run run-demo vk-renderer-lib test run-headless-smoke run-data-path-contract-checks visual-harness package-desktop package-desktop-smoke package-desktop-self-test package-desktop-copy-desktop package-desktop-sync package-desktop-open package-desktop-remove package-desktop-refresh release-contract release-clean release-build release-bundle-audit release-sign release-verify release-verify-signed release-notarize release-staple release-verify-notarized release-artifact release-distribute release-desktop-refresh FORCE
 
 all: $(BIN)
+
+FORCE:
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
 
-$(KIT_RENDER_DIR)/build/vk/libkit_render.a:
-	$(MAKE) -C $(KIT_RENDER_DIR) KIT_RENDER_ENABLE_VK=1
+$(KIT_RENDER_DIR)/build/vk/libkit_render.a: FORCE
+	$(MAKE) -C $(KIT_RENDER_DIR) CC="$(CC)" KIT_RENDER_ENABLE_VK=1
 
-$(KIT_UI_DIR)/build/libkit_ui.a: $(KIT_RENDER_DIR)/build/vk/libkit_render.a
-	$(MAKE) -C $(KIT_UI_DIR) KIT_RENDER_ENABLE_VK=1
+$(KIT_UI_DIR)/build/libkit_ui.a: FORCE $(KIT_RENDER_DIR)/build/vk/libkit_render.a
+	$(MAKE) -C $(KIT_UI_DIR) CC="$(CC)" KIT_RENDER_ENABLE_VK=1
 
-$(KIT_GRAPH_STRUCT_DIR)/build/libkit_graph_struct.a: $(KIT_UI_DIR)/build/libkit_ui.a
-	$(MAKE) -C $(KIT_GRAPH_STRUCT_DIR) KIT_RENDER_ENABLE_VK=1
+$(KIT_GRAPH_STRUCT_DIR)/build/libkit_graph_struct.a: FORCE $(KIT_UI_DIR)/build/libkit_ui.a
+	$(MAKE) -C $(KIT_GRAPH_STRUCT_DIR) CC="$(CC)" KIT_RENDER_ENABLE_VK=1
 
-$(CORE_BASE_DIR)/build/libcore_base.a:
-	$(MAKE) -C $(CORE_BASE_DIR)
+$(CORE_BASE_DIR)/build/libcore_base.a: FORCE
+	$(MAKE) -C $(CORE_BASE_DIR) CC="$(CC)"
 
-$(CORE_THEME_DIR)/build/libcore_theme.a: $(CORE_BASE_DIR)/build/libcore_base.a
-	$(MAKE) -C $(CORE_THEME_DIR)
+$(CORE_THEME_DIR)/build/libcore_theme.a: FORCE $(CORE_BASE_DIR)/build/libcore_base.a
+	$(MAKE) -C $(CORE_THEME_DIR) CC="$(CC)"
 
-$(CORE_FONT_DIR)/build/libcore_font.a: $(CORE_BASE_DIR)/build/libcore_base.a
-	$(MAKE) -C $(CORE_FONT_DIR)
+$(CORE_FONT_DIR)/build/libcore_font.a: FORCE $(CORE_BASE_DIR)/build/libcore_base.a
+	$(MAKE) -C $(CORE_FONT_DIR) CC="$(CC)"
 
-$(CORE_QUEUE_DIR)/build/libcore_queue.a:
-	$(MAKE) -C $(CORE_QUEUE_DIR)
+$(CORE_QUEUE_DIR)/build/libcore_queue.a: FORCE
+	$(MAKE) -C $(CORE_QUEUE_DIR) CC="$(CC)"
 
-$(CORE_TIME_DIR)/build/libcore_time.a:
-	$(MAKE) -C $(CORE_TIME_DIR)
+$(CORE_TIME_DIR)/build/libcore_time.a: FORCE
+	$(MAKE) -C $(CORE_TIME_DIR) CC="$(CC)"
 
-$(CORE_SCHED_DIR)/build/libcore_sched.a:
-	$(MAKE) -C $(CORE_SCHED_DIR)
+$(CORE_SCHED_DIR)/build/libcore_sched.a: FORCE
+	$(MAKE) -C $(CORE_SCHED_DIR) CC="$(CC)"
 
-$(CORE_JOBS_DIR)/build/libcore_jobs.a:
-	$(MAKE) -C $(CORE_JOBS_DIR)
+$(CORE_JOBS_DIR)/build/libcore_jobs.a: FORCE
+	$(MAKE) -C $(CORE_JOBS_DIR) CC="$(CC)"
 
-$(CORE_WORKERS_DIR)/build/libcore_workers.a: $(CORE_QUEUE_DIR)/build/libcore_queue.a
-	$(MAKE) -C $(CORE_WORKERS_DIR)
+$(CORE_WORKERS_DIR)/build/libcore_workers.a: FORCE $(CORE_QUEUE_DIR)/build/libcore_queue.a
+	$(MAKE) -C $(CORE_WORKERS_DIR) CC="$(CC)"
 
-$(CORE_WAKE_DIR)/build/libcore_wake.a:
-	$(MAKE) -C $(CORE_WAKE_DIR)
+$(CORE_WAKE_DIR)/build/libcore_wake.a: FORCE
+	$(MAKE) -C $(CORE_WAKE_DIR) CC="$(CC)"
 
-$(CORE_KERNEL_DIR)/build/libcore_kernel.a: $(CORE_TIME_DIR)/build/libcore_time.a $(CORE_SCHED_DIR)/build/libcore_sched.a $(CORE_JOBS_DIR)/build/libcore_jobs.a $(CORE_WAKE_DIR)/build/libcore_wake.a $(CORE_QUEUE_DIR)/build/libcore_queue.a
-	$(MAKE) -C $(CORE_KERNEL_DIR)
+$(CORE_KERNEL_DIR)/build/libcore_kernel.a: FORCE $(CORE_TIME_DIR)/build/libcore_time.a $(CORE_SCHED_DIR)/build/libcore_sched.a $(CORE_JOBS_DIR)/build/libcore_jobs.a $(CORE_WAKE_DIR)/build/libcore_wake.a $(CORE_QUEUE_DIR)/build/libcore_queue.a
+	$(MAKE) -C $(CORE_KERNEL_DIR) CC="$(CC)"
 
-$(CORE_MEMDB_DIR)/build/libcore_memdb.a: $(CORE_BASE_DIR)/build/libcore_base.a
-	$(MAKE) -C $(CORE_MEMDB_DIR)
+$(CORE_MEMDB_DIR)/build/libcore_memdb.a: FORCE $(CORE_BASE_DIR)/build/libcore_base.a
+	$(MAKE) -C $(CORE_MEMDB_DIR) CC="$(CC)"
 
-$(CORE_PANE_DIR)/build/libcore_pane.a:
-	$(MAKE) -C $(CORE_PANE_DIR)
+$(CORE_PANE_DIR)/build/libcore_pane.a: FORCE
+	$(MAKE) -C $(CORE_PANE_DIR) CC="$(CC)"
 
-$(CORE_PACK_DIR)/build/libcore_pack.a: $(CORE_BASE_DIR)/build/libcore_base.a
-	$(MAKE) -C $(CORE_PACK_DIR)
+$(CORE_PACK_DIR)/build/libcore_pack.a: FORCE $(CORE_BASE_DIR)/build/libcore_base.a
+	$(MAKE) -C $(CORE_PACK_DIR) CC="$(CC)"
 
-vk-renderer-lib:
-	$(MAKE) -C $(VK_RENDERER_DIR)
+vk-renderer-lib: FORCE
+	$(MAKE) -C $(VK_RENDERER_DIR) CC="$(CC)"
 
 $(BIN): $(SRC) $(KIT_GRAPH_STRUCT_DIR)/build/libkit_graph_struct.a $(KIT_UI_DIR)/build/libkit_ui.a $(KIT_RENDER_DIR)/build/vk/libkit_render.a $(CORE_MEMDB_DIR)/build/libcore_memdb.a $(CORE_PACK_DIR)/build/libcore_pack.a $(CORE_PANE_DIR)/build/libcore_pane.a $(CORE_KERNEL_DIR)/build/libcore_kernel.a $(CORE_WORKERS_DIR)/build/libcore_workers.a $(CORE_QUEUE_DIR)/build/libcore_queue.a $(CORE_SCHED_DIR)/build/libcore_sched.a $(CORE_JOBS_DIR)/build/libcore_jobs.a $(CORE_WAKE_DIR)/build/libcore_wake.a $(CORE_TIME_DIR)/build/libcore_time.a vk-renderer-lib $(CORE_THEME_DIR)/build/libcore_theme.a $(CORE_FONT_DIR)/build/libcore_font.a $(CORE_BASE_DIR)/build/libcore_base.a | $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC) $(SRC) $(KIT_GRAPH_STRUCT_DIR)/build/libkit_graph_struct.a $(KIT_UI_DIR)/build/libkit_ui.a $(KIT_RENDER_DIR)/build/vk/libkit_render.a $(VK_RENDERER_DIR)/build/lib/libvkrenderer.a $(CORE_MEMDB_DIR)/build/libcore_memdb.a $(CORE_PACK_DIR)/build/libcore_pack.a $(CORE_PANE_DIR)/build/libcore_pane.a $(CORE_KERNEL_DIR)/build/libcore_kernel.a $(CORE_WORKERS_DIR)/build/libcore_workers.a $(CORE_QUEUE_DIR)/build/libcore_queue.a $(CORE_SCHED_DIR)/build/libcore_sched.a $(CORE_JOBS_DIR)/build/libcore_jobs.a $(CORE_WAKE_DIR)/build/libcore_wake.a $(CORE_TIME_DIR)/build/libcore_time.a $(CORE_THEME_DIR)/build/libcore_theme.a $(CORE_FONT_DIR)/build/libcore_font.a $(CORE_BASE_DIR)/build/libcore_base.a $(VULKAN_LIBS) $(SDL_LIBS) $(SDL_TTF_LIBS) $(APPLE_FW) -lm -o $@
@@ -209,6 +217,7 @@ visual-harness: $(BIN)
 package-desktop: $(BIN)
 	@echo "Preparing desktop package..."
 	@rm -rf "$(PACKAGE_APP_DIR)"
+	@rm -rf "$(DEPRECATED_PACKAGE_APP_DIR)"
 	@mkdir -p "$(PACKAGE_MACOS_DIR)" "$(PACKAGE_RESOURCES_DIR)" "$(PACKAGE_FRAMEWORKS_DIR)"
 	@cp "$(PACKAGE_INFO_PLIST_SRC)" "$(PACKAGE_CONTENTS_DIR)/Info.plist"
 	@cp "$(BIN)" "$(PACKAGE_MACOS_DIR)/mem-console-bin"
@@ -250,6 +259,7 @@ package-desktop-self-test: package-desktop-smoke
 package-desktop-copy-desktop: package-desktop
 	@mkdir -p "$(dir $(DESKTOP_APP_DIR))"
 	@rm -rf "$(DESKTOP_APP_DIR)"
+	@rm -rf "$(DEPRECATED_DESKTOP_APP_DIR)"
 	@cp -R "$(PACKAGE_APP_DIR)" "$(DESKTOP_APP_DIR)"
 	@echo "Copied $(PACKAGE_APP_NAME) to $(DESKTOP_APP_DIR)"
 
@@ -261,11 +271,13 @@ package-desktop-open: package-desktop
 
 package-desktop-remove:
 	@rm -rf "$(DESKTOP_APP_DIR)"
+	@rm -rf "$(DEPRECATED_DESKTOP_APP_DIR)"
 	@echo "Removed desktop app copy: $(DESKTOP_APP_DIR)"
 
 package-desktop-refresh: package-desktop
 	@mkdir -p "$(dir $(DESKTOP_APP_DIR))"
 	@rm -rf "$(DESKTOP_APP_DIR)"
+	@rm -rf "$(DEPRECATED_DESKTOP_APP_DIR)"
 	@cp -R "$(PACKAGE_APP_DIR)" "$(DESKTOP_APP_DIR)"
 	@echo "Refreshed $(PACKAGE_APP_NAME) at $(DESKTOP_APP_DIR)"
 
@@ -382,6 +394,7 @@ release-distribute: release-artifact
 release-desktop-refresh: release-distribute
 	@mkdir -p "$$(dirname "$(DESKTOP_APP_DIR)")"
 	@rm -rf "$(DESKTOP_APP_DIR)"
+	@rm -rf "$(DEPRECATED_DESKTOP_APP_DIR)"
 	@cp -R "$(PACKAGE_APP_DIR)" "$(DESKTOP_APP_DIR)"
 	@spctl --assess --type execute --verbose=2 "$(DESKTOP_APP_DIR)"
 	@echo "release-desktop-refresh passed."

@@ -88,8 +88,11 @@ typedef struct MemConsoleListItem {
 typedef struct MemConsoleGraphNode {
     int64_t item_id;
     int64_t created_ns;
+    int64_t render_anchor_item_id;
+    int64_t render_anchor_created_ns;
     int pinned;
     int canonical;
+    int is_rollup_node;
     char title[160];
     char body_preview[256];
     char project_key[64];
@@ -260,6 +263,8 @@ typedef struct MemConsoleState {
     CoreFontTextSizeTier graph_hud_cache_row_tiers[MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT];
     float graph_hud_cache_row_line_steps[MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT];
     char graph_hud_cache_lines[MEM_CONSOLE_GRAPH_HUD_LINE_LIMIT][256];
+    char detail_title_lines[8][256];
+    int detail_title_line_count;
     char detail_connection_summary_text[640];
     char detail_connection_summary_lines[MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT][256];
     int graph_drag_active;

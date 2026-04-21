@@ -107,6 +107,7 @@ int graph_build_node_hud_spec(MemConsoleState *state,
     const MemConsoleGraphNode *hovered_node;
     const char *raw_body;
     const char *project_key;
+    int64_t anchor_item_id = 0;
 
     if (!state || !out_spec || hovered_node_index < 0 || hovered_node_index >= state->graph_node_count) {
         return 0;
@@ -114,6 +115,7 @@ int graph_build_node_hud_spec(MemConsoleState *state,
     hovered_node = &state->graph_nodes[hovered_node_index];
     raw_body = hovered_node->body_preview[0] ? hovered_node->body_preview : "(no body)";
     project_key = hovered_node->project_key[0] ? hovered_node->project_key : "misc";
+    anchor_item_id = hovered_node->render_anchor_item_id > 0 ? hovered_node->render_anchor_item_id : hovered_node->item_id;
 
     memset(out_spec, 0, sizeof(*out_spec));
     out_spec->width_ratio = 0.48f;
@@ -154,11 +156,20 @@ int graph_build_node_hud_spec(MemConsoleState *state,
                    "ID %lld | %s",
                    (long long)hovered_node->item_id,
                    project_key);
-    (void)snprintf(state->graph_hud_flags,
-                   sizeof(state->graph_hud_flags),
-                   "PIN %s | CAN %s",
-                   hovered_node->pinned ? "ON" : "OFF",
-                   hovered_node->canonical ? "ON" : "OFF");
+    if (hovered_node->is_rollup_node) {
+        (void)snprintf(state->graph_hud_flags,
+                       sizeof(state->graph_hud_flags),
+                       "PIN %s | CAN %s | ROLLUP ON | ANCHOR %lld",
+                       hovered_node->pinned ? "ON" : "OFF",
+                       hovered_node->canonical ? "ON" : "OFF",
+                       (long long)anchor_item_id);
+    } else {
+        (void)snprintf(state->graph_hud_flags,
+                       sizeof(state->graph_hud_flags),
+                       "PIN %s | CAN %s",
+                       hovered_node->pinned ? "ON" : "OFF",
+                       hovered_node->canonical ? "ON" : "OFF");
+    }
     out_spec->cache_key = graph_hud_hash_u64(1469598103934665603ull, state->graph_layout_signature);
     out_spec->cache_key = graph_hud_hash_u64(out_spec->cache_key, (uint64_t)hovered_node->item_id);
     out_spec->cache_key = graph_hud_hash_u64(out_spec->cache_key, 1ull);

@@ -1,5 +1,6 @@
 #include "mem_console_db.h"
 #include "mem_console_db_internal.h"
+#include "mem_console_db_graph_sort.h"
 
 #include <SDL2/SDL.h>
 #include <stdio.h>
@@ -75,6 +76,7 @@ static CoreResult load_graph_node_detail(CoreMemDb *db, int64_t item_id, MemCons
 
     memset(out_node, 0, sizeof(*out_node));
     out_node->item_id = item_id;
+    out_node->render_anchor_item_id = item_id;
 
     result = core_memdb_prepare(db,
                                 "SELECT title, body, pinned, canonical, created_ns, project_key, kind, stable_id "
@@ -156,6 +158,7 @@ static CoreResult load_graph_node_detail(CoreMemDb *db, int64_t item_id, MemCons
     if (result.code != CORE_OK) {
         goto cleanup;
     }
+    out_node->render_anchor_created_ns = out_node->created_ns;
     result = core_memdb_stmt_column_text(&stmt, 5, &project_key);
     if (result.code != CORE_OK) {
         goto cleanup;
@@ -225,232 +228,15 @@ static int is_graph_node_limit_result(CoreResult result) {
            strcmp(result.message, "graph node limit reached") == 0;
 }
 
-static int graph_sort_nodes_should_swap(const MemConsoleState *state,
-                                        const MemConsoleGraphNode *left,
-                                        const MemConsoleGraphNode *right) {
-    if (!state || !left || !right) {
-        return 0;
-    }
-    if (state->graph_sort_mode == MEM_CONSOLE_GRAPH_SORT_OLDEST_FIRST) {
-        if (left->created_ns > right->created_ns) {
-            return 1;
-        }
-        if (left->created_ns < right->created_ns) {
-            return 0;
-        }
-        return left->item_id > right->item_id ? 1 : 0;
-    }
-
-    if (left->created_ns < right->created_ns) {
-        return 1;
-    }
-    if (left->created_ns > right->created_ns) {
-        return 0;
-    }
-    return left->item_id < right->item_id ? 1 : 0;
-}
-
-static void apply_graph_node_sort(MemConsoleState *state) {
-    MemConsoleGraphNode *sorted_nodes = 0;
-    int *order = 0;
-    int *old_to_new = 0;
-    int node_count = 0;
-    int edge_count = 0;
-    int i;
-    int j;
-    int changed = 0;
-
-    if (!state) {
-        return;
-    }
-
-    node_count = state->graph_node_count;
-    if (node_count <= 1) {
-        return;
-    }
-    if (node_count > MEM_CONSOLE_GRAPH_NODE_LIMIT) {
-        node_count = MEM_CONSOLE_GRAPH_NODE_LIMIT;
-    }
-    edge_count = state->graph_edge_count;
-    if (edge_count < 0) {
-        edge_count = 0;
-    }
-    if (edge_count > MEM_CONSOLE_GRAPH_EDGE_LIMIT) {
-        edge_count = MEM_CONSOLE_GRAPH_EDGE_LIMIT;
-    }
-
-    sorted_nodes = (MemConsoleGraphNode *)malloc((size_t)node_count * sizeof(*sorted_nodes));
-    order = (int *)malloc((size_t)node_count * sizeof(*order));
-    old_to_new = (int *)malloc((size_t)node_count * sizeof(*old_to_new));
-    if (!sorted_nodes || !order || !old_to_new) {
-        free(sorted_nodes);
-        free(order);
-        free(old_to_new);
-        return;
-    }
-
-    for (i = 0; i < node_count; ++i) {
-        order[i] = i;
-    }
-
-    for (i = 1; i < node_count; ++i) {
-        int key = order[i];
-        j = i - 1;
-        while (j >= 0 &&
-               graph_sort_nodes_should_swap(state,
-                                            &state->graph_nodes[order[j]],
-                                            &state->graph_nodes[key])) {
-            order[j + 1] = order[j];
-            j -= 1;
-        }
-        order[j + 1] = key;
-    }
-
-    for (i = 0; i < node_count; ++i) {
-        if (order[i] != i) {
-            changed = 1;
-            break;
-        }
-    }
-    if (!changed) {
-        free(sorted_nodes);
-        free(order);
-        free(old_to_new);
-        return;
-    }
-
-    for (i = 0; i < node_count; ++i) {
-        sorted_nodes[i] = state->graph_nodes[order[i]];
-        old_to_new[order[i]] = i;
-    }
-    for (i = 0; i < node_count; ++i) {
-        state->graph_nodes[i] = sorted_nodes[i];
-    }
-
-    for (i = 0; i < edge_count; ++i) {
-        int from_index = state->graph_edges[i].from_index;
-        int to_index = state->graph_edges[i].to_index;
-        if (from_index >= 0 && from_index < node_count) {
-            state->graph_edges[i].from_index = old_to_new[from_index];
-        }
-        if (to_index >= 0 && to_index < node_count) {
-            state->graph_edges[i].to_index = old_to_new[to_index];
-        }
-    }
-
-    free(sorted_nodes);
-    free(order);
-    free(old_to_new);
-}
-
-static void compact_graph_by_node_kind(MemConsoleState *state) {
-    MemConsoleGraphNode *kept_nodes = 0;
-    MemConsoleGraphEdge *kept_edges = 0;
-    int *old_to_new = 0;
-    int old_node_count;
-    int old_edge_count;
-    int kept_node_count = 0;
-    int kept_edge_count = 0;
-    int i;
-
-    if (!state) {
-        return;
-    }
-
-    old_node_count = state->graph_node_count;
-    old_edge_count = state->graph_edge_count;
-    if (old_node_count < 0) {
-        old_node_count = 0;
-    }
-    if (old_node_count > MEM_CONSOLE_GRAPH_NODE_LIMIT) {
-        old_node_count = MEM_CONSOLE_GRAPH_NODE_LIMIT;
-    }
-    if (old_edge_count < 0) {
-        old_edge_count = 0;
-    }
-    if (old_edge_count > MEM_CONSOLE_GRAPH_EDGE_LIMIT) {
-        old_edge_count = MEM_CONSOLE_GRAPH_EDGE_LIMIT;
-    }
-
-    if (old_node_count > 0) {
-        kept_nodes = (MemConsoleGraphNode *)malloc((size_t)old_node_count * sizeof(*kept_nodes));
-        old_to_new = (int *)malloc((size_t)old_node_count * sizeof(*old_to_new));
-        if (!kept_nodes || !old_to_new) {
-            free(kept_nodes);
-            free(old_to_new);
-            return;
-        }
-    }
-    if (old_edge_count > 0) {
-        kept_edges = (MemConsoleGraphEdge *)malloc((size_t)old_edge_count * sizeof(*kept_edges));
-        if (!kept_edges) {
-            free(kept_nodes);
-            free(old_to_new);
-            return;
-        }
-    }
-
-    for (i = 0; i < old_node_count; ++i) {
-        old_to_new[i] = -1;
-        if (!mem_console_graph_node_kind_is_enabled(state, state->graph_nodes[i].kind)) {
-            continue;
-        }
-        if (kept_node_count >= MEM_CONSOLE_GRAPH_NODE_LIMIT) {
-            continue;
-        }
-        kept_nodes[kept_node_count] = state->graph_nodes[i];
-        old_to_new[i] = kept_node_count;
-        kept_node_count += 1;
-    }
-
-    for (i = 0; i < old_edge_count; ++i) {
-        int old_from = state->graph_edges[i].from_index;
-        int old_to = state->graph_edges[i].to_index;
-        int new_from;
-        int new_to;
-
-        if (kept_edge_count >= MEM_CONSOLE_GRAPH_EDGE_LIMIT) {
-            break;
-        }
-        if (old_from < 0 || old_to < 0 || old_from >= old_node_count || old_to >= old_node_count) {
-            continue;
-        }
-        new_from = old_to_new[old_from];
-        new_to = old_to_new[old_to];
-        if (new_from < 0 || new_to < 0) {
-            continue;
-        }
-        kept_edges[kept_edge_count] = state->graph_edges[i];
-        kept_edges[kept_edge_count].from_index = new_from;
-        kept_edges[kept_edge_count].to_index = new_to;
-        kept_edge_count += 1;
-    }
-
-    if (kept_node_count > 0) {
-        memcpy(state->graph_nodes, kept_nodes, (size_t)kept_node_count * sizeof(state->graph_nodes[0]));
-    }
-    if (kept_edge_count > 0) {
-        memcpy(state->graph_edges, kept_edges, (size_t)kept_edge_count * sizeof(state->graph_edges[0]));
-    }
-    state->graph_node_count = kept_node_count;
-    state->graph_edge_count = kept_edge_count;
-
-    free(kept_nodes);
-    free(kept_edges);
-    free(old_to_new);
-}
-
-
-
-
-
 CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
     CoreMemStmt stmt = {0};
     CoreResult result;
     int has_row = 0;
     int edge_limit = MEM_CONSOLE_GRAPH_EDGE_LIMIT;
+    int query_edge_limit = MEM_CONSOLE_GRAPH_EDGE_LIMIT;
     int graph_hops = MEM_CONSOLE_GRAPH_HOPS_MIN;
     int use_full_scope = 0;
+    int sort_oldest_first = 0;
     int64_t center_item_id = 0;
 
     if (!db || !state) {
@@ -459,25 +245,41 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
 
     edge_limit = mem_console_graph_edge_limit_clamp(state->graph_query_edge_limit);
     state->graph_query_edge_limit = edge_limit;
+    query_edge_limit = MEM_CONSOLE_GRAPH_EDGE_LIMIT;
     graph_hops = mem_console_graph_hops_clamp(state->graph_query_hops);
     state->graph_query_hops = graph_hops;
     use_full_scope = state->graph_scope_full_mode_enabled ? 1 : 0;
+    sort_oldest_first = state->graph_sort_mode == MEM_CONSOLE_GRAPH_SORT_OLDEST_FIRST ? 1 : 0;
 
     state->graph_node_count = 0;
     state->graph_edge_count = 0;
 
     if (use_full_scope) {
-        result = core_memdb_prepare(db,
-                                    "SELECT l.from_item_id, l.to_item_id, l.kind "
-                                    "FROM mem_link l "
-                                    "JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
-                                    "                  AND (?3 = 0 OR src.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
-                                    "JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
-                                    "                  AND (?3 = 0 OR dst.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
-                                    "WHERE (?1 = '' OR l.kind = ?1) "
-                                    "ORDER BY l.id DESC "
-                                    "LIMIT ?2;",
-                                    &stmt);
+        if (sort_oldest_first) {
+            result = core_memdb_prepare(db,
+                                        "SELECT l.from_item_id, l.to_item_id, l.kind "
+                                        "FROM mem_link l "
+                                        "JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
+                                        "                  AND (?3 = 0 OR src.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
+                                        "JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
+                                        "                  AND (?3 = 0 OR dst.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
+                                        "WHERE (?1 = '' OR l.kind = ?1) "
+                                        "ORDER BY l.id ASC "
+                                        "LIMIT ?2;",
+                                        &stmt);
+        } else {
+            result = core_memdb_prepare(db,
+                                        "SELECT l.from_item_id, l.to_item_id, l.kind "
+                                        "FROM mem_link l "
+                                        "JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
+                                        "                  AND (?3 = 0 OR src.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
+                                        "JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
+                                        "                  AND (?3 = 0 OR dst.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
+                                        "WHERE (?1 = '' OR l.kind = ?1) "
+                                        "ORDER BY l.id DESC "
+                                        "LIMIT ?2;",
+                                        &stmt);
+        }
         if (result.code != CORE_OK) {
             return result;
         }
@@ -486,7 +288,7 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
         if (result.code != CORE_OK) {
             goto cleanup;
         }
-        result = core_memdb_stmt_bind_i64(&stmt, 2, edge_limit);
+        result = core_memdb_stmt_bind_i64(&stmt, 2, query_edge_limit);
         if (result.code != CORE_OK) {
             goto cleanup;
         }
@@ -640,8 +442,10 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
             }
         }
 
-        compact_graph_by_node_kind(state);
-        apply_graph_node_sort(state);
+        mem_console_db_compact_graph_by_node_kind(state);
+        mem_console_db_annotate_rollup_render_anchors(state);
+        mem_console_db_apply_graph_node_sort(state);
+        mem_console_db_apply_graph_edge_priority(state, edge_limit);
 
         if (state->selected_item_id != 0 &&
             find_graph_node_index(state, state->selected_item_id) >= 0) {
@@ -682,39 +486,75 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
         state->graph_center_item_id = center_item_id;
     }
 
-    result = core_memdb_prepare(db,
-                                "WITH RECURSIVE walk(node_id, depth) AS ("
-                                "  SELECT ?1, 0 "
-                                "  UNION "
-                                "  SELECT CASE WHEN l.from_item_id = walk.node_id THEN l.to_item_id ELSE l.from_item_id END, "
-                                "         walk.depth + 1 "
-                                "  FROM walk "
-                                "  JOIN mem_link l ON (l.from_item_id = walk.node_id OR l.to_item_id = walk.node_id) "
-                                "  JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
-                                "                    AND (?5 = 0 OR src.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)) "
-                                "  JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
-                                "                    AND (?5 = 0 OR dst.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)) "
-                                "  WHERE walk.depth < ?2 "
-                                "    AND (?3 = '' OR l.kind = ?3)"
-                                "), nodes AS ("
-                                "  SELECT DISTINCT node_id FROM walk"
-                                "), edges AS ("
-                                "  SELECT l.from_item_id, l.to_item_id, l.kind, l.id "
-                                "  FROM mem_link l "
-                                "  JOIN nodes a ON a.node_id = l.from_item_id "
-                                "  JOIN nodes b ON b.node_id = l.to_item_id "
-                                "  JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
-                                "                    AND (?5 = 0 OR src.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)) "
-                                "  JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
-                                "                    AND (?5 = 0 OR dst.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)) "
-                                "  WHERE (?3 = '' OR l.kind = ?3) "
-                                "  ORDER BY l.id ASC "
-                                "  LIMIT ?4"
-                                ") "
-                                "SELECT from_item_id, to_item_id, kind "
-                                "FROM edges "
-                                "ORDER BY id ASC;",
-                                &stmt);
+    if (sort_oldest_first) {
+        result = core_memdb_prepare(db,
+                                    "WITH RECURSIVE walk(node_id, depth) AS ("
+                                    "  SELECT ?1, 0 "
+                                    "  UNION "
+                                    "  SELECT CASE WHEN l.from_item_id = walk.node_id THEN l.to_item_id ELSE l.from_item_id END, "
+                                    "         walk.depth + 1 "
+                                    "  FROM walk "
+                                    "  JOIN mem_link l ON (l.from_item_id = walk.node_id OR l.to_item_id = walk.node_id) "
+                                    "  JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
+                                    "                    AND (?5 = 0 OR src.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)) "
+                                    "  JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
+                                    "                    AND (?5 = 0 OR dst.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)) "
+                                    "  WHERE walk.depth < ?2 "
+                                    "    AND (?3 = '' OR l.kind = ?3)"
+                                    "), nodes AS ("
+                                    "  SELECT DISTINCT node_id FROM walk"
+                                    "), edges AS ("
+                                    "  SELECT l.from_item_id, l.to_item_id, l.kind, l.id "
+                                    "  FROM mem_link l "
+                                    "  JOIN nodes a ON a.node_id = l.from_item_id "
+                                    "  JOIN nodes b ON b.node_id = l.to_item_id "
+                                    "  JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
+                                    "                    AND (?5 = 0 OR src.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)) "
+                                    "  JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
+                                    "                    AND (?5 = 0 OR dst.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)) "
+                                    "  WHERE (?3 = '' OR l.kind = ?3) "
+                                    "  ORDER BY l.id ASC "
+                                    "  LIMIT ?4"
+                                    ") "
+                                    "SELECT from_item_id, to_item_id, kind "
+                                    "FROM edges "
+                                    "ORDER BY id ASC;",
+                                    &stmt);
+    } else {
+        result = core_memdb_prepare(db,
+                                    "WITH RECURSIVE walk(node_id, depth) AS ("
+                                    "  SELECT ?1, 0 "
+                                    "  UNION "
+                                    "  SELECT CASE WHEN l.from_item_id = walk.node_id THEN l.to_item_id ELSE l.from_item_id END, "
+                                    "         walk.depth + 1 "
+                                    "  FROM walk "
+                                    "  JOIN mem_link l ON (l.from_item_id = walk.node_id OR l.to_item_id = walk.node_id) "
+                                    "  JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
+                                    "                    AND (?5 = 0 OR src.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)) "
+                                    "  JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
+                                    "                    AND (?5 = 0 OR dst.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)) "
+                                    "  WHERE walk.depth < ?2 "
+                                    "    AND (?3 = '' OR l.kind = ?3)"
+                                    "), nodes AS ("
+                                    "  SELECT DISTINCT node_id FROM walk"
+                                    "), edges AS ("
+                                    "  SELECT l.from_item_id, l.to_item_id, l.kind, l.id "
+                                    "  FROM mem_link l "
+                                    "  JOIN nodes a ON a.node_id = l.from_item_id "
+                                    "  JOIN nodes b ON b.node_id = l.to_item_id "
+                                    "  JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
+                                    "                    AND (?5 = 0 OR src.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)) "
+                                    "  JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
+                                    "                    AND (?5 = 0 OR dst.project_key IN (?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)) "
+                                    "  WHERE (?3 = '' OR l.kind = ?3) "
+                                    "  ORDER BY l.id DESC "
+                                    "  LIMIT ?4"
+                                    ") "
+                                    "SELECT from_item_id, to_item_id, kind "
+                                    "FROM edges "
+                                    "ORDER BY id DESC;",
+                                    &stmt);
+    }
     if (result.code != CORE_OK) {
         return result;
     }
@@ -731,7 +571,7 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
     if (result.code != CORE_OK) {
         goto cleanup;
     }
-    result = core_memdb_stmt_bind_i64(&stmt, 4, edge_limit);
+    result = core_memdb_stmt_bind_i64(&stmt, 4, query_edge_limit);
     if (result.code != CORE_OK) {
         goto cleanup;
     }
@@ -805,8 +645,10 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
         state->graph_edge_count += 1;
     }
 
-    compact_graph_by_node_kind(state);
-    apply_graph_node_sort(state);
+    mem_console_db_compact_graph_by_node_kind(state);
+    mem_console_db_annotate_rollup_render_anchors(state);
+    mem_console_db_apply_graph_node_sort(state);
+    mem_console_db_apply_graph_edge_priority(state, edge_limit);
 
     result = core_result_ok();
 

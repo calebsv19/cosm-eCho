@@ -173,20 +173,12 @@ KitRenderColor graph_bucket_border_color(GraphBucketRole role) {
 void graph_build_node_label_text(const MemConsoleGraphNode *node,
                                  char *out_text,
                                  size_t out_cap) {
-    GraphBucketRole role;
-
     if (!out_text || out_cap == 0u) {
         return;
     }
     out_text[0] = '\0';
     if (!node) {
         (void)snprintf(out_text, out_cap, "0");
-        return;
-    }
-
-    role = graph_bucket_role_for_node(node);
-    if (role != GRAPH_BUCKET_ROLE_NONE) {
-        (void)snprintf(out_text, out_cap, "%s", graph_bucket_role_label(role));
         return;
     }
 

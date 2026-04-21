@@ -210,8 +210,11 @@ CoreResult mem_console_ui_draw_graph_panel(KitRenderContext *render_ctx,
             return result;
         }
 
-        if (graph_filter_changed && *io_action == MEM_CONSOLE_ACTION_NONE) {
-            *io_action = MEM_CONSOLE_ACTION_REFRESH_GRAPH;
+        if (graph_filter_changed) {
+            state->graph_layout_valid = 0;
+            mem_console_redraw_mark(state,
+                                    MEM_CONSOLE_REDRAW_REASON_LAYOUT |
+                                        MEM_CONSOLE_REDRAW_REASON_CONTENT);
         }
 
         if (input->mouse_released &&

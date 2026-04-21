@@ -2,10 +2,6 @@
 
 #include <stdio.h>
 
-static const CoreFontTextSizeTier k_graph_node_label_tiers[] = {
-    CORE_FONT_TEXT_SIZE_CAPTION
-};
-
 static KitRenderColor mix_color(KitRenderColor a, KitRenderColor b, float t) {
     float clamped_t = t;
     float inv_t;
@@ -448,15 +444,13 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         int has_project_color = 0;
         KitRenderRectCommand rect_cmd;
         KitRenderTextCommand text_cmd;
-        KitUiTextFitResult node_text_fit;
-        char node_id_text[24];
         CoreThemeColorToken text_color_token = CORE_THEME_COLOR_TEXT_PRIMARY;
-        CoreFontRoleId node_font_role = CORE_FONT_ROLE_UI_REGULAR;
         GraphBucketRole bucket_role = GRAPH_BUCKET_ROLE_NONE;
         int anchor_hidden = 0;
+        const MemConsoleGraphNode *graph_node = 0;
 
         if (has_graph_data) {
-            const MemConsoleGraphNode *graph_node = &state->graph_nodes[i];
+            graph_node = &state->graph_nodes[i];
             KitRenderColor bucket_border;
             bucket_role = graph_bucket_role_for_node(graph_node);
             if (graph_node->project_key[0] != '\0') {
@@ -579,56 +573,40 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
             node_h <= GRAPH_NODE_TEXT_HIDE_HEIGHT_PX) {
             continue;
         }
-        if (node_w < 20.0f || state->graph_viewport.zoom < 1.45f) {
-            node_font_role = CORE_FONT_ROLE_UI_MONO_SMALL;
-        }
         {
-            float text_pad_x = graph_clampf(node_w * 0.14f, 1.0f, 3.0f);
-            float text_pad_y = graph_clampf(node_h * 0.16f, 0.8f, 2.0f);
+            float text_pad_x = graph_clampf(node_w * 0.06f, 0.5f, 1.4f);
+            float text_pad_y = graph_clampf(node_h * 0.06f, 0.4f, 1.0f);
             float text_max_w = node_w - (text_pad_x * 2.0f);
             float text_max_h = node_h - (text_pad_y * 2.0f);
+            float id_width_px;
+
             if (text_max_w <= 1.0f || text_max_h <= 1.0f) {
                 continue;
             }
+
+            if (graph_node) {
+                (void)snprintf(state->graph_draw_node_labels[i],
+                               sizeof(state->graph_draw_node_labels[i]),
+                               "%lld",
+                               (long long)graph_node->item_id);
+            } else {
+                (void)snprintf(state->graph_draw_node_labels[i],
+                               sizeof(state->graph_draw_node_labels[i]),
+                               "0");
+            }
+            id_width_px = mem_console_ui_measure_text_width_px(render_ctx,
+                                                                CORE_FONT_ROLE_UI_MONO_SMALL,
+                                                                CORE_FONT_TEXT_SIZE_CAPTION,
+                                                                state->graph_draw_node_labels[i]);
+            if (id_width_px > text_max_w || text_max_h < 7.0f) {
+                continue;
+            }
+
             text_cmd.origin.x = node_rect.x + text_pad_x;
             text_cmd.origin.y = node_rect.y + (node_h * 0.5f);
-            if (has_graph_data && i < (uint32_t)state->graph_node_count) {
-                graph_build_node_label_text(&state->graph_nodes[i],
-                                            node_id_text,
-                                            sizeof(node_id_text));
-            } else {
-                (void)snprintf(node_id_text, sizeof(node_id_text), "0");
-            }
-            result = kit_ui_fit_text_to_rect(ui_ctx,
-                                             node_id_text,
-                                             node_font_role,
-                                             k_graph_node_label_tiers,
-                                             (uint32_t)(sizeof(k_graph_node_label_tiers) /
-                                                        sizeof(k_graph_node_label_tiers[0])),
-                                             text_max_w,
-                                             text_max_h,
-                                             state->graph_draw_node_labels[i],
-                                             sizeof(state->graph_draw_node_labels[i]),
-                                             &node_text_fit);
-            if (result.code != CORE_OK) {
-                return result;
-            }
-            if (state->graph_draw_node_labels[i][0] == '\0') {
-                if (state->graph_viewport.zoom < 1.70f || node_w < 20.0f || node_h < 13.0f) {
-                    continue;
-                }
-                if (node_id_text[0] != '\0') {
-                    state->graph_draw_node_labels[i][0] = node_id_text[0];
-                    state->graph_draw_node_labels[i][1] = '\0';
-                } else {
-                    state->graph_draw_node_labels[i][0] = '0';
-                    state->graph_draw_node_labels[i][1] = '\0';
-                }
-                node_text_fit.text_tier = CORE_FONT_TEXT_SIZE_CAPTION;
-            }
             text_cmd.text = state->graph_draw_node_labels[i];
-            text_cmd.font_role = node_font_role;
-            text_cmd.text_tier = node_text_fit.text_tier;
+            text_cmd.font_role = CORE_FONT_ROLE_UI_MONO_SMALL;
+            text_cmd.text_tier = CORE_FONT_TEXT_SIZE_CAPTION;
             text_cmd.color_token = text_color_token;
             text_cmd.transform = kit_render_identity_transform();
             result = kit_render_push_text(frame, &text_cmd);

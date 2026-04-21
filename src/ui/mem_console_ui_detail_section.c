@@ -322,6 +322,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
     KitUiStackLayout meta_layout;
     KitUiStackLayout body_layout;
     KitRenderRect row;
+    KitRenderRect detail_meta_line_rect;
     KitRenderRect detail_title_row;
     KitRenderRect connections_panel;
     KitRenderRect summary_content;
@@ -331,8 +332,14 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
     float body_h;
     float reserved_controls_h;
     float body_line_step = 24.0f;
+    float title_line_step = 24.0f;
+    float title_text_width = 0.0f;
     CoreResult result;
     int title_input_active;
+    int title_line_count = 0;
+    int title_line_limit = 0;
+    int title_max_chars = 0;
+    int i;
 
     if (!render_ctx || !ui_ctx || !frame || !state || !input || !layout_cfg || !out_right_layout) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid detail section draw request" };
@@ -353,33 +360,24 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         return result;
     }
 
-    result = kit_ui_stack_next(&meta_layout, layout_cfg->right_header_h, 0.0f, &row);
-    if (result.code != CORE_OK) {
-        return result;
-    }
-    result = mem_console_ui_draw_info_line_custom(ui_ctx,
-                                                  frame,
-                                                  row,
-                                                  "DETAIL",
-                                                  CORE_THEME_COLOR_TEXT_PRIMARY,
-                                                  CORE_FONT_ROLE_UI_BOLD,
-                                                  CORE_FONT_TEXT_SIZE_TITLE);
-    if (result.code != CORE_OK) {
-        return result;
-    }
-
-    result = kit_ui_stack_next(&meta_layout, layout_cfg->right_meta_h, 0.0f, &row);
-    if (result.code != CORE_OK) {
-        return result;
-    }
     detail_title_row = (KitRenderRect){
-        row.x,
-        row.y + 2.0f,
-        row.width,
-        layout_cfg->right_title_h + 2.0f
+        meta_layout.bounds.x,
+        meta_layout.bounds.y + 1.0f,
+        meta_layout.bounds.width,
+        meta_layout.bounds.height - 23.0f
+    };
+    if (detail_title_row.height < 20.0f) {
+        detail_title_row.height = 20.0f;
+    }
+    detail_meta_line_rect = (KitRenderRect){
+        meta_layout.bounds.x,
+        meta_layout.bounds.y + meta_layout.bounds.height - 18.0f,
+        meta_layout.bounds.width,
+        18.0f
     };
 
     if (state->title_edit_mode) {
+        state->detail_title_line_count = 0;
         result = mem_console_ui_draw_editable_line(ui_ctx,
                                                    render_ctx,
                                                    frame,
@@ -387,7 +385,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                                                    state->title_edit_text,
                                                    CORE_THEME_COLOR_TEXT_PRIMARY,
                                                    CORE_FONT_ROLE_UI_BOLD,
-                                                   CORE_FONT_TEXT_SIZE_PARAGRAPH,
+                                                   CORE_FONT_TEXT_SIZE_TITLE,
                                                    title_input_active,
                                                    state->title_edit_cursor);
         if (result.code != CORE_OK) {
@@ -402,23 +400,58 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                                                                              input->mouse_x,
                                                                              text_origin_x,
                                                                              CORE_FONT_ROLE_UI_BOLD,
-                                                                             CORE_FONT_TEXT_SIZE_PARAGRAPH);
+                                                                             CORE_FONT_TEXT_SIZE_TITLE);
         }
     } else {
-        format_text_for_width(state->detail_title_draw_line,
-                              sizeof(state->detail_title_draw_line),
-                              state->selected_title,
-                              detail_title_row.width - (ui_ctx->style.padding * 2.0f),
-                              CORE_FONT_TEXT_SIZE_PARAGRAPH);
-        result = mem_console_ui_draw_info_line_custom(ui_ctx,
-                                                      frame,
-                                                      detail_title_row,
-                                                      state->detail_title_draw_line,
-                                                      CORE_THEME_COLOR_TEXT_PRIMARY,
-                                                      CORE_FONT_ROLE_UI_BOLD,
-                                                      CORE_FONT_TEXT_SIZE_PARAGRAPH);
-        if (result.code != CORE_OK) {
-            return result;
+        title_line_step = detail_wrapped_text_line_step(CORE_FONT_TEXT_SIZE_TITLE);
+        if (title_line_step < 18.0f) {
+            title_line_step = 18.0f;
+        }
+        title_text_width = detail_title_row.width - (ui_ctx->style.padding * 2.0f);
+        if (title_text_width < 40.0f) {
+            title_text_width = 40.0f;
+        }
+
+        title_line_limit = (int)((detail_title_row.height - 2.0f) / title_line_step);
+        if (title_line_limit < 1) {
+            title_line_limit = 1;
+        }
+        if (title_line_limit > (int)(sizeof(state->detail_title_lines) / sizeof(state->detail_title_lines[0]))) {
+            title_line_limit = (int)(sizeof(state->detail_title_lines) / sizeof(state->detail_title_lines[0]));
+        }
+
+        title_max_chars = (int)(title_text_width /
+                                (float)mem_console_ui_estimate_char_width_px(CORE_FONT_TEXT_SIZE_TITLE));
+        title_line_count = detail_wrap_text_lines(state->selected_title,
+                                                  state->detail_title_lines,
+                                                  title_line_limit,
+                                                  title_max_chars);
+        if (title_line_count <= 0) {
+            title_line_count = 1;
+            (void)snprintf(state->detail_title_lines[0],
+                           sizeof(state->detail_title_lines[0]),
+                           "%s",
+                           state->selected_title);
+        }
+        state->detail_title_line_count = title_line_count;
+
+        for (i = 0; i < title_line_count; ++i) {
+            KitRenderRect title_line_rect = {
+                detail_title_row.x,
+                detail_title_row.y + ((float)i * title_line_step),
+                detail_title_row.width,
+                title_line_step
+            };
+            result = mem_console_ui_draw_info_line_custom(ui_ctx,
+                                                          frame,
+                                                          title_line_rect,
+                                                          state->detail_title_lines[i],
+                                                          CORE_THEME_COLOR_TEXT_PRIMARY,
+                                                          CORE_FONT_ROLE_UI_BOLD,
+                                                          CORE_FONT_TEXT_SIZE_TITLE);
+            if (result.code != CORE_OK) {
+                return result;
+            }
         }
     }
 
@@ -445,12 +478,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
     }
     result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                   frame,
-                                                  (KitRenderRect){
-                                                      row.x,
-                                                      detail_title_row.y + detail_title_row.height + 4.0f,
-                                                      row.width,
-                                                      18.0f
-                                                  },
+                                                  detail_meta_line_rect,
                                                   state->detail_meta_line,
                                                   CORE_THEME_COLOR_TEXT_MUTED,
                                                   CORE_FONT_ROLE_UI_REGULAR,
