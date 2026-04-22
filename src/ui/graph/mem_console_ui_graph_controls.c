@@ -300,7 +300,7 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
     KitRenderRect graph_hint_row;
     KitRenderRect action_bar;
     KitRenderRect action_row;
-    KitRenderRect action_btn_rects[10];
+    KitRenderRect action_btn_rects[11];
     KitUiButtonResult button_result;
     CoreResult result;
     int graph_hops_index;
@@ -321,11 +321,12 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
                                               sizeof(k_graph_node_kind_toggles[0])) + 1;
     const int graph_mode_sort_button_count = 6;
     const int graph_total_controls = graph_role_button_count + graph_mode_sort_button_count;
+    int action_button_count = 0;
     float action_gap = 0.0f;
-    float action_widths[10];
-    float action_min_widths[10];
+    float action_widths[11];
+    float action_min_widths[11];
     int i;
-    GraphActionDef actions[10];
+    GraphActionDef actions[11];
 
     if (!render_ctx || !ui_ctx || !frame || !state || !input || !layout_cfg || !right_layout || !io_action) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid graph controls draw request" };
@@ -783,37 +784,54 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
         action_bar.width - (layout_cfg->action_block_pad * 2.0f),
         layout_cfg->action_button_h
     };
-    actions[0] = (GraphActionDef){ state->graph_scope_full_mode_enabled ? "FULL VIEW" : "FOCUS VIEW",
-                                   1,
-                                   state->graph_scope_full_mode_enabled ? 1 : 0,
-                                   MEM_CONSOLE_ACTION_TOGGLE_GRAPH_MODE };
-    actions[1] = (GraphActionDef){ "REFRESH", 1, 0, MEM_CONSOLE_ACTION_REFRESH_GRAPH };
-    actions[2] = (GraphActionDef){ "CENTER", 1, 0, MEM_CONSOLE_ACTION_CENTER_GRAPH };
-    actions[3] = (GraphActionDef){ "CENTER SEL", state->selected_item_id != 0, 0, MEM_CONSOLE_ACTION_CENTER_SELECTED };
-    actions[4] = (GraphActionDef){ "P", state->selected_item_id != 0, state->selected_pinned ? 1 : 0, MEM_CONSOLE_ACTION_TOGGLE_PINNED };
-    actions[5] = (GraphActionDef){ "C", state->selected_item_id != 0, state->selected_canonical ? 1 : 0, MEM_CONSOLE_ACTION_TOGGLE_CANONICAL };
-    actions[6] = (GraphActionDef){ "NEW", 1, 0, MEM_CONSOLE_ACTION_CREATE_FROM_SEARCH };
-    actions[7] = (GraphActionDef){ state->title_edit_mode ? "SAVE TITLE" : "EDIT TITLE",
-                                   state->selected_item_id != 0,
-                                   state->title_edit_mode ? 1 : 0,
-                                   state->title_edit_mode ? MEM_CONSOLE_ACTION_SAVE_TITLE_EDIT
-                                                          : MEM_CONSOLE_ACTION_BEGIN_TITLE_EDIT };
-    actions[8] = (GraphActionDef){ state->body_edit_mode ? "SAVE BODY" : "EDIT BODY",
-                                   state->selected_item_id != 0,
-                                   state->body_edit_mode ? 1 : 0,
-                                   state->body_edit_mode ? MEM_CONSOLE_ACTION_SAVE_BODY_EDIT
-                                                         : MEM_CONSOLE_ACTION_BEGIN_BODY_EDIT };
-    actions[9] = (GraphActionDef){ "CANCEL", has_any_edit_mode, 0,
-                                   state->title_edit_mode ? MEM_CONSOLE_ACTION_CANCEL_TITLE_EDIT
-                                                          : MEM_CONSOLE_ACTION_CANCEL_BODY_EDIT };
+    actions[action_button_count++] = (GraphActionDef){ state->graph_scope_full_mode_enabled ? "FULL VIEW" : "FOCUS VIEW",
+                                                        1,
+                                                        state->graph_scope_full_mode_enabled ? 1 : 0,
+                                                        MEM_CONSOLE_ACTION_TOGGLE_GRAPH_MODE };
+    actions[action_button_count++] = (GraphActionDef){ "REFRESH", 1, 0, MEM_CONSOLE_ACTION_REFRESH_GRAPH };
+    actions[action_button_count++] = (GraphActionDef){ "CENTER", 1, 0, MEM_CONSOLE_ACTION_CENTER_GRAPH };
+    actions[action_button_count++] = (GraphActionDef){ "CENTER SEL",
+                                                        state->selected_item_id != 0,
+                                                        0,
+                                                        MEM_CONSOLE_ACTION_CENTER_SELECTED };
+    if (state->detail_reference_path_available) {
+        actions[action_button_count++] = (GraphActionDef){ "OPEN REF", 1, 0, MEM_CONSOLE_ACTION_OPEN_REFERENCE_PATH };
+    }
+    actions[action_button_count++] = (GraphActionDef){ "P",
+                                                        state->selected_item_id != 0,
+                                                        state->selected_pinned ? 1 : 0,
+                                                        MEM_CONSOLE_ACTION_TOGGLE_PINNED };
+    actions[action_button_count++] = (GraphActionDef){ "C",
+                                                        state->selected_item_id != 0,
+                                                        state->selected_canonical ? 1 : 0,
+                                                        MEM_CONSOLE_ACTION_TOGGLE_CANONICAL };
+    actions[action_button_count++] = (GraphActionDef){ "NEW", 1, 0, MEM_CONSOLE_ACTION_CREATE_FROM_SEARCH };
+    actions[action_button_count++] = (GraphActionDef){ state->title_edit_mode ? "SAVE TITLE" : "EDIT TITLE",
+                                                        state->selected_item_id != 0,
+                                                        state->title_edit_mode ? 1 : 0,
+                                                        state->title_edit_mode ? MEM_CONSOLE_ACTION_SAVE_TITLE_EDIT
+                                                                               : MEM_CONSOLE_ACTION_BEGIN_TITLE_EDIT };
+    actions[action_button_count++] = (GraphActionDef){ state->body_edit_mode ? "SAVE BODY" : "EDIT BODY",
+                                                        state->selected_item_id != 0,
+                                                        state->body_edit_mode ? 1 : 0,
+                                                        state->body_edit_mode ? MEM_CONSOLE_ACTION_SAVE_BODY_EDIT
+                                                                              : MEM_CONSOLE_ACTION_BEGIN_BODY_EDIT };
+    actions[action_button_count++] = (GraphActionDef){ "CANCEL",
+                                                        has_any_edit_mode,
+                                                        0,
+                                                        state->title_edit_mode ? MEM_CONSOLE_ACTION_CANCEL_TITLE_EDIT
+                                                                               : MEM_CONSOLE_ACTION_CANCEL_BODY_EDIT };
 
-    for (i = 0; i < 10; ++i) {
+    for (i = 0; i < action_button_count; ++i) {
         float max_w = 112.0f;
         float min_w = 28.0f;
-        if (i == 4 || i == 5) {
+        if (strcmp(actions[i].label, "P") == 0 || strcmp(actions[i].label, "C") == 0) {
             min_w = 20.0f;
             max_w = 32.0f;
-        } else if (i >= 1 && i <= 3) {
+        } else if (strcmp(actions[i].label, "REFRESH") == 0 ||
+                   strcmp(actions[i].label, "CENTER") == 0 ||
+                   strcmp(actions[i].label, "CENTER SEL") == 0 ||
+                   strcmp(actions[i].label, "OPEN REF") == 0) {
             min_w = 40.0f;
             max_w = 96.0f;
         }
@@ -830,17 +848,17 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
     fit_button_widths_to_row(action_row.width,
                              action_widths,
                              action_min_widths,
-                             10,
+                             action_button_count,
                              layout_cfg->action_button_gap,
                              16.0f,
                              &action_gap);
     layout_centered_button_row(action_row,
                                action_widths,
-                               10,
+                               action_button_count,
                                action_gap,
                                action_btn_rects);
 
-    for (i = 0; i < 10; ++i) {
+    for (i = 0; i < action_button_count; ++i) {
         KitUiWidgetState draw_state;
         button_result = kit_ui_eval_button(action_btn_rects[i], input, actions[i].enabled);
         draw_state = button_result.state;

@@ -21,6 +21,8 @@ typedef struct KitRenderVkBackendState {
 #if KIT_RENDER_ENABLE_VK_BACKEND
     TTF_Font *ttf_font_cache[CORE_FONT_ROLE_COUNT][CORE_FONT_TEXT_SIZE_COUNT];
     uint8_t ttf_font_failed[CORE_FONT_ROLE_COUNT][CORE_FONT_TEXT_SIZE_COUNT];
+    struct KitRenderVkRasterFontCacheEntry *ttf_raster_cache;
+    int ttf_raster_cache_capacity;
     CoreFontPresetId ttf_cache_preset_id;
     int ttf_cache_zoom_step;
     int ttf_cache_initialized;
@@ -28,6 +30,21 @@ typedef struct KitRenderVkBackendState {
     int ttf_runtime_failed;
 #endif
 } KitRenderVkBackendState;
+
+#if KIT_RENDER_ENABLE_VK_BACKEND
+typedef struct KitRenderVkRasterFontCacheEntry {
+    TTF_Font *font;
+    CoreFontRoleId role_id;
+    CoreFontTextSizeTier tier;
+    int requested_point_size;
+    float raster_scale;
+    int kerning_enabled;
+} KitRenderVkRasterFontCacheEntry;
+
+enum {
+    KIT_RENDER_TTF_RASTER_CACHE_CAPACITY = 64
+};
+#endif
 
 static CoreResult vk_backend_invalid(const char *message) {
     CoreResult r = { CORE_ERR_INVALID_ARG, message };
@@ -58,6 +75,20 @@ static CoreResult vk_backend_init(KitRenderContext *ctx) {
         return r;
     }
 
+#if KIT_RENDER_ENABLE_VK_BACKEND
+    state->ttf_raster_cache =
+        (KitRenderVkRasterFontCacheEntry *)core_calloc(KIT_RENDER_TTF_RASTER_CACHE_CAPACITY,
+                                                       sizeof(KitRenderVkRasterFontCacheEntry));
+    if (!state->ttf_raster_cache) {
+        core_free(state);
+        {
+            CoreResult r = { CORE_ERR_OUT_OF_MEMORY, "out of memory" };
+            return r;
+        }
+    }
+    state->ttf_raster_cache_capacity = KIT_RENDER_TTF_RASTER_CACHE_CAPACITY;
+#endif
+
     ctx->backend_state = state;
     return core_result_ok();
 }
@@ -71,6 +102,11 @@ static void vk_backend_shutdown(KitRenderContext *ctx) {
     state = (KitRenderVkBackendState *)ctx->backend_state;
 #if KIT_RENDER_ENABLE_VK_BACKEND
     vk_backend_clear_font_cache(state);
+    if (state->ttf_raster_cache) {
+        core_free(state->ttf_raster_cache);
+        state->ttf_raster_cache = 0;
+    }
+    state->ttf_raster_cache_capacity = 0;
 #endif
     if (state->renderer && state->owns_renderer && state->release_fn) {
         state->release_fn(state->renderer, state->release_user);
@@ -161,6 +197,45 @@ static SDL_Rect vk_backend_rect_to_sdl(KitRenderRect rect) {
     return out;
 }
 
+static int vk_backend_role_kerning_enabled(CoreFontRoleId role_id) {
+    if (role_id == CORE_FONT_ROLE_UI_MONO || role_id == CORE_FONT_ROLE_UI_MONO_SMALL) {
+        return 0;
+    }
+    return 1;
+}
+
+static float vk_backend_render_text_scale(VkRenderer *renderer) {
+    float logical_w;
+    float logical_h;
+    float scale_x = 1.0f;
+    float scale_y = 1.0f;
+    if (!renderer) {
+        return 1.0f;
+    }
+    logical_w = renderer->draw_state.logical_size[0];
+    logical_h = renderer->draw_state.logical_size[1];
+    if (logical_w > 0.0f) {
+        scale_x = (float)renderer->context.swapchain.extent.width / logical_w;
+    }
+    if (logical_h > 0.0f) {
+        scale_y = (float)renderer->context.swapchain.extent.height / logical_h;
+    }
+    if (scale_x < 1.0f) {
+        scale_x = 1.0f;
+    }
+    if (scale_y < 1.0f) {
+        scale_y = 1.0f;
+    }
+    return (scale_x > scale_y) ? scale_x : scale_y;
+}
+
+static VkFilter vk_backend_text_upload_filter(float raster_scale) {
+    if (raster_scale > 1.0f) {
+        return VK_FILTER_NEAREST;
+    }
+    return VK_FILTER_LINEAR;
+}
+
 static void vk_backend_glyph_rows(unsigned char c, uint8_t rows[7]) {
     size_t i;
 
@@ -242,6 +317,7 @@ static int vk_backend_text_scale(const KitRenderContext *ctx,
 static void vk_backend_clear_font_cache(KitRenderVkBackendState *state) {
     int role_index;
     int tier_index;
+    int raster_index;
 
     if (!state) {
         return;
@@ -254,6 +330,18 @@ static void vk_backend_clear_font_cache(KitRenderVkBackendState *state) {
                 state->ttf_font_cache[role_index][tier_index] = 0;
             }
             state->ttf_font_failed[role_index][tier_index] = 0u;
+        }
+    }
+
+    if (state->ttf_raster_cache && state->ttf_raster_cache_capacity > 0) {
+        for (raster_index = 0; raster_index < state->ttf_raster_cache_capacity; ++raster_index) {
+            if (state->ttf_raster_cache[raster_index].font) {
+                TTF_CloseFont(state->ttf_raster_cache[raster_index].font);
+            }
+            state->ttf_raster_cache[raster_index].font = 0;
+            state->ttf_raster_cache[raster_index].requested_point_size = 0;
+            state->ttf_raster_cache[raster_index].raster_scale = 1.0f;
+            state->ttf_raster_cache[raster_index].kerning_enabled = 1;
         }
     }
 
@@ -353,17 +441,50 @@ static TTF_Font *vk_backend_open_font_with_search(const char *font_path, int poi
     return 0;
 }
 
+static CoreResult vk_backend_resolve_role_point_size(const KitRenderContext *ctx,
+                                                     CoreFontRoleId role_id,
+                                                     CoreFontTextSizeTier tier,
+                                                     CoreFontRoleSpec *out_role_spec,
+                                                     int *out_point_size) {
+    CoreFontRoleSpec role_spec;
+    CoreResult result;
+    int point_size = 0;
+    if (!ctx || !out_role_spec || !out_point_size) {
+        return vk_backend_invalid("invalid role point-size request");
+    }
+    result = core_font_resolve_role(&ctx->font, role_id, &role_spec);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+    result = core_font_point_size_for_tier(&role_spec, tier, &point_size);
+    if (result.code != CORE_OK) {
+        point_size = role_spec.point_size;
+    }
+    point_size = (point_size * kit_render_text_zoom_percent(ctx)) / 100;
+    if (point_size <= 0) {
+        point_size = 10;
+    }
+    if (point_size < 6) {
+        point_size = 6;
+    }
+    *out_role_spec = role_spec;
+    *out_point_size = point_size;
+    return core_result_ok();
+}
+
 static CoreResult vk_backend_get_ttf_font(KitRenderContext *ctx,
                                           KitRenderVkBackendState *state,
                                           CoreFontRoleId role_id,
                                           CoreFontTextSizeTier tier,
-                                          TTF_Font **out_font) {
+                                          TTF_Font **out_font,
+                                          int *out_point_size) {
     CoreFontRoleSpec role_spec;
     CoreResult result;
     const char *font_paths[2];
     int point_size = 0;
     TTF_Font *font = 0;
     int path_index;
+    int kerning_enabled = 1;
 
     if (!ctx || !state || !out_font) {
         return vk_backend_invalid("invalid ttf font request");
@@ -395,6 +516,14 @@ static CoreResult vk_backend_get_ttf_font(KitRenderContext *ctx,
 
     font = state->ttf_font_cache[(int)role_id][(int)tier];
     if (font) {
+        if (out_point_size) {
+            CoreFontRoleSpec cached_spec;
+            int cached_point = 0;
+            result = vk_backend_resolve_role_point_size(ctx, role_id, tier, &cached_spec, &cached_point);
+            if (result.code == CORE_OK) {
+                *out_point_size = cached_point;
+            }
+        }
         *out_font = font;
         return core_result_ok();
     }
@@ -402,22 +531,13 @@ static CoreResult vk_backend_get_ttf_font(KitRenderContext *ctx,
         return vk_backend_invalid("cached ttf font failure");
     }
 
-    result = core_font_resolve_role(&ctx->font, role_id, &role_spec);
+    result = vk_backend_resolve_role_point_size(ctx, role_id, tier, &role_spec, &point_size);
     if (result.code != CORE_OK) {
         state->ttf_font_failed[(int)role_id][(int)tier] = 1u;
         return result;
     }
-    result = core_font_point_size_for_tier(&role_spec, tier, &point_size);
-    if (result.code != CORE_OK) {
-        point_size = role_spec.point_size;
-    }
-    point_size = (point_size * kit_render_text_zoom_percent(ctx)) / 100;
-    if (point_size <= 0) {
-        point_size = 10;
-    }
-    if (point_size < 6) {
-        point_size = 6;
-    }
+
+    kerning_enabled = vk_backend_role_kerning_enabled(role_id);
 
     font_paths[0] = role_spec.primary_path;
     font_paths[1] = role_spec.fallback_path;
@@ -440,10 +560,129 @@ static CoreResult vk_backend_get_ttf_font(KitRenderContext *ctx,
     }
 
     TTF_SetFontHinting(font, TTF_HINTING_LIGHT);
-    TTF_SetFontKerning(font, 1);
+    TTF_SetFontKerning(font, kerning_enabled);
 
     state->ttf_font_cache[(int)role_id][(int)tier] = font;
+    if (out_point_size) {
+        *out_point_size = point_size;
+    }
     *out_font = font;
+    return core_result_ok();
+}
+
+static CoreResult vk_backend_get_raster_ttf_font_for_scale(KitRenderContext *ctx,
+                                                            KitRenderVkBackendState *state,
+                                                            CoreFontRoleId role_id,
+                                                            CoreFontTextSizeTier tier,
+                                                            float render_scale,
+                                                            TTF_Font **out_font,
+                                                            float *out_raster_scale) {
+    CoreResult result;
+    TTF_Font *base_font = 0;
+    CoreFontRoleSpec role_spec;
+    int base_point_size = 0;
+    int requested_point_size = 0;
+    int kerning_enabled = 1;
+    int slot = -1;
+    int i;
+    if (!ctx || !state || !out_font) {
+        return vk_backend_invalid("invalid raster ttf font request");
+    }
+    if (out_raster_scale) {
+        *out_raster_scale = 1.0f;
+    }
+    result = vk_backend_get_ttf_font(ctx, state, role_id, tier, &base_font, &base_point_size);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+    if (render_scale < 1.0f) {
+        render_scale = 1.0f;
+    }
+    if (render_scale > 4.0f) {
+        render_scale = 4.0f;
+    }
+    if (base_point_size <= 0) {
+        *out_font = base_font;
+        return core_result_ok();
+    }
+    requested_point_size = (int)(((float)base_point_size * render_scale) + 0.5f);
+    if (requested_point_size <= base_point_size) {
+        *out_font = base_font;
+        return core_result_ok();
+    }
+    if (!state->ttf_raster_cache || state->ttf_raster_cache_capacity <= 0) {
+        *out_font = base_font;
+        return core_result_ok();
+    }
+    for (i = 0; i < state->ttf_raster_cache_capacity; ++i) {
+        KitRenderVkRasterFontCacheEntry *entry = &state->ttf_raster_cache[i];
+        if (entry->font &&
+            entry->role_id == role_id &&
+            entry->tier == tier &&
+            entry->requested_point_size == requested_point_size) {
+            if (out_raster_scale) {
+                *out_raster_scale = entry->raster_scale;
+            }
+            *out_font = entry->font;
+            return core_result_ok();
+        }
+    }
+
+    result = vk_backend_resolve_role_point_size(ctx, role_id, tier, &role_spec, &base_point_size);
+    if (result.code != CORE_OK) {
+        *out_font = base_font;
+        return core_result_ok();
+    }
+
+    kerning_enabled = vk_backend_role_kerning_enabled(role_id);
+
+    for (i = 0; i < state->ttf_raster_cache_capacity; ++i) {
+        if (!state->ttf_raster_cache[i].font) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0) {
+        slot = 0;
+    }
+
+    {
+        TTF_Font *raster_font = 0;
+        const char *font_paths[2];
+        int path_index;
+        font_paths[0] = role_spec.primary_path;
+        font_paths[1] = role_spec.fallback_path;
+        for (path_index = 0; path_index < 2; ++path_index) {
+            const char *path = font_paths[path_index];
+            if (!path || !path[0]) {
+                continue;
+            }
+            raster_font = vk_backend_open_font_with_search(path, requested_point_size);
+            if (raster_font) {
+                break;
+            }
+        }
+        if (!raster_font) {
+            *out_font = base_font;
+            return core_result_ok();
+        }
+        TTF_SetFontHinting(raster_font, TTF_HINTING_LIGHT);
+        TTF_SetFontKerning(raster_font, kerning_enabled);
+        if (state->ttf_raster_cache[slot].font) {
+            TTF_CloseFont(state->ttf_raster_cache[slot].font);
+        }
+        state->ttf_raster_cache[slot].font = raster_font;
+        state->ttf_raster_cache[slot].role_id = role_id;
+        state->ttf_raster_cache[slot].tier = tier;
+        state->ttf_raster_cache[slot].requested_point_size = requested_point_size;
+        state->ttf_raster_cache[slot].raster_scale =
+            (float)requested_point_size / (float)base_point_size;
+        state->ttf_raster_cache[slot].kerning_enabled = kerning_enabled;
+        if (out_raster_scale) {
+            *out_raster_scale = state->ttf_raster_cache[slot].raster_scale;
+        }
+        *out_font = raster_font;
+    }
     return core_result_ok();
 }
 
@@ -521,7 +760,10 @@ static CoreResult vk_backend_draw_text_bitmap(KitRenderContext *ctx,
         }
     }
 
-    if (vk_renderer_upload_sdl_surface(renderer, surface, &texture) != VK_SUCCESS) {
+    if (vk_renderer_upload_sdl_surface_with_filter(renderer,
+                                                   surface,
+                                                   &texture,
+                                                   VK_FILTER_NEAREST) != VK_SUCCESS) {
         SDL_FreeSurface(surface);
         return vk_backend_invalid("failed to upload text texture");
     }
@@ -552,14 +794,26 @@ static CoreResult vk_backend_draw_text_ttf(KitRenderContext *ctx,
     SDL_Surface *surface = 0;
     VkRendererTexture texture;
     SDL_Rect dst;
+    float render_scale = 1.0f;
+    float raster_scale = 1.0f;
 
     if (!ctx || !state || !renderer || !text_cmd || !text_cmd->text || text_cmd->text[0] == '\0') {
         return vk_backend_invalid("invalid text command");
     }
 
-    font_result = vk_backend_get_ttf_font(ctx, state, text_cmd->font_role, text_cmd->text_tier, &font);
+    render_scale = vk_backend_render_text_scale(renderer);
+    font_result = vk_backend_get_raster_ttf_font_for_scale(ctx,
+                                                           state,
+                                                           text_cmd->font_role,
+                                                           text_cmd->text_tier,
+                                                           render_scale,
+                                                           &font,
+                                                           &raster_scale);
     if (font_result.code != CORE_OK) {
         return font_result;
+    }
+    if (raster_scale < 1.0f) {
+        raster_scale = 1.0f;
     }
 
     if (core_theme_get_color(&ctx->theme, text_cmd->color_token, &theme_color).code != CORE_OK) {
@@ -582,15 +836,24 @@ static CoreResult vk_backend_draw_text_ttf(KitRenderContext *ctx,
         return core_result_ok();
     }
 
-    if (vk_renderer_upload_sdl_surface(renderer, surface, &texture) != VK_SUCCESS) {
+    if (vk_renderer_upload_sdl_surface_with_filter(renderer,
+                                                   surface,
+                                                   &texture,
+                                                   vk_backend_text_upload_filter(raster_scale)) != VK_SUCCESS) {
         SDL_FreeSurface(surface);
         return vk_backend_invalid("failed to upload text texture");
     }
 
     dst.x = (int)text_cmd->origin.x;
-    dst.y = (int)(text_cmd->origin.y - ((float)surface->h * 0.5f));
-    dst.w = surface->w;
-    dst.h = surface->h;
+    dst.w = (int)(((float)surface->w / raster_scale) + 0.5f);
+    dst.h = (int)(((float)surface->h / raster_scale) + 0.5f);
+    if (dst.w < 1) {
+        dst.w = 1;
+    }
+    if (dst.h < 1) {
+        dst.h = 1;
+    }
+    dst.y = (int)(text_cmd->origin.y - ((float)dst.h * 0.5f));
     vk_renderer_draw_texture(renderer, &texture, 0, &dst);
     vk_renderer_queue_texture_destroy(renderer, &texture);
     SDL_FreeSurface(surface);
@@ -665,7 +928,8 @@ static CoreResult vk_backend_measure_text_ttf(const KitRenderContext *ctx,
                                           state,
                                           font_role,
                                           text_tier,
-                                          &font);
+                                          &font,
+                                          0);
     if (font_result.code != CORE_OK) {
         return font_result;
     }

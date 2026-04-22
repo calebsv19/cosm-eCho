@@ -48,6 +48,9 @@ void set_default_detail(MemConsoleState *state) {
     (void)snprintf(state->selected_body,
                    sizeof(state->selected_body),
                    "Type to filter, or use mem_cli add to create records first.");
+    state->detail_reference_scan_item_id = 0;
+    state->detail_reference_path_available = 0;
+    state->detail_reference_path[0] = '\0';
 }
 
 void copy_core_str(CoreStr value, char *out_text, size_t out_cap) {

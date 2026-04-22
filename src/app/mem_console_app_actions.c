@@ -1,11 +1,63 @@
 #include "mem_console_app_internal.h"
 
 #include <SDL2/SDL.h>
+#include <spawn.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "mem_console_prefs.h"
 #include "mem_console_ui_graph.h"
+
+extern char **environ;
+
+static int mem_console_path_has_md_suffix(const char *path) {
+    size_t len;
+
+    if (!path) {
+        return 0;
+    }
+    len = strlen(path);
+    if (len < 3u) {
+        return 0;
+    }
+    return path[len - 3u] == '.' &&
+           (path[len - 2u] == 'm' || path[len - 2u] == 'M') &&
+           (path[len - 1u] == 'd' || path[len - 1u] == 'D');
+}
+
+static int mem_console_path_is_regular_file(const char *path) {
+    struct stat st = {0};
+
+    if (!path || !path[0]) {
+        return 0;
+    }
+    if (stat(path, &st) != 0) {
+        return 0;
+    }
+    return S_ISREG(st.st_mode) ? 1 : 0;
+}
+
+static int mem_console_open_path_with_system_default(const char *path) {
+#if defined(__APPLE__)
+    pid_t pid = (pid_t)0;
+    char *const argv[] = { "open", (char *)path, 0 };
+    int spawn_rc;
+
+    if (!path || !path[0]) {
+        return 0;
+    }
+
+    spawn_rc = posix_spawnp(&pid, "open", 0, 0, argv, environ);
+    if (spawn_rc != 0) {
+        return 0;
+    }
+    return 1;
+#else
+    (void)path;
+    return 0;
+#endif
+}
 
 static int mem_console_pick_folder_macos(char *out_path, size_t out_cap) {
 #if defined(__APPLE__)
@@ -328,6 +380,34 @@ void mem_console_app_apply_pending_action(CoreMemDb *db,
                        sizeof(state->status_line),
                        "Centered selected memory %lld.",
                        (long long)state->selected_item_id);
+        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        return;
+    }
+
+    if (action == MEM_CONSOLE_ACTION_OPEN_REFERENCE_PATH) {
+        if (!state->detail_reference_path_available || !state->detail_reference_path[0]) {
+            (void)snprintf(state->status_line, sizeof(state->status_line), "No markdown reference path available.");
+            mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+            return;
+        }
+        if (!mem_console_path_has_md_suffix(state->detail_reference_path) ||
+            !mem_console_path_is_regular_file(state->detail_reference_path)) {
+            (void)snprintf(state->status_line,
+                           sizeof(state->status_line),
+                           "Reference path is unavailable: %s",
+                           state->detail_reference_path);
+            mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+            return;
+        }
+        if (!mem_console_open_path_with_system_default(state->detail_reference_path)) {
+            (void)snprintf(state->status_line, sizeof(state->status_line), "Failed to open reference path.");
+            mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+            return;
+        }
+
+        (void)snprintf(state->status_line,
+                       sizeof(state->status_line),
+                       "Opened reference path in default app.");
         mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
         return;
     }

@@ -45,7 +45,8 @@ typedef enum MemConsoleAction {
     MEM_CONSOLE_ACTION_CANCEL_DB_PICKER = 17,
     MEM_CONSOLE_ACTION_CONFIRM_DB_PICKER = 18,
     MEM_CONSOLE_ACTION_BEGIN_INPUT_ROOT_PICKER = 19,
-    MEM_CONSOLE_ACTION_PICK_INPUT_ROOT_FOLDER = 20
+    MEM_CONSOLE_ACTION_PICK_INPUT_ROOT_FOLDER = 20,
+    MEM_CONSOLE_ACTION_OPEN_REFERENCE_PATH = 21
 } MemConsoleAction;
 
 typedef enum MemConsoleInputTarget {
@@ -267,6 +268,9 @@ typedef struct MemConsoleState {
     int detail_title_line_count;
     char detail_connection_summary_text[640];
     char detail_connection_summary_lines[MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT][256];
+    char detail_reference_path[1024];
+    int64_t detail_reference_scan_item_id;
+    int detail_reference_path_available;
     int graph_drag_active;
     int graph_drag_moved;
     int graph_click_armed;

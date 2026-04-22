@@ -1,5 +1,6 @@
 #include "mem_console_runtime.h"
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -8,9 +9,32 @@
 
 enum {
     MEM_CONSOLE_RUNTIME_DEFAULT_POLL_MS = 900,
-    MEM_CONSOLE_RUNTIME_IDLE_MAX_WAIT_MS = 33,
+    MEM_CONSOLE_RUNTIME_IDLE_MAX_WAIT_MS = 120,
     MEM_CONSOLE_RUNTIME_IDLE_ACTIVE_WAIT_MS = 8
 };
+
+enum {
+    MEM_CONSOLE_RUNTIME_WAIT_MIN_MS = 1,
+    MEM_CONSOLE_RUNTIME_WAIT_MAX_MS = 5000
+};
+
+static uint32_t mem_console_runtime_wait_cap_ms(void) {
+    const char *env_value = getenv("MEM_CONSOLE_LOOP_MAX_WAIT_MS");
+    char *end = NULL;
+    long parsed = 0;
+
+    if (!env_value || !env_value[0]) {
+        return MEM_CONSOLE_RUNTIME_IDLE_MAX_WAIT_MS;
+    }
+    parsed = strtol(env_value, &end, 10);
+    if (end == env_value || *end != '\0') {
+        return MEM_CONSOLE_RUNTIME_IDLE_MAX_WAIT_MS;
+    }
+    if (parsed < MEM_CONSOLE_RUNTIME_WAIT_MIN_MS || parsed > MEM_CONSOLE_RUNTIME_WAIT_MAX_MS) {
+        return MEM_CONSOLE_RUNTIME_IDLE_MAX_WAIT_MS;
+    }
+    return (uint32_t)parsed;
+}
 
 typedef struct MemConsoleRefreshTask {
     char db_path[1024];
@@ -822,6 +846,7 @@ uint32_t mem_console_runtime_idle_wait_ms(const MemConsoleRuntime *runtime,
                                           const MemConsoleState *state,
                                           uint64_t now_ms) {
     uint64_t remaining_ms = 0;
+    uint32_t wait_cap_ms = mem_console_runtime_wait_cap_ms();
 
     if (!state) {
         return 0u;
@@ -836,8 +861,8 @@ uint32_t mem_console_runtime_idle_wait_ms(const MemConsoleRuntime *runtime,
             return 0u;
         }
         remaining_ms = 150u - elapsed_ms;
-        if (remaining_ms > MEM_CONSOLE_RUNTIME_IDLE_MAX_WAIT_MS) {
-            remaining_ms = MEM_CONSOLE_RUNTIME_IDLE_MAX_WAIT_MS;
+        if (remaining_ms > wait_cap_ms) {
+            remaining_ms = wait_cap_ms;
         }
         return (uint32_t)remaining_ms;
     }
@@ -858,8 +883,8 @@ uint32_t mem_console_runtime_idle_wait_ms(const MemConsoleRuntime *runtime,
     }
 
     remaining_ms = runtime->next_poll_due_ms - now_ms;
-    if (remaining_ms > MEM_CONSOLE_RUNTIME_IDLE_MAX_WAIT_MS) {
-        remaining_ms = MEM_CONSOLE_RUNTIME_IDLE_MAX_WAIT_MS;
+    if (remaining_ms > wait_cap_ms) {
+        remaining_ms = wait_cap_ms;
     }
     if (remaining_ms == 0u) {
         return 0u;

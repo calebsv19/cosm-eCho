@@ -95,6 +95,19 @@ typedef struct MemConsoleRenderDiagTotals {
     uint64_t submit_fatal_count;
 } MemConsoleRenderDiagTotals;
 
+typedef struct MemConsoleLoopDiagState {
+    int initialized;
+    int enabled;
+    int json_output;
+    uint64_t period_start_ms;
+    uint64_t frames;
+    uint64_t wait_calls;
+    uint64_t blocked_ms;
+    uint64_t active_ms;
+} MemConsoleLoopDiagState;
+
+static MemConsoleLoopDiagState s_mem_console_loop_diag = {0};
+
 static int mem_console_env_flag_enabled(const char *name) {
     const char *value = NULL;
     if (!name) {
@@ -117,6 +130,119 @@ static int mem_console_ir1_diag_enabled(void) {
 
 static int mem_console_rs1_diag_enabled(void) {
     return mem_console_env_flag_enabled("MEM_CONSOLE_RS1_DIAG");
+}
+
+static void mem_console_loop_diag_init_once(void) {
+    const char *format_env = NULL;
+    if (s_mem_console_loop_diag.initialized) {
+        return;
+    }
+
+    if (mem_console_env_flag_enabled("MEM_CONSOLE_LOOP_DIAG_LOG") ||
+        mem_console_env_flag_enabled("MEM_CONSOLE_LOOP_DIAG_JSON")) {
+        s_mem_console_loop_diag.enabled = 1;
+    }
+
+    format_env = getenv("MEM_CONSOLE_LOOP_DIAG_FORMAT");
+    if (format_env && format_env[0] && strcmp(format_env, "json") == 0) {
+        s_mem_console_loop_diag.enabled = 1;
+        s_mem_console_loop_diag.json_output = 1;
+    }
+    if (mem_console_env_flag_enabled("MEM_CONSOLE_LOOP_DIAG_JSON")) {
+        s_mem_console_loop_diag.enabled = 1;
+        s_mem_console_loop_diag.json_output = 1;
+    }
+    s_mem_console_loop_diag.initialized = 1;
+}
+
+static void mem_console_loop_diag_emit(uint64_t period_ms) {
+    uint64_t total_ms = s_mem_console_loop_diag.blocked_ms + s_mem_console_loop_diag.active_ms;
+    double blocked_pct = (total_ms > 0u)
+                             ? (100.0 * (double)s_mem_console_loop_diag.blocked_ms / (double)total_ms)
+                             : 0.0;
+    double active_pct = (total_ms > 0u)
+                            ? (100.0 * (double)s_mem_console_loop_diag.active_ms / (double)total_ms)
+                            : 0.0;
+
+    if (s_mem_console_loop_diag.json_output) {
+        printf("{\"tag\":\"LoopDiag\",\"schema\":1,\"period_ms\":%llu,\"frames\":%llu,"
+               "\"wait_calls\":%llu,\"blocked_ms\":%llu,\"blocked_pct\":%.1f,"
+               "\"active_ms\":%llu,\"active_pct\":%.1f,\"wakes\":0,\"timers\":0,"
+               "\"results_queue\":{\"last\":0,\"peak\":0},"
+               "\"jobs\":{\"scheduled\":0,\"coalesced\":0},"
+               "\"results\":{\"applied\":0,\"stale_dropped\":0},"
+               "\"edit_txn\":{\"starts\":0,\"commits\":0,\"debounce_commits\":0,\"boundary_commits\":0},"
+               "\"events\":{\"queue_last\":0,\"queue_peak\":0,\"enqueued\":0,\"processed\":0,\"deferred\":0,\"dropped\":0,"
+               "\"emit\":{\"symbols\":0,\"diagnostics\":0,\"analysis_progress\":0,\"analysis_status\":0,\"library_index\":0,\"analysis_finished\":0},"
+               "\"dispatch\":{\"symbols\":0,\"diagnostics\":0,\"analysis_progress\":0,\"analysis_status\":0,\"library_index\":0,\"analysis_finished\":0}},"
+               "\"stale_by_kind\":{\"symbols\":0,\"diagnostics\":0,\"analysis_progress\":0,\"analysis_status\":0,\"analysis_finished\":0}}\n",
+               (unsigned long long)period_ms,
+               (unsigned long long)s_mem_console_loop_diag.frames,
+               (unsigned long long)s_mem_console_loop_diag.wait_calls,
+               (unsigned long long)s_mem_console_loop_diag.blocked_ms,
+               blocked_pct,
+               (unsigned long long)s_mem_console_loop_diag.active_ms,
+               active_pct);
+    } else {
+        printf("[LoopDiag] period=%llums frames=%llu waits=%llu blocked=%llums(%.1f%%) active=%llums(%.1f%%)\n",
+               (unsigned long long)period_ms,
+               (unsigned long long)s_mem_console_loop_diag.frames,
+               (unsigned long long)s_mem_console_loop_diag.wait_calls,
+               (unsigned long long)s_mem_console_loop_diag.blocked_ms,
+               blocked_pct,
+               (unsigned long long)s_mem_console_loop_diag.active_ms,
+               active_pct);
+    }
+}
+
+static void mem_console_loop_diag_tick(uint64_t frame_begin_ms,
+                                       uint64_t frame_end_ms,
+                                       uint32_t wait_call_count,
+                                       uint32_t wait_blocked_ms) {
+    uint64_t frame_elapsed_ms = 0u;
+    uint64_t blocked_ms = 0u;
+    uint64_t active_ms = 0u;
+    uint64_t elapsed_ms = 0u;
+
+    mem_console_loop_diag_init_once();
+    if (!s_mem_console_loop_diag.enabled) {
+        return;
+    }
+    if (frame_end_ms <= frame_begin_ms) {
+        return;
+    }
+
+    if (s_mem_console_loop_diag.period_start_ms == 0u) {
+        s_mem_console_loop_diag.period_start_ms = frame_begin_ms;
+    }
+
+    frame_elapsed_ms = frame_end_ms - frame_begin_ms;
+    blocked_ms = wait_blocked_ms;
+    if (blocked_ms > frame_elapsed_ms) {
+        blocked_ms = frame_elapsed_ms;
+    }
+    active_ms = frame_elapsed_ms - blocked_ms;
+
+    s_mem_console_loop_diag.frames += 1u;
+    s_mem_console_loop_diag.wait_calls += (uint64_t)wait_call_count;
+    s_mem_console_loop_diag.blocked_ms += blocked_ms;
+    s_mem_console_loop_diag.active_ms += active_ms;
+
+    if (frame_end_ms < s_mem_console_loop_diag.period_start_ms) {
+        s_mem_console_loop_diag.period_start_ms = frame_end_ms;
+        return;
+    }
+    elapsed_ms = frame_end_ms - s_mem_console_loop_diag.period_start_ms;
+    if (elapsed_ms < 1000u) {
+        return;
+    }
+
+    mem_console_loop_diag_emit(elapsed_ms);
+    s_mem_console_loop_diag.period_start_ms = frame_end_ms;
+    s_mem_console_loop_diag.frames = 0u;
+    s_mem_console_loop_diag.wait_calls = 0u;
+    s_mem_console_loop_diag.blocked_ms = 0u;
+    s_mem_console_loop_diag.active_ms = 0u;
 }
 
 static void mem_console_render_derive_frame(MemConsoleRenderDeriveFrame *out_derive,
@@ -389,9 +515,13 @@ int mem_console_app_run_loop(MemConsoleAppLoopContext *ctx) {
         uint64_t runtime_dropped_before;
         uint64_t runtime_errors_before;
         uint64_t runtime_coalesced_before;
+        uint64_t frame_begin_ms = SDL_GetTicks64();
         int runtime_in_flight_before;
         int runtime_pending_before;
         int waited_event = 0;
+        int wait_performed = 0;
+        uint32_t wait_call_count = 0u;
+        uint32_t wait_blocked_ms = 0u;
         int wheel_y = 0;
 
         mem_console_input_frame_begin(&input_frame);
@@ -400,6 +530,11 @@ int mem_console_app_run_loop(MemConsoleAppLoopContext *ctx) {
 
         idle_wait_ms = mem_console_runtime_idle_wait_ms(ctx->runtime, ctx->state, SDL_GetTicks64());
         if (idle_wait_ms > 0u) {
+            uint64_t wait_begin_ms = SDL_GetTicks64();
+            uint64_t wait_end_ms = 0u;
+            uint64_t wait_elapsed_ms = 0u;
+            wait_performed = 1;
+            wait_call_count = 1u;
             if (SDL_WaitEventTimeout(&event, (int)idle_wait_ms)) {
                 waited_event = 1;
                 mem_console_input_apply_event(&input_frame, &event);
@@ -412,6 +547,15 @@ int mem_console_app_run_loop(MemConsoleAppLoopContext *ctx) {
                                                   &input,
                                                   &wheel_y,
                                                   &keyboard_action);
+            }
+            wait_end_ms = SDL_GetTicks64();
+            if (wait_end_ms > wait_begin_ms) {
+                wait_elapsed_ms = wait_end_ms - wait_begin_ms;
+            }
+            if (wait_elapsed_ms > (uint64_t)UINT32_MAX) {
+                wait_blocked_ms = UINT32_MAX;
+            } else {
+                wait_blocked_ms = (uint32_t)wait_elapsed_ms;
             }
         }
 
@@ -546,6 +690,10 @@ int mem_console_app_run_loop(MemConsoleAppLoopContext *ctx) {
                                                                  "Swapchain recover failed")) {
                     return 1;
                 }
+                mem_console_loop_diag_tick(frame_begin_ms,
+                                           SDL_GetTicks64(),
+                                           wait_call_count,
+                                           wait_blocked_ms);
                 continue;
             }
             if (frame_result == MEM_CONSOLE_FRAME_FATAL) {
@@ -622,10 +770,16 @@ int mem_console_app_run_loop(MemConsoleAppLoopContext *ctx) {
         }
 
         if (waited_event == 0 &&
+            wait_performed == 0 &&
             pending_action == MEM_CONSOLE_ACTION_NONE &&
             mem_console_redraw_pending(ctx->state) == 0u) {
             SDL_Delay(1u);
         }
+
+        mem_console_loop_diag_tick(frame_begin_ms,
+                                   SDL_GetTicks64(),
+                                   wait_call_count,
+                                   wait_blocked_ms);
     }
 
     return 0;

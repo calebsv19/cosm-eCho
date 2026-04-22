@@ -56,6 +56,7 @@ Implemented now:
 10. additive runtime theme/font preset switching through `kit_render_set_theme_preset(...)` and `kit_render_set_font_preset(...)`
 11. runtime font-path resilience improvements in the Vulkan text backend so TTF font loading can resolve shared relative font paths when apps are launched from nested working directories
 12. additive text measurement API through `kit_render_measure_text(...)`, with TTF-backed metrics on Vulkan and deterministic fallback metrics on null/bitmap paths
+13. Vulkan text crispness upgrade: render-scale-aware raster font selection, nearest-filter upload for downscaled raster glyph textures, and logical-size-correct destination sizing for high-DPI/zoom clarity
 
 ## Planned Growth
 
@@ -125,8 +126,10 @@ Expected visual result:
 Current Vulkan text support now uses a TTF-first render path with shared `core_font` selection:
 
 - `core_font` role and size tier resolve font path + point size
+- text draw now derives rasterization scale from swapchain extent vs logical size
 - `core_theme` color tokens drive glyph color
 - SDL_ttf rasterizes UTF-8 text into surfaces that are uploaded and drawn via textured quads
+- when rasterizing above logical point size, upload uses nearest filtering and draw destination is downscaled back to logical metrics
 - backend-local bitmap fallback remains available when TTF path resolution or rasterization fails
 
 Current limitations:
