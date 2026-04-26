@@ -5,3 +5,4 @@ data/
 tmp/
 ide_files/
 demo/*.sqlite
+tools/packaging/macos/local_app_icon/

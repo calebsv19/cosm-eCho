@@ -1,6 +1,6 @@
 # mem_console Desktop Packaging
 
-Last updated: 2026-04-04
+Last updated: 2026-04-25
 
 ## Bundle Contract
 - output app: `dist/eCho.app`
@@ -11,9 +11,14 @@ Last updated: 2026-04-04
   - `Contents/Frameworks/libMoltenVK.dylib`
 - bundled resources:
   - `Contents/Resources/data/default.sqlite`
+  - optional `Contents/Resources/AppIcon.icns` when `PACKAGE_APP_ICON_SRC` or `PACKAGE_APP_ICONSET_SRC` is provided
   - `Contents/Resources/shared/assets/fonts/*`
   - `Contents/Resources/vk_renderer/shaders/*`
   - `Contents/Resources/shaders/*`
+
+Default local icon store:
+- `mem_console/tools/packaging/macos/local_app_icon/AppIcon.icns`
+- `mem_console/tools/packaging/macos/local_app_icon/AppIcon.iconset`
 
 ## Make Targets
 - local packaging:
@@ -21,6 +26,10 @@ Last updated: 2026-04-04
   - `make -C mem_console package-desktop-smoke`
   - `make -C mem_console package-desktop-self-test`
   - `make -C mem_console package-desktop-refresh`
+  - `make -C mem_console package-desktop-refresh PACKAGE_APP_ICON_SRC="/absolute/path/to/echo.icns"`
+  - `make -C mem_console package-desktop-refresh PACKAGE_APP_ICONSET_SRC="/absolute/path/to/echo.iconset"`
+
+Plain `make -C mem_console package-desktop-refresh` and `package-desktop-self-test` now look in that local store first. The local icon store is gitignored so refreshed icon copies do not dirty the normal repo worktree.
 - release readiness:
   - `make -C mem_console release-contract`
   - `make -C mem_console release-bundle-audit`
@@ -31,6 +40,7 @@ Last updated: 2026-04-04
 ## Launcher Runtime Contract
 - `--print-config` dumps active paths and env configuration.
 - `--self-test` verifies app binary, plist, DB seed, shared fonts, Vulkan shader bundles, runtime ICD, and bundled MoltenVK.
+- when icon inputs are provided, packaging bundles `AppIcon.icns` and declares `CFBundleIconFile=AppIcon`.
 - startup logs go to `~/Library/Logs/MemConsole/launcher.log` (tmp fallback).
 - launcher runtime root:
   - `MEM_CONSOLE_RUNTIME_DIR=~/Library/Application Support/MemConsole/runtime` (tmp fallback)
@@ -52,3 +62,6 @@ Last updated: 2026-04-04
 7. `/Users/<user>/Desktop/eCho.app/Contents/MacOS/mem-console-launcher --print-config`
 8. `open /Users/<user>/Desktop/eCho.app`
 9. `tail -n 120 ~/Library/Logs/MemConsole/launcher.log`
+
+Note:
+- a fresh clone will still need an `AppIcon.icns` copied into `tools/packaging/macos/local_app_icon/` before plain packaging picks it up, because that lane is intentionally ignored.

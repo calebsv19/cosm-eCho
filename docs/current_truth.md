@@ -1,6 +1,6 @@
 # mem_console Current Truth
 
-Last updated: 2026-04-10
+Last updated: 2026-04-25
 
 ## Program Identity
 - Repo/program directory: `mem_console`
@@ -57,6 +57,10 @@ Last updated: 2026-04-10
   - `make -C mem_console package-desktop-smoke`
   - `make -C mem_console package-desktop-self-test`
   - `make -C mem_console package-desktop-refresh`
+  - optional icon-input packaging:
+    - default local icon store is `tools/packaging/macos/local_app_icon/AppIcon.icns` and `tools/packaging/macos/local_app_icon/AppIcon.iconset`
+    - `PACKAGE_APP_ICON_SRC=/absolute/path/to/*.icns`
+    - `PACKAGE_APP_ICONSET_SRC=/absolute/path/to/*.iconset`
 - release readiness verification:
   - `make -C mem_console release-contract`
   - `make -C mem_console release-bundle-audit`
@@ -94,10 +98,16 @@ Last updated: 2026-04-10
   - `--self-test`
   - startup logfile: `~/Library/Logs/MemConsole/launcher.log`
 - packaged runtime resource lanes:
+  - default local packaging icon store:
+    - `tools/packaging/macos/local_app_icon/AppIcon.icns`
+    - `tools/packaging/macos/local_app_icon/AppIcon.iconset`
+  - `Contents/Resources/AppIcon.icns` when icon input is provided
   - `Contents/Resources/data/default.sqlite` (seed DB)
   - `Contents/Resources/shared/assets/fonts/*`
   - `Contents/Resources/vk_renderer/shaders/*`
   - `Contents/Resources/shaders/*`
+- bundle plist now declares `CFBundleIconFile=AppIcon` when icon input is provided.
+- the local packaging icon store is gitignored and treated as a local distribution asset lane.
 - launcher runtime contract now uses writable runtime root:
   - `~/Library/Application Support/MemConsole/runtime` (tmp fallback)
   - seeded DB path: `<runtime>/data/default.sqlite`
