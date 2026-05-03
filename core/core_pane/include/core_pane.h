@@ -54,7 +54,33 @@ typedef struct CorePaneSplitterHit {
     float max_ratio_01;
 } CorePaneSplitterHit;
 
+typedef enum CorePaneValidationCode {
+    CORE_PANE_VALIDATION_OK = 0,
+    CORE_PANE_VALIDATION_ERR_INVALID_ARG = 1,
+    CORE_PANE_VALIDATION_ERR_EMPTY_GRAPH = 2,
+    CORE_PANE_VALIDATION_ERR_INVALID_ROOT = 3,
+    CORE_PANE_VALIDATION_ERR_INVALID_BOUNDS = 4,
+    CORE_PANE_VALIDATION_ERR_NODE_INDEX_OUT_OF_RANGE = 5,
+    CORE_PANE_VALIDATION_ERR_CYCLE_DETECTED = 6,
+    CORE_PANE_VALIDATION_ERR_DUPLICATE_CHILD = 7,
+    CORE_PANE_VALIDATION_ERR_SELF_CHILD = 8,
+    CORE_PANE_VALIDATION_ERR_SPLIT_BOUNDS_INVALID = 9,
+    CORE_PANE_VALIDATION_ERR_OUTPUT_CAPACITY = 10
+} CorePaneValidationCode;
+
+typedef struct CorePaneValidationReport {
+    CorePaneValidationCode code;
+    uint32_t node_index;
+    uint32_t related_index;
+} CorePaneValidationReport;
+
 float core_pane_clamp_ratio(float ratio_01, float min_ratio_01, float max_ratio_01);
+bool core_pane_validate_graph(const CorePaneNode *nodes,
+                              uint32_t node_count,
+                              uint32_t root_index,
+                              CorePaneRect bounds,
+                              CorePaneValidationReport *out_report);
+const char *core_pane_validation_code_string(CorePaneValidationCode code);
 
 bool core_pane_solve(const CorePaneNode *nodes,
                      uint32_t node_count,
@@ -72,6 +98,21 @@ bool core_pane_hit_test_splitter(const CorePaneNode *nodes,
                                  float point_x,
                                  float point_y,
                                  CorePaneSplitterHit *out_hit);
+
+bool core_pane_collect_splitter_hits(const CorePaneNode *nodes,
+                                     uint32_t node_count,
+                                     uint32_t root_index,
+                                     CorePaneRect bounds,
+                                     float handle_thickness,
+                                     CorePaneSplitterHit *out_hits,
+                                     uint32_t out_hit_cap,
+                                     uint32_t *out_hit_count);
+
+bool core_pane_hit_test_splitter_hits(const CorePaneSplitterHit *hits,
+                                      uint32_t hit_count,
+                                      float point_x,
+                                      float point_y,
+                                      CorePaneSplitterHit *out_hit);
 
 bool core_pane_apply_splitter_drag(CorePaneNode *nodes,
                                    uint32_t node_count,
