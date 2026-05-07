@@ -168,6 +168,7 @@ APP_SRCS := src/app/mem_console.c \
 	src/ui/graph/mem_console_ui_graph_panel.c
 
 APP_OBJS := $(patsubst src/%.c,$(OBJ_DIR)/src/%.o,$(APP_SRCS))
+APP_HEADERS := $(shell find include src -name '*.h' -type f 2>/dev/null)
 CORE_BASE_LIB_SRC := $(CORE_BASE_DIR)/build/libcore_base.a
 CORE_THEME_LIB_SRC := $(CORE_THEME_DIR)/build/libcore_theme.a
 CORE_FONT_LIB_SRC := $(CORE_FONT_DIR)/build/libcore_font.a
@@ -255,7 +256,7 @@ $(COMPILER_STAMP): $(TOOLCHAIN_DEP) | $(COMPILER_STAMP_DIR)
 $(SHARED_BUILD_DIR):
 	@mkdir -p "$@"
 
-$(OBJ_DIR)/src/%.o: src/%.c $(COMPILER_STAMP) | $(OBJ_DIR)
+$(OBJ_DIR)/src/%.o: src/%.c $(APP_HEADERS) $(COMPILER_STAMP) | $(OBJ_DIR)
 	@mkdir -p "$(dir $@)"
 	$(APP_CC) $(CFLAGS) $(INC) $(if $(filter clang,$(BUILD_TOOLCHAIN)),$(ARCH_FLAGS),) -c "$<" -o "$@"
 
