@@ -4,7 +4,7 @@
 
 This is a top-level program host, not a reusable shared kit.
 
-Its job is to become the first interactive proving ground for:
+Its job is to remain the first interactive proving ground for:
 
 - `core_memdb`
 - `kit_render`
@@ -13,7 +13,7 @@ Its job is to become the first interactive proving ground for:
 
 ## Current State
 
-The current app is a windowed Phase 3 console with the follow-on theme/font refinement lane implemented.
+The current app is a windowed interactive console with the graph/runtime/pane shell, theme/font refinement, async refresh hardening, and packaging follow-up lanes already landed.
 
 Right now it proves:
 - the intended build and link shape is in place
@@ -39,6 +39,7 @@ Right now it proves:
 - graph mode now has explicit `GRAPH MODE` toggle and `REFRESH GRAPH` controls
 - advanced graph filter/settings controls now collapse when graph mode is off (progressive disclosure)
 - graph mode now includes a bounded edge-kind filter segmented control (`ALL`, `SUPPORTS`, `DEPENDS`, `REFS`, `SUMMARY`, `RELATED`)
+- graph mode now includes node-kind filter controls and project-scope pod overlays for fuller neighborhood inspection
 - detail pane now shows compact selected-node connection summaries in the top metadata row (right side of title/id area)
 - graph edges now render compact kind labels so connection semantics are visible in preview
 - graph edges touching selected node now use subtle directional tinting (outbound=green-tinted white, inbound=red-tinted white, bidirectional=white)
@@ -65,8 +66,10 @@ Right now it proves:
 - periodic async DB refresh is now wired through shared runtime libs (`core_workers` + `core_queue` + `core_wake`) with main-thread apply safety guards
 - idle-loop pacing now uses timed waits to reduce churn when no input/work is pending
 - redraw invalidation reasons (`input/layout/theme/content/background`) now drive frame scheduling so the app sleeps when no redraw is needed
+- input routing and invalidation accounting now run through explicit IR1-style intake/normalize/route/invalidate helper seams in `src/app/mem_console_app_loop_input.c`
 - refresh requests now coalesce while a worker refresh is in-flight, keeping latest intent
 - refresh intent matching/coalescing now includes selected project-filter sets (not only search/selection/offset)
+- runtime refresh payload comparison and metrics publication now live in dedicated runtime helper seams
 - runtime observability counters are now surfaced in the left pane for async submitted/applied/dropped/error/coalesced status
 - optional kernel-bridge evaluation mode is available (`--kernel-bridge`) and surfaces compact kernel telemetry in the left pane
 - theme/font preset selection now persists through an app-local `.pack` prefs file (`<db_path>.ui.pack`) using `core_pack`

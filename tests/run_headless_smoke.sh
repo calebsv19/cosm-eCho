@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN_PATH="${ROOT_DIR}/build/mem_console"
+BIN_PATH="${BIN_PATH:-${ROOT_DIR}/build/mem_console}"
 
 if [[ ! -x "${BIN_PATH}" ]]; then
     echo "headless smoke failed: missing binary at ${BIN_PATH}" >&2

@@ -19,6 +19,12 @@ MKDIR_BIN="/bin/mkdir"
 
 "$MKDIR_BIN" -p "$FRAMEWORKS_DIR"
 
+if [ -n "${PACKAGE_DEP_SEARCH_ROOTS:-}" ]; then
+    SEARCH_ROOTS=$(printf '%s\n' "$PACKAGE_DEP_SEARCH_ROOTS" | tr ':' '\n')
+else
+    SEARCH_ROOTS=$(printf '%s\n%s\n' "/opt/homebrew" "/usr/local")
+fi
+
 WORK_TMP_DIR="${TMPDIR:-/tmp}/mem_console_bundle_dylibs.$$"
 "$MKDIR_BIN" -p "$WORK_TMP_DIR"
 QUEUE_FILE="$WORK_TMP_DIR/queue.txt"
@@ -54,13 +60,19 @@ while IFS= read -r current_file; do
             @rpath/*)
                 if [ -f "$FRAMEWORKS_DIR/$dep_base" ]; then
                     dep_src="$FRAMEWORKS_DIR/$dep_base"
-                elif [ -f "/opt/homebrew/lib/$dep_base" ]; then
-                    dep_src="/opt/homebrew/lib/$dep_base"
-                elif [ -f "/usr/local/lib/$dep_base" ]; then
-                    dep_src="/usr/local/lib/$dep_base"
                 else
-                    echo "warning: unable to resolve $dep for $current_file" >&2
-                    continue
+                    dep_src=""
+                    for root in $SEARCH_ROOTS; do
+                        [ -n "$root" ] || continue
+                        if [ -f "$root/lib/$dep_base" ]; then
+                            dep_src="$root/lib/$dep_base"
+                            break
+                        fi
+                    done
+                    if [ -z "$dep_src" ]; then
+                        echo "warning: unable to resolve $dep for $current_file" >&2
+                        continue
+                    fi
                 fi
                 ;;
         esac
@@ -82,7 +94,9 @@ while IFS= read -r current_file; do
 done <"$QUEUE_FILE"
 
 MOLTENVK_SRC=""
-for candidate in /opt/homebrew/lib/libMoltenVK.dylib /usr/local/lib/libMoltenVK.dylib; do
+for root in $SEARCH_ROOTS; do
+    [ -n "$root" ] || continue
+    candidate="$root/lib/libMoltenVK.dylib"
     if [ -f "$candidate" ]; then
         MOLTENVK_SRC="$candidate"
         break

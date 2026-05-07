@@ -301,7 +301,7 @@ CoreResult draw_graph_edge_legend(KitUiContext *ui_ctx,
 
     if (hovered_row >= 0 &&
         input &&
-        (input->mouse_pressed || input->mouse_released)) {
+        input->mouse_released) {
         clicked_row = hovered_row;
         if (out_click_consumed) {
             *out_click_consumed = 1;

@@ -1,6 +1,6 @@
 # mem_console Future Intent
 
-Last updated: 2026-04-10
+Last updated: 2026-05-04
 
 ## Scaffold Alignment Targets
 - lock lifecycle around a canonical app wrapper (`mem_console_app_main`) and named startup stages
@@ -46,6 +46,22 @@ Last updated: 2026-04-10
 - next packaging posture:
   - maintenance-only parity with ecosystem release contract updates.
   - keep Desktop/Finder launch + `release-verify-notarized` evidence in packaging-affecting closeout gates.
+  - Intel validation/retest evidence should live as release-follow-up history, not as an active implementation lane once the handoff plan is archived.
+
+## Runtime Loop and Refresh Intent
+- keep the app-loop/input/runtime split explicit:
+  - `mem_console_app_loop.c` should stay as orchestrator
+  - input normalization/routing/invalidation stays in `mem_console_app_loop_input.c`
+  - async refresh payload/intent helpers stay in `mem_console_runtime_refresh.c`
+- continue using helper extraction when loop/runtime files grow, instead of re-embedding orchestration inline
+
+## Graph Inspection Intent
+- preserve current graph exploration strengths:
+  - edge-kind filters
+  - node-kind filters
+  - project pod overlays
+  - camera pan/zoom and routed edge previews
+- next graph work should add richer editing/inspection affordances without weakening deterministic refresh behavior
 
 ## Large-File Maintenance Posture
 - continue behavior-preserving helper extraction when modules exceed readability/size thresholds.

@@ -165,6 +165,7 @@ int mem_console_graph_kind_toggle_enabled(MemConsoleState *state, const char *ki
     uint32_t all_mask;
     uint32_t kind_mask;
     uint32_t before_mask;
+    int before_all_override;
 
     if (!state || !kind || !kind[0]) {
         return 0;
@@ -177,9 +178,12 @@ int mem_console_graph_kind_toggle_enabled(MemConsoleState *state, const char *ki
     }
 
     before_mask = state->graph_kind_filter_mask;
+    before_all_override = state->graph_kind_filter_all_override;
     state->graph_kind_filter_mask = (state->graph_kind_filter_mask ^ kind_mask) & all_mask;
+    state->graph_kind_filter_all_override = 0;
     mem_console_graph_kind_sync_text_filter(state);
-    return before_mask != state->graph_kind_filter_mask ? 1 : 0;
+    return before_mask != state->graph_kind_filter_mask ||
+           before_all_override != state->graph_kind_filter_all_override;
 }
 
 void mem_console_graph_kind_select_all(MemConsoleState *state) {
@@ -187,6 +191,7 @@ void mem_console_graph_kind_select_all(MemConsoleState *state) {
         return;
     }
     state->graph_kind_filter_all_override = 1;
+    state->graph_kind_filter_mask = mem_console_graph_kind_filter_all_mask();
     mem_console_graph_kind_sync_text_filter(state);
 }
 
@@ -198,6 +203,9 @@ int mem_console_graph_kind_toggle_all_override(MemConsoleState *state) {
     }
     before = state->graph_kind_filter_all_override;
     state->graph_kind_filter_all_override = state->graph_kind_filter_all_override ? 0 : 1;
+    if (state->graph_kind_filter_all_override) {
+        state->graph_kind_filter_mask = mem_console_graph_kind_filter_all_mask();
+    }
     mem_console_graph_kind_sync_text_filter(state);
     return before != state->graph_kind_filter_all_override ? 1 : 0;
 }

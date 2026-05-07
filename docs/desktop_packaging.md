@@ -1,9 +1,11 @@
 # mem_console Desktop Packaging
 
-Last updated: 2026-04-25
+Last updated: 2026-05-04
 
 ## Bundle Contract
-- output app: `dist/eCho.app`
+- output app:
+  - local default lane still exposes `dist/eCho.app`
+  - multi-arch/release lane uses `build/targets/<target-triple>/dist/eCho.app`
 - launcher: `Contents/MacOS/mem-console-launcher`
 - runtime binary: `Contents/MacOS/mem-console-bin`
 - bundled frameworks include Vulkan runtime closure:
@@ -37,6 +39,17 @@ Plain `make -C mem_console package-desktop-refresh` and `package-desktop-self-te
   - `make -C mem_console release-notarize APPLE_SIGN_IDENTITY="Developer ID Application: <Name> (<TEAMID>)" APPLE_NOTARY_PROFILE="cosm-notary"`
   - `make -C mem_console release-distribute APPLE_SIGN_IDENTITY="Developer ID Application: <Name> (<TEAMID>)" APPLE_NOTARY_PROFILE="cosm-notary"`
 
+Multi-arch release lane:
+- target contract:
+  - `TARGET_OS`
+  - `TARGET_ARCH`
+  - `TARGET_VARIANT`
+  - `TARGET_TRIPLE`
+- Intel/ad-hoc examples:
+  - `make -C mem_console release-contract TARGET_ARCH=x86_64 BUILD_TOOLCHAIN=clang PACKAGE_TOOLCHAIN=clang`
+  - `HOME=/private/tmp/codex-mem-console-x86-home make -C mem_console package-desktop-self-test TARGET_ARCH=x86_64 BUILD_TOOLCHAIN=clang PACKAGE_TOOLCHAIN=clang`
+  - `HOME=/private/tmp/codex-mem-console-x86-home make -C mem_console release-artifact TARGET_ARCH=x86_64 BUILD_TOOLCHAIN=clang PACKAGE_TOOLCHAIN=clang`
+
 ## Launcher Runtime Contract
 - `--print-config` dumps active paths and env configuration.
 - `--self-test` verifies app binary, plist, DB seed, shared fonts, Vulkan shader bundles, runtime ICD, and bundled MoltenVK.
@@ -51,6 +64,9 @@ Plain `make -C mem_console package-desktop-refresh` and `package-desktop-self-te
   - `VK_ICD_FILENAMES=<runtime>/vk/MoltenVK_icd.json`
   - `VK_DRIVER_FILES=<runtime>/vk/MoltenVK_icd.json`
   - `MOLTENVK_DYLIB=<App>/Contents/Frameworks/libMoltenVK.dylib`
+- Intel shader follow-up:
+  - launcher now seeds runtime copies for both `runtime/shaders` and `runtime/vk_renderer`
+  - `VK_RENDERER_SHADER_ROOT` points at the runtime root so relative shader lookups remain valid on staged Intel handoff packages
 
 ## Validation Flow
 1. `make -C mem_console clean && make -C mem_console`

@@ -37,6 +37,8 @@ typedef struct MemConsoleRuntime {
     int in_flight_selected_project_count;
     char in_flight_selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
     char in_flight_graph_kind_filter[32];
+    uint32_t in_flight_graph_kind_filter_mask;
+    int in_flight_graph_kind_filter_all_override;
     int in_flight_graph_edge_limit;
     int in_flight_graph_hops;
     int in_flight_graph_layout_mode;
@@ -52,6 +54,8 @@ typedef struct MemConsoleRuntime {
     int pending_selected_project_count;
     char pending_selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
     char pending_graph_kind_filter[32];
+    uint32_t pending_graph_kind_filter_mask;
+    int pending_graph_kind_filter_all_override;
     int pending_graph_edge_limit;
     int pending_graph_hops;
     int pending_graph_layout_mode;
@@ -70,13 +74,20 @@ typedef struct MemConsoleRuntime {
     int wake_initialized;
 } MemConsoleRuntime;
 
+typedef struct MemConsoleRuntimeTickOutcome {
+    int metrics_changed;
+    int content_changed;
+    int graph_content_changed;
+} MemConsoleRuntimeTickOutcome;
+
 CoreResult mem_console_runtime_init(MemConsoleRuntime *runtime, uint64_t now_ms);
 void mem_console_runtime_shutdown(MemConsoleRuntime *runtime);
 
 void mem_console_runtime_note_local_write(MemConsoleRuntime *runtime, uint64_t now_ms);
 void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                               MemConsoleState *state,
-                              uint64_t now_ms);
+                              uint64_t now_ms,
+                              MemConsoleRuntimeTickOutcome *outcome);
 uint32_t mem_console_runtime_idle_wait_ms(const MemConsoleRuntime *runtime,
                                           const MemConsoleState *state,
                                           uint64_t now_ms);

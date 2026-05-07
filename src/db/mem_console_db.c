@@ -228,6 +228,231 @@ static int is_graph_node_limit_result(CoreResult result) {
            strcmp(result.message, "graph node limit reached") == 0;
 }
 
+static CoreResult load_full_scope_graph_nodes(CoreMemDb *db,
+                                              MemConsoleState *state,
+                                              int sort_oldest_first) {
+    CoreMemStmt stmt = {0};
+    CoreResult result;
+    int has_row = 0;
+
+    if (!db || !state) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid full scope node load request" };
+    }
+
+    if (sort_oldest_first) {
+        result = core_memdb_prepare(db,
+                                    "SELECT i.id, i.kind "
+                                    "FROM mem_item i "
+                                    "WHERE i.archived_ns IS NULL "
+                                    "  AND (?1 = 0 OR i.project_key IN (?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)) "
+                                    "ORDER BY i.updated_ns ASC, i.id ASC;",
+                                    &stmt);
+    } else {
+        result = core_memdb_prepare(db,
+                                    "SELECT i.id, i.kind "
+                                    "FROM mem_item i "
+                                    "WHERE i.archived_ns IS NULL "
+                                    "  AND (?1 = 0 OR i.project_key IN (?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)) "
+                                    "ORDER BY i.updated_ns DESC, i.id DESC;",
+                                    &stmt);
+    }
+    if (result.code != CORE_OK) {
+        result = core_memdb_prepare(db,
+                                    sort_oldest_first
+                                        ? "SELECT i.id, '' "
+                                          "FROM mem_item i "
+                                          "WHERE i.archived_ns IS NULL "
+                                          "  AND (?1 = 0 OR i.project_key IN (?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)) "
+                                          "ORDER BY i.updated_ns ASC, i.id ASC;"
+                                        : "SELECT i.id, '' "
+                                          "FROM mem_item i "
+                                          "WHERE i.archived_ns IS NULL "
+                                          "  AND (?1 = 0 OR i.project_key IN (?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)) "
+                                          "ORDER BY i.updated_ns DESC, i.id DESC;",
+                                    &stmt);
+        if (result.code != CORE_OK) {
+            return result;
+        }
+    }
+
+    result = bind_project_filters(&stmt, 1, state);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
+
+    for (;;) {
+        int64_t item_id = 0;
+        CoreStr kind = {0};
+        char node_kind[32];
+        int node_index = -1;
+
+        if (state->graph_node_count >= MEM_CONSOLE_GRAPH_NODE_LIMIT) {
+            break;
+        }
+
+        result = core_memdb_stmt_step(&stmt, &has_row);
+        if (result.code != CORE_OK) {
+            goto cleanup;
+        }
+        if (!has_row) {
+            break;
+        }
+
+        result = core_memdb_stmt_column_i64(&stmt, 0, &item_id);
+        if (result.code != CORE_OK) {
+            goto cleanup;
+        }
+        result = core_memdb_stmt_column_text(&stmt, 1, &kind);
+        if (result.code != CORE_OK) {
+            goto cleanup;
+        }
+
+        copy_core_str(kind, node_kind, sizeof(node_kind));
+        normalize_ascii_in_place(node_kind);
+        if (!mem_console_graph_node_kind_is_enabled(state, node_kind)) {
+            continue;
+        }
+
+        result = ensure_graph_node(db, state, item_id, &node_index);
+        if (result.code != CORE_OK) {
+            if (is_graph_node_limit_result(result)) {
+                break;
+            }
+            goto cleanup;
+        }
+    }
+
+    result = core_result_ok();
+
+cleanup:
+    {
+        CoreResult finalize_result = core_memdb_stmt_finalize(&stmt);
+        if (result.code == CORE_OK && finalize_result.code != CORE_OK) {
+            result = finalize_result;
+        }
+    }
+    return result;
+}
+
+static CoreResult load_full_scope_graph_edges(CoreMemDb *db,
+                                              MemConsoleState *state,
+                                              int sort_oldest_first) {
+    CoreMemStmt stmt = {0};
+    CoreResult result;
+    int has_row = 0;
+
+    if (!db || !state) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid full scope edge load request" };
+    }
+
+    if (sort_oldest_first) {
+        result = core_memdb_prepare(db,
+                                    "SELECT l.from_item_id, l.to_item_id, l.kind "
+                                    "FROM mem_link l "
+                                    "JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
+                                    "                  AND (?3 = 0 OR src.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
+                                    "JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
+                                    "                  AND (?3 = 0 OR dst.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
+                                    "WHERE (?1 = '' OR l.kind = ?1) "
+                                    "ORDER BY l.id ASC "
+                                    "LIMIT ?2;",
+                                    &stmt);
+    } else {
+        result = core_memdb_prepare(db,
+                                    "SELECT l.from_item_id, l.to_item_id, l.kind "
+                                    "FROM mem_link l "
+                                    "JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
+                                    "                  AND (?3 = 0 OR src.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
+                                    "JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
+                                    "                  AND (?3 = 0 OR dst.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
+                                    "WHERE (?1 = '' OR l.kind = ?1) "
+                                    "ORDER BY l.id DESC "
+                                    "LIMIT ?2;",
+                                    &stmt);
+    }
+    if (result.code != CORE_OK) {
+        return result;
+    }
+
+    result = core_memdb_stmt_bind_text(&stmt, 1, state->graph_kind_filter);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
+    result = core_memdb_stmt_bind_i64(&stmt, 2, MEM_CONSOLE_GRAPH_EDGE_LIMIT);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
+    result = bind_project_filters(&stmt, 3, state);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
+
+    for (;;) {
+        int64_t from_item_id = 0;
+        int64_t to_item_id = 0;
+        CoreStr kind = {0};
+        char edge_kind[32];
+        int from_index = -1;
+        int to_index = -1;
+
+        if (state->graph_edge_count >= MEM_CONSOLE_GRAPH_EDGE_LIMIT) {
+            break;
+        }
+
+        result = core_memdb_stmt_step(&stmt, &has_row);
+        if (result.code != CORE_OK) {
+            goto cleanup;
+        }
+        if (!has_row) {
+            break;
+        }
+
+        result = core_memdb_stmt_column_i64(&stmt, 0, &from_item_id);
+        if (result.code != CORE_OK) {
+            goto cleanup;
+        }
+        result = core_memdb_stmt_column_i64(&stmt, 1, &to_item_id);
+        if (result.code != CORE_OK) {
+            goto cleanup;
+        }
+        result = core_memdb_stmt_column_text(&stmt, 2, &kind);
+        if (result.code != CORE_OK) {
+            goto cleanup;
+        }
+
+        from_index = find_graph_node_index(state, from_item_id);
+        to_index = find_graph_node_index(state, to_item_id);
+        if (from_index < 0 || to_index < 0) {
+            continue;
+        }
+
+        copy_core_str(kind, edge_kind, sizeof(edge_kind));
+        normalize_ascii_in_place(edge_kind);
+        if (!mem_console_graph_kind_is_enabled(state, edge_kind)) {
+            continue;
+        }
+
+        state->graph_edges[state->graph_edge_count].from_index = from_index;
+        state->graph_edges[state->graph_edge_count].to_index = to_index;
+        (void)snprintf(state->graph_edges[state->graph_edge_count].kind,
+                       sizeof(state->graph_edges[state->graph_edge_count].kind),
+                       "%s",
+                       edge_kind);
+        state->graph_edge_count += 1;
+    }
+
+    result = core_result_ok();
+
+cleanup:
+    {
+        CoreResult finalize_result = core_memdb_stmt_finalize(&stmt);
+        if (result.code == CORE_OK && finalize_result.code != CORE_OK) {
+            result = finalize_result;
+        }
+    }
+    return result;
+}
+
 CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
     CoreMemStmt stmt = {0};
     CoreResult result;
@@ -255,180 +480,13 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
     state->graph_edge_count = 0;
 
     if (use_full_scope) {
-        if (sort_oldest_first) {
-            result = core_memdb_prepare(db,
-                                        "SELECT l.from_item_id, l.to_item_id, l.kind "
-                                        "FROM mem_link l "
-                                        "JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
-                                        "                  AND (?3 = 0 OR src.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
-                                        "JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
-                                        "                  AND (?3 = 0 OR dst.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
-                                        "WHERE (?1 = '' OR l.kind = ?1) "
-                                        "ORDER BY l.id ASC "
-                                        "LIMIT ?2;",
-                                        &stmt);
-        } else {
-            result = core_memdb_prepare(db,
-                                        "SELECT l.from_item_id, l.to_item_id, l.kind "
-                                        "FROM mem_link l "
-                                        "JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
-                                        "                  AND (?3 = 0 OR src.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
-                                        "JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
-                                        "                  AND (?3 = 0 OR dst.project_key IN (?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)) "
-                                        "WHERE (?1 = '' OR l.kind = ?1) "
-                                        "ORDER BY l.id DESC "
-                                        "LIMIT ?2;",
-                                        &stmt);
-        }
+        result = load_full_scope_graph_nodes(db, state, sort_oldest_first);
         if (result.code != CORE_OK) {
             return result;
         }
-
-        result = core_memdb_stmt_bind_text(&stmt, 1, state->graph_kind_filter);
+        result = load_full_scope_graph_edges(db, state, sort_oldest_first);
         if (result.code != CORE_OK) {
-            goto cleanup;
-        }
-        result = core_memdb_stmt_bind_i64(&stmt, 2, query_edge_limit);
-        if (result.code != CORE_OK) {
-            goto cleanup;
-        }
-        result = bind_project_filters(&stmt, 3, state);
-        if (result.code != CORE_OK) {
-            goto cleanup;
-        }
-
-        for (;;) {
-            int64_t from_item_id = 0;
-            int64_t to_item_id = 0;
-            CoreStr kind = {0};
-            char edge_kind[32];
-            int from_index = -1;
-            int to_index = -1;
-
-            result = core_memdb_stmt_step(&stmt, &has_row);
-            if (result.code != CORE_OK) {
-                goto cleanup;
-            }
-            if (!has_row) {
-                break;
-            }
-            if (state->graph_edge_count >= MEM_CONSOLE_GRAPH_EDGE_LIMIT) {
-                break;
-            }
-
-            result = core_memdb_stmt_column_i64(&stmt, 0, &from_item_id);
-            if (result.code != CORE_OK) {
-                goto cleanup;
-            }
-            result = core_memdb_stmt_column_i64(&stmt, 1, &to_item_id);
-            if (result.code != CORE_OK) {
-                goto cleanup;
-            }
-            result = core_memdb_stmt_column_text(&stmt, 2, &kind);
-            if (result.code != CORE_OK) {
-                goto cleanup;
-            }
-            copy_core_str(kind, edge_kind, sizeof(edge_kind));
-            normalize_ascii_in_place(edge_kind);
-            if (!mem_console_graph_kind_is_enabled(state, edge_kind)) {
-                continue;
-            }
-            result = ensure_graph_node(db, state, from_item_id, &from_index);
-            if (result.code != CORE_OK) {
-                if (is_graph_node_limit_result(result)) {
-                    continue;
-                }
-                goto cleanup;
-            }
-            result = ensure_graph_node(db, state, to_item_id, &to_index);
-            if (result.code != CORE_OK) {
-                if (is_graph_node_limit_result(result)) {
-                    continue;
-                }
-                goto cleanup;
-            }
-
-            state->graph_edges[state->graph_edge_count].from_index = from_index;
-            state->graph_edges[state->graph_edge_count].to_index = to_index;
-            (void)snprintf(state->graph_edges[state->graph_edge_count].kind,
-                           sizeof(state->graph_edges[state->graph_edge_count].kind),
-                           "%s",
-                           edge_kind);
-            state->graph_edge_count += 1;
-        }
-
-        {
-            CoreResult finalize_result = core_memdb_stmt_finalize(&stmt);
-            memset(&stmt, 0, sizeof(stmt));
-            if (result.code == CORE_OK && finalize_result.code != CORE_OK) {
-                result = finalize_result;
-            }
-            if (result.code != CORE_OK) {
-                return result;
-            }
-        }
-
-        result = core_memdb_prepare(db,
-                                    "SELECT i.id, i.kind "
-                                    "FROM mem_item i "
-                                    "WHERE i.archived_ns IS NULL "
-                                    "  AND (?1 = 0 OR i.project_key IN (?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)) "
-                                    "ORDER BY i.updated_ns DESC, i.id DESC "
-                                    "LIMIT ?18;",
-                                    &stmt);
-        if (result.code != CORE_OK) {
-            result = core_memdb_prepare(db,
-                                        "SELECT i.id, '' "
-                                        "FROM mem_item i "
-                                        "WHERE i.archived_ns IS NULL "
-                                        "  AND (?1 = 0 OR i.project_key IN (?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)) "
-                                        "ORDER BY i.updated_ns DESC, i.id DESC "
-                                        "LIMIT ?18;",
-                                        &stmt);
-            if (result.code != CORE_OK) {
-                return result;
-            }
-        }
-
-        result = bind_project_filters(&stmt, 1, state);
-        if (result.code != CORE_OK) {
-            goto cleanup;
-        }
-        result = core_memdb_stmt_bind_i64(&stmt, 18, MEM_CONSOLE_GRAPH_NODE_LIMIT);
-        if (result.code != CORE_OK) {
-            goto cleanup;
-        }
-
-        for (;;) {
-            int64_t item_id = 0;
-            CoreStr kind = {0};
-            char node_kind[32];
-            int node_index = -1;
-
-            result = core_memdb_stmt_step(&stmt, &has_row);
-            if (result.code != CORE_OK) {
-                goto cleanup;
-            }
-            if (!has_row) {
-                break;
-            }
-            result = core_memdb_stmt_column_i64(&stmt, 0, &item_id);
-            if (result.code != CORE_OK) {
-                goto cleanup;
-            }
-            result = core_memdb_stmt_column_text(&stmt, 1, &kind);
-            if (result.code != CORE_OK) {
-                goto cleanup;
-            }
-            copy_core_str(kind, node_kind, sizeof(node_kind));
-            normalize_ascii_in_place(node_kind);
-            if (!mem_console_graph_node_kind_is_enabled(state, node_kind)) {
-                continue;
-            }
-            result = ensure_graph_node(db, state, item_id, &node_index);
-            if (result.code != CORE_OK && !is_graph_node_limit_result(result)) {
-                goto cleanup;
-            }
+            return result;
         }
 
         {
