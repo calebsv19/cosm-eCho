@@ -585,6 +585,7 @@ int run_frame(KitRenderContext *render_ctx,
     int draw_width;
     int draw_height;
     int has_any_edit_mode;
+    int authoring_active;
     KitUiInputState blocked_input;
     const MemConsoleLayoutConfig *layout_cfg;
 
@@ -604,14 +605,19 @@ int run_frame(KitRenderContext *render_ctx,
         draw_height = layout_cfg->min_frame_height;
     }
 
+    authoring_active = mem_console_workspace_authoring_host_active(&state->workspace_authoring);
+    mem_console_workspace_authoring_host_set_viewport(&state->workspace_authoring,
+                                                      (uint32_t)draw_width,
+                                                      (uint32_t)draw_height);
+
     blocked_input = *input;
-    if (state->db_modal_open) {
+    if (state->db_modal_open || authoring_active) {
         blocked_input.mouse_down = 0;
         blocked_input.mouse_pressed = 0;
         blocked_input.mouse_released = 0;
     }
 
-    if (!state->db_modal_open && input->mouse_pressed) {
+    if (!state->db_modal_open && !authoring_active && input->mouse_pressed) {
         int left_drag_started = mem_console_ui_left_begin_panel_drag(state,
                                                                      layout_cfg,
                                                                      ui_ctx->style.gap,
@@ -626,12 +632,12 @@ int run_frame(KitRenderContext *render_ctx,
                                                      input->mouse_y);
         }
     }
-    if (!state->db_modal_open && state->left_panel_drag_active && input->mouse_down) {
+    if (!state->db_modal_open && !authoring_active && state->left_panel_drag_active && input->mouse_down) {
         (void)mem_console_ui_left_update_panel_drag(state,
                                                     layout_cfg,
                                                     ui_ctx->style.gap,
                                                     input->mouse_y);
-    } else if (!state->db_modal_open && state->pane_drag_active && input->mouse_down) {
+    } else if (!state->db_modal_open && !authoring_active && state->pane_drag_active && input->mouse_down) {
         (void)mem_console_pane_layout_update_drag(state,
                                                   layout_cfg,
                                                   draw_width,
@@ -639,7 +645,7 @@ int run_frame(KitRenderContext *render_ctx,
                                                   input->mouse_x,
                                                   input->mouse_y);
     }
-    if (!state->db_modal_open && input->mouse_released) {
+    if ((!state->db_modal_open && input->mouse_released) || authoring_active) {
         if (state->left_panel_drag_active) {
             mem_console_ui_left_end_panel_drag(state);
         }
@@ -829,6 +835,20 @@ int run_frame(KitRenderContext *render_ctx,
                     result.message ? result.message : "no message");
             return 1;
         }
+    }
+
+    result = mem_console_workspace_authoring_overlay_render(render_ctx,
+                                                            ui_ctx,
+                                                            &frame,
+                                                            state,
+                                                            draw_width,
+                                                            draw_height);
+    if (result.code != CORE_OK) {
+        fprintf(stderr,
+                "mem_console: mem_console_workspace_authoring_overlay_render failed: %d (%s)\n",
+                (int)result.code,
+                result.message ? result.message : "no message");
+        return 1;
     }
 
     result = kit_render_end_frame(render_ctx, &frame);

@@ -5,6 +5,7 @@
 
 #include "core_memdb.h"
 #include "kit_graph_struct.h"
+#include "mem_console_workspace_authoring.h"
 
 enum {
     MEM_CONSOLE_LIST_FETCH_LIMIT = 96,
@@ -307,6 +308,7 @@ typedef struct MemConsoleState {
     KitRenderRect pane_right_detail_body;
     KitRenderRect pane_right_graph;
     KitGraphStructViewport graph_viewport;
+    MemConsoleWorkspaceAuthoringHost workspace_authoring;
 } MemConsoleState;
 
 #endif

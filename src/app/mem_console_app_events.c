@@ -72,6 +72,17 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
         return;
     }
 
+    if (mem_console_workspace_authoring_host_handle_sdl_event(
+            &state->workspace_authoring,
+            state,
+            render_ctx,
+            ui_ctx,
+            event,
+            state->title_edit_mode || state->body_edit_mode || state->db_modal_open)) {
+        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_INPUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        return;
+    }
+
     switch (event->type) {
         case SDL_QUIT:
             *running = false;

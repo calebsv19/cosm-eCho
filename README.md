@@ -54,6 +54,9 @@ Right now it proves:
 - top-level pane geometry now routes through a pane adapter backed by shared `core_pane` split-solve logic
 - pane splitters are now draggable for left/right and right-top/right-bottom sizing in-app
 - pane layout ratios now persist in the app-local prefs pack (`<db_path>.ui.pack`) and restore on startup with safe fallback clamping
+- Workspace Authoring is now attached through shared `kit_workspace_authoring`: `Alt+C` then `Alt+V` enters active authoring, `Tab` switches pane vs. full-screen Font/Theme overlays, `Enter` applies, and `Esc`/toggle-out cancels previews
+- authoring Font/Theme changes preview live through the existing `core_theme`, `core_font`, and text-zoom state, while normal runtime keeps no persistent authoring HUD
+- accepted authoring changes persist through the existing per-DB `.ui.pack`; canceled previews restore the entry baseline
 - root pane surfaces/seams now render in a dedicated chrome pass with pane-owned seam policy (IDE-style single-owner boundaries)
 - top-level frame draw now enforces pane clip scopes for left/detail/graph paths to prevent cross-pane overdraw
 - compact UI density pass now applies tighter default margins/insets/row heights and a compact `kit_ui` style override for IDE-like space usage
@@ -74,11 +77,11 @@ Right now it proves:
 - optional kernel-bridge evaluation mode is available (`--kernel-bridge`) and surfaces compact kernel telemetry in the left pane
 - theme/font preset selection now persists through an app-local `.pack` prefs file (`<db_path>.ui.pack`) using `core_pack`
 
-It does not yet provide a full multiline editor widget or richer styling controls.
+It does not yet provide a full multiline editor widget, richer styling controls, or real authoring module insertion beyond the shared add-module stub.
 
 Current source layout:
 - `src/app/`:
-  - lifecycle/bootstrap/loop and event/action dispatch (`mem_console.c`, `mem_console_app_main.c`, `mem_console_app_loop.c`)
+  - lifecycle/bootstrap/loop, event/action dispatch, and Workspace Authoring host integration (`mem_console.c`, `mem_console_app_main.c`, `mem_console_app_loop.c`, `mem_console_workspace_authoring_host.c`)
 - `src/runtime/`:
   - runtime state/path/prefs/worker lanes (`mem_console_state*.c`, `mem_console_prefs.c`, `mem_console_prefs_app_io.c`, `mem_console_runtime.c`)
 - `src/db/`:
@@ -86,7 +89,7 @@ Current source layout:
 - `src/layout/`:
   - pane split and density config (`mem_console_pane_layout.c`, `mem_console_layout_config.c`)
 - `src/ui/`:
-  - frame/chrome/left/detail/hud composition
+  - frame/chrome/left/detail/hud composition and shared Workspace Authoring overlay rendering
 - `src/ui/graph/`:
   - graph viewport/camera/draw/controls/layout/overlay/pods (`mem_console_ui_graph_layout_focus_helpers.c` included)
 - `include/mem_console/`:

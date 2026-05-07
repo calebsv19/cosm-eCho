@@ -283,6 +283,7 @@ void seed_state(MemConsoleState *state, const char *db_path) {
     }
 
     memset(state, 0, sizeof(*state));
+    mem_console_workspace_authoring_host_reset(&state->workspace_authoring);
     initial_input_root[0] = '\0';
     initial_output_root[0] = '\0';
     if (db_path && db_path[0]) {

@@ -488,7 +488,8 @@ static void mem_console_loop_post_action_phase(const MemConsoleAppLoopContext *c
         }
     }
 
-    if (*ctx->prefs_path_valid) {
+    if (!mem_console_workspace_authoring_host_active(&ctx->state->workspace_authoring) &&
+        *ctx->prefs_path_valid) {
         uint64_t current_signature = mem_console_prefs_state_signature(ctx->state);
         if (!*ctx->prefs_signature_valid) {
             *ctx->prefs_last_saved_signature = current_signature;
@@ -499,6 +500,7 @@ static void mem_console_loop_post_action_phase(const MemConsoleAppLoopContext *c
     }
 
     if (*ctx->prefs_path_valid &&
+        !mem_console_workspace_authoring_host_active(&ctx->state->workspace_authoring) &&
         ctx->state->pane_prefs_dirty &&
         !ctx->state->pane_drag_active &&
         !ctx->state->left_panel_drag_active &&
@@ -602,12 +604,21 @@ int mem_console_app_run_loop(MemConsoleAppLoopContext *ctx) {
     while (run_state.running) {
         MemConsoleLoopStepResult step_result = mem_console_loop_frame_step(ctx, &run_state);
         if (step_result == MEM_CONSOLE_LOOP_STEP_FATAL) {
+            mem_console_workspace_authoring_host_cancel_active_preview(&ctx->state->workspace_authoring,
+                                                                       ctx->state,
+                                                                       ctx->render_ctx,
+                                                                       ctx->ui_ctx);
             return 1;
         }
         if (step_result == MEM_CONSOLE_LOOP_STEP_EXIT) {
             break;
         }
     }
+
+    mem_console_workspace_authoring_host_cancel_active_preview(&ctx->state->workspace_authoring,
+                                                               ctx->state,
+                                                               ctx->render_ctx,
+                                                               ctx->ui_ctx);
 
     return 0;
 }

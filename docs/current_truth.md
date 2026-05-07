@@ -1,6 +1,6 @@
 # mem_console Current Truth
 
-Last updated: 2026-05-04
+Last updated: 2026-05-07
 
 ## Program Identity
 - Repository/program directory: `mem_console`
@@ -27,6 +27,15 @@ Last updated: 2026-05-04
   - `LOAD DB` and `NEW DB` path modal flow
   - discovered `.sqlite` selection from `input_root`
   - app-level startup prefs remain separate from per-DB UI prefs
+- Workspace Authoring is active through shared `kit_workspace_authoring`:
+  - normal runtime has no persistent authoring HUD
+  - `Alt+C` then `Alt+V` toggles active authoring
+  - active authoring captures reserved input
+  - `Tab` cycles pane overlay and full-screen Font/Theme overlay
+  - shared overlay button geometry and shared Font/Theme layout/hit actions are used
+  - Font/Theme/text-size previews are live
+  - `Enter` applies; `Esc` or toggle-out cancels and restores the entry baseline
+  - accepted changes persist through the existing per-DB `.ui.pack`
 
 ## Structure
 - Required lanes: `docs/`, `src/`, `include/`, `tests/`, `build/`
@@ -37,6 +46,10 @@ Last updated: 2026-05-04
   - `src/app/mem_console_app_loop_input.c`
   - `src/runtime/mem_console_runtime_refresh.c`
   - corresponding internal headers for loop/runtime decomposition
+- Workspace Authoring seams:
+  - `include/mem_console/mem_console_workspace_authoring.h`
+  - `src/app/mem_console_workspace_authoring_host.c`
+  - `src/ui/mem_console_workspace_authoring_overlay.c`
 
 ## Verification Contract
 - Core gates:
@@ -67,8 +80,8 @@ Last updated: 2026-05-04
   - launcher now seeds real runtime shader copies for Intel retest safety
 
 ## Current Boundary
-- Maintain lifecycle/diagnostic wrapper stability while continuing graph/UI affordance hardening under the existing verification contract.
-- Keep the completed Intel packaging plan archived rather than leaving it in the active private bucket.
+- Manual visual acceptance for the new Workspace Authoring host is the next runtime check.
+- After acceptance, continue graph/UI affordance hardening under the existing verification contract.
 
 ## History and Deep Lane References
 - Full execution history is in:

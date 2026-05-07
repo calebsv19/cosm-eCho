@@ -40,6 +40,7 @@ CORE_PANE_DIR ?= $(SHARED_ROOT)/core/core_pane
 KIT_RENDER_DIR ?= $(SHARED_ROOT)/kit/kit_render
 KIT_UI_DIR ?= $(SHARED_ROOT)/kit/kit_ui
 KIT_GRAPH_STRUCT_DIR ?= $(SHARED_ROOT)/kit/kit_graph_struct
+KIT_WORKSPACE_AUTHORING_DIR ?= $(SHARED_ROOT)/kit/kit_workspace_authoring
 VK_RENDERER_DIR ?= $(SHARED_ROOT)/vk_renderer
 
 VULKAN_CFLAGS := $(shell env PKG_CONFIG_LIBDIR="$(TARGET_PKG_CONFIG_LIBDIR)" $(PKG_CONFIG) --cflags vulkan 2>/dev/null)
@@ -68,7 +69,7 @@ ifeq ($(strip $(SDL_TTF_LIBS)),)
 endif
 APPLE_FW := -framework Metal -framework QuartzCore -framework Cocoa -framework IOKit -framework CoreVideo
 
-INC = -Isrc -Iinclude -Iinclude/mem_console -I$(CORE_MEMDB_DIR)/include -I$(CORE_PACK_DIR)/include -I$(CORE_TIME_DIR)/include -I$(CORE_QUEUE_DIR)/include -I$(CORE_SCHED_DIR)/include -I$(CORE_JOBS_DIR)/include -I$(CORE_WORKERS_DIR)/include -I$(CORE_WAKE_DIR)/include -I$(CORE_KERNEL_DIR)/include -I$(CORE_PANE_DIR)/include -I$(KIT_UI_DIR)/include -I$(KIT_GRAPH_STRUCT_DIR)/include -I$(KIT_RENDER_DIR)/include -I$(VK_RENDERER_DIR)/include -I$(CORE_BASE_DIR)/include -I$(CORE_THEME_DIR)/include -I$(CORE_FONT_DIR)/include $(VULKAN_CFLAGS) $(SDL_CFLAGS) $(SDL_TTF_CFLAGS)
+INC = -Isrc -Iinclude -Iinclude/mem_console -I$(CORE_MEMDB_DIR)/include -I$(CORE_PACK_DIR)/include -I$(CORE_TIME_DIR)/include -I$(CORE_QUEUE_DIR)/include -I$(CORE_SCHED_DIR)/include -I$(CORE_JOBS_DIR)/include -I$(CORE_WORKERS_DIR)/include -I$(CORE_WAKE_DIR)/include -I$(CORE_KERNEL_DIR)/include -I$(CORE_PANE_DIR)/include -I$(KIT_UI_DIR)/include -I$(KIT_GRAPH_STRUCT_DIR)/include -I$(KIT_WORKSPACE_AUTHORING_DIR)/include -I$(KIT_RENDER_DIR)/include -I$(VK_RENDERER_DIR)/include -I$(CORE_BASE_DIR)/include -I$(CORE_THEME_DIR)/include -I$(CORE_FONT_DIR)/include $(VULKAN_CFLAGS) $(SDL_CFLAGS) $(SDL_TTF_CFLAGS)
 
 BUILD_ROOT := build
 TARGET_BUILD_ROOT := $(BUILD_ROOT)/targets/$(TARGET_TRIPLE)
@@ -126,6 +127,7 @@ APP_SRCS := src/app/mem_console.c \
 	src/app/mem_console_app_loop.c \
 	src/app/mem_console_app_loop_input.c \
 	src/app/mem_console_app_theme.c \
+	src/app/mem_console_workspace_authoring_host.c \
 	src/app/mem_console_kernel_bridge.c \
 	src/db/mem_console_db.c \
 	src/db/mem_console_db_graph_sort.c \
@@ -149,6 +151,7 @@ APP_SRCS := src/app/mem_console.c \
 	src/ui/mem_console_ui_detail_panel.c \
 	src/ui/mem_console_ui_detail_section.c \
 	src/ui/mem_console_ui_hud.c \
+	src/ui/mem_console_workspace_authoring_overlay.c \
 	src/ui/mem_console_ui_left_panel.c \
 	src/ui/mem_console_ui_left_section.c \
 	src/ui/graph/mem_console_ui_graph.c \
@@ -181,6 +184,7 @@ CORE_PANE_LIB_SRC := $(CORE_PANE_DIR)/build/libcore_pane.a
 KIT_RENDER_LIB_SRC := $(KIT_RENDER_DIR)/build/vk/libkit_render.a
 KIT_UI_LIB_SRC := $(KIT_UI_DIR)/build/libkit_ui.a
 KIT_GRAPH_STRUCT_LIB_SRC := $(KIT_GRAPH_STRUCT_DIR)/build/libkit_graph_struct.a
+KIT_WORKSPACE_AUTHORING_LIB_SRC := $(KIT_WORKSPACE_AUTHORING_DIR)/build/libkit_workspace_authoring.a
 VK_RENDERER_LIB_SRC := $(VK_RENDERER_DIR)/build/lib/libvkrenderer.a
 
 CORE_BASE_LIB := $(SHARED_BUILD_DIR)/libcore_base.a
@@ -199,10 +203,12 @@ CORE_PANE_LIB := $(SHARED_BUILD_DIR)/libcore_pane.a
 KIT_RENDER_LIB := $(SHARED_BUILD_DIR)/libkit_render.a
 KIT_UI_LIB := $(SHARED_BUILD_DIR)/libkit_ui.a
 KIT_GRAPH_STRUCT_LIB := $(SHARED_BUILD_DIR)/libkit_graph_struct.a
+KIT_WORKSPACE_AUTHORING_LIB := $(SHARED_BUILD_DIR)/libkit_workspace_authoring.a
 VK_RENDERER_LIB := $(SHARED_BUILD_DIR)/libvkrenderer.a
 
 APP_SHARED_LIBS := \
 	$(KIT_GRAPH_STRUCT_LIB) \
+	$(KIT_WORKSPACE_AUTHORING_LIB) \
 	$(KIT_UI_LIB) \
 	$(KIT_RENDER_LIB) \
 	$(VK_RENDERER_LIB) \
@@ -263,6 +269,7 @@ endef
 $(eval $(call build_copy_static_lib,KIT_RENDER,KIT_RENDER_ENABLE_VK=1,))
 $(eval $(call build_copy_static_lib,KIT_UI,KIT_RENDER_ENABLE_VK=1,$(KIT_RENDER_LIB)))
 $(eval $(call build_copy_static_lib,KIT_GRAPH_STRUCT,KIT_RENDER_ENABLE_VK=1,$(KIT_UI_LIB)))
+$(eval $(call build_copy_static_lib,KIT_WORKSPACE_AUTHORING,,$(CORE_BASE_LIB) $(CORE_THEME_LIB) $(CORE_FONT_LIB) $(CORE_PANE_LIB) $(KIT_RENDER_LIB)))
 $(eval $(call build_copy_static_lib,CORE_BASE,,))
 $(eval $(call build_copy_static_lib,CORE_THEME,,$(CORE_BASE_LIB)))
 $(eval $(call build_copy_static_lib,CORE_FONT,,$(CORE_BASE_LIB)))
