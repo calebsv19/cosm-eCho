@@ -68,6 +68,18 @@ CoreResult draw_rect_outline(KitRenderFrame *frame,
     return kit_render_push_rect(frame, &rect_cmd);
 }
 
+static const char *graph_view_mode_text(const MemConsoleState *state) {
+    int view_mode = mem_console_graph_view_mode_get(state);
+
+    if (view_mode == MEM_CONSOLE_GRAPH_VIEW_PODS) {
+        return "pods";
+    }
+    if (view_mode == MEM_CONSOLE_GRAPH_VIEW_WEB) {
+        return "web";
+    }
+    return "focus";
+}
+
 CoreResult draw_project_pod_overlays(const KitRenderContext *render_ctx,
                                      KitRenderFrame *frame,
                                      MemConsoleState *state,
@@ -79,7 +91,8 @@ CoreResult draw_project_pod_overlays(const KitRenderContext *render_ctx,
     if (!render_ctx || !frame || !state) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid pod overlay draw request" };
     }
-    if (!state->graph_scope_full_mode_enabled || state->graph_layout_node_count == 0u) {
+    if (mem_console_graph_view_mode_get(state) != MEM_CONSOLE_GRAPH_VIEW_PODS ||
+        state->graph_layout_node_count == 0u) {
         return core_result_ok();
     }
 
@@ -398,17 +411,6 @@ CoreResult draw_graph_edge_legend(KitUiContext *ui_ctx,
     return core_result_ok();
 }
 
-static const char *graph_layout_mode_text(int layout_mode) {
-    return layout_mode == MEM_CONSOLE_GRAPH_LAYOUT_TREE ? "tree" : "dag";
-}
-
-static const char *graph_scope_mode_text(const MemConsoleState *state) {
-    if (!state) {
-        return "focus";
-    }
-    return state->graph_scope_full_mode_enabled ? "full" : "focus";
-}
-
 CoreResult draw_graph_view_diagnostics(KitUiContext *ui_ctx,
                                        const KitRenderContext *render_ctx,
                                        KitRenderFrame *frame,
@@ -441,9 +443,9 @@ CoreResult draw_graph_view_diagnostics(KitUiContext *ui_ctx,
 
     (void)snprintf(state->graph_status_line,
                    sizeof(state->graph_status_line),
-                   "scope:%s  layout:%s  lbl:%s  fnl:%s  zoom:%.2fx  n:%u e:%u",
-                   graph_scope_mode_text(state),
-                   graph_layout_mode_text(state->graph_layout_mode),
+                   "mode:%s  sort:%s  lbl:%s  fnl:%s  zoom:%.2fx  n:%u e:%u",
+                   graph_view_mode_text(state),
+                   state->graph_sort_mode == MEM_CONSOLE_GRAPH_SORT_OLDEST_FIRST ? "old" : "new",
                    state->graph_edge_labels_enabled ? "on" : "off",
                    state->graph_anchor_funnel_enabled ? "on" : "off",
                    state->graph_viewport.zoom,

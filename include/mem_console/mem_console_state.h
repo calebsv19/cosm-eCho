@@ -52,6 +52,10 @@ int mem_console_graph_edge_limit_parse(const char *text, int fallback);
 void mem_console_graph_edge_limit_set(MemConsoleState *state, int value);
 int mem_console_graph_hops_clamp(int value);
 int mem_console_graph_layout_mode_clamp(int value);
+int mem_console_graph_view_mode_clamp(int value);
+int mem_console_graph_view_mode_get(const MemConsoleState *state);
+int mem_console_graph_view_mode_set(MemConsoleState *state, int view_mode);
+void mem_console_graph_view_mode_reset_viewport(MemConsoleState *state);
 int mem_console_graph_sort_mode_clamp(int value);
 uint32_t mem_console_graph_kind_filter_all_mask(void);
 uint32_t mem_console_graph_kind_filter_mask_for_kind(const char *kind);
@@ -83,6 +87,11 @@ void mem_console_project_filter_prune_to_options(MemConsoleState *state);
 
 int selected_id_in_visible_items(const MemConsoleState *state);
 void sync_edit_buffers_from_selection(MemConsoleState *state);
+void mem_console_select_item_for_navigation(MemConsoleState *state,
+                                            int64_t item_id,
+                                            int enable_graph_mode,
+                                            int reset_graph_viewport,
+                                            MemConsoleAction *io_action);
 void begin_title_edit_mode(MemConsoleState *state);
 void cancel_title_edit_mode(MemConsoleState *state);
 void begin_body_edit_mode(MemConsoleState *state);

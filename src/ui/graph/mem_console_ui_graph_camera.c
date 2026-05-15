@@ -7,47 +7,6 @@ typedef struct GraphCameraWorldPoint {
     float y;
 } GraphCameraWorldPoint;
 
-static float graph_camera_node_zoom_scale(float zoom) {
-    float t = zoom;
-    float q = 1.0f;
-
-    if (t <= 0.0f) {
-        return 0.0f;
-    }
-
-    /* Global sizing baseline: roughly 1/1.6 of raw zoom scale. */
-    t = t / 1.6f;
-
-    /*
-     * Heavy collapse starts around 1.75x and increases as zoom moves away from
-     * close-in program view.
-     */
-    if (zoom < 1.75f) {
-        q = zoom / 1.75f;
-        if (q < 0.0f) {
-            q = 0.0f;
-        }
-        if (q > 1.0f) {
-            q = 1.0f;
-        }
-        t *= 0.58f + (0.42f * q * q);
-    }
-
-    if (zoom < 1.10f) {
-        t *= 0.90f;
-    }
-    if (zoom < 0.82f) {
-        t *= 0.82f;
-    }
-    if (zoom < 0.58f) {
-        t *= 0.74f;
-    }
-    if (zoom < 0.40f) {
-        t *= 0.68f;
-    }
-    return t;
-}
-
 /*
  * Graph drawing is transposed for horizontal flow:
  * - screen X maps to viewport pan_y axis
@@ -105,22 +64,28 @@ static void graph_camera_world_to_screen(const KitGraphStructViewport *viewport,
 
 void graph_camera_apply_to_layouts(KitGraphStructNodeLayout *layouts,
                                    uint32_t layout_count,
-                                   const KitGraphStructViewport *viewport,
+                                   const MemConsoleState *state,
                                    KitRenderRect graph_bounds) {
     uint32_t i;
+    const KitGraphStructViewport *viewport = 0;
     float safe_zoom = 1.0f;
     float node_zoom = 1.0f;
+    float min_render_w = GRAPH_NODE_MIN_RENDER_WIDTH_PX;
+    float min_render_h = GRAPH_NODE_MIN_RENDER_HEIGHT_PX;
 
-    if (!layouts || !viewport) {
+    if (!layouts || !state) {
         return;
     }
+    viewport = &state->graph_viewport;
     if (viewport->zoom > 0.0001f) {
         safe_zoom = viewport->zoom;
     }
-    node_zoom = graph_camera_node_zoom_scale(safe_zoom);
+    node_zoom = graph_mode_node_zoom_scale(state, safe_zoom);
     if (node_zoom > GRAPH_NODE_ZOOM_SIZE_CAP) {
         node_zoom = GRAPH_NODE_ZOOM_SIZE_CAP;
     }
+    min_render_w = graph_mode_min_render_width_px(state);
+    min_render_h = graph_mode_min_render_height_px(state);
 
     for (i = 0u; i < layout_count; ++i) {
         float world_x = layouts[i].rect.x;
@@ -134,12 +99,12 @@ void graph_camera_apply_to_layouts(KitGraphStructNodeLayout *layouts,
         float center_compensate_x = (full_scaled_w - capped_scaled_w) * 0.5f;
         float center_compensate_y = (full_scaled_h - capped_scaled_h) * 0.5f;
 
-        if (capped_scaled_w < GRAPH_NODE_MIN_RENDER_WIDTH_PX) {
-            capped_scaled_w = GRAPH_NODE_MIN_RENDER_WIDTH_PX;
+        if (capped_scaled_w < min_render_w) {
+            capped_scaled_w = min_render_w;
             center_compensate_x = (full_scaled_w - capped_scaled_w) * 0.5f;
         }
-        if (capped_scaled_h < GRAPH_NODE_MIN_RENDER_HEIGHT_PX) {
-            capped_scaled_h = GRAPH_NODE_MIN_RENDER_HEIGHT_PX;
+        if (capped_scaled_h < min_render_h) {
+            capped_scaled_h = min_render_h;
             center_compensate_y = (full_scaled_h - capped_scaled_h) * 0.5f;
         }
 

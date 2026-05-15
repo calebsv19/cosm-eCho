@@ -11,6 +11,18 @@
 
 extern char **environ;
 
+static const char *mem_console_graph_view_mode_status_text(const MemConsoleState *state) {
+    int view_mode = mem_console_graph_view_mode_get(state);
+
+    if (view_mode == MEM_CONSOLE_GRAPH_VIEW_PODS) {
+        return "pods";
+    }
+    if (view_mode == MEM_CONSOLE_GRAPH_VIEW_WEB) {
+        return "web";
+    }
+    return "focus";
+}
+
 static int mem_console_path_has_md_suffix(const char *path) {
     size_t len;
 
@@ -315,7 +327,17 @@ void mem_console_app_apply_pending_action(CoreMemDb *db,
 
     if (action == MEM_CONSOLE_ACTION_TOGGLE_GRAPH_MODE) {
         state->graph_mode_enabled = 1;
-        state->graph_scope_full_mode_enabled = state->graph_scope_full_mode_enabled ? 0 : 1;
+        {
+            int current_view_mode = mem_console_graph_view_mode_get(state);
+            int next_view_mode = MEM_CONSOLE_GRAPH_VIEW_FOCUS;
+
+            if (current_view_mode == MEM_CONSOLE_GRAPH_VIEW_FOCUS) {
+                next_view_mode = MEM_CONSOLE_GRAPH_VIEW_PODS;
+            } else if (current_view_mode == MEM_CONSOLE_GRAPH_VIEW_PODS) {
+                next_view_mode = MEM_CONSOLE_GRAPH_VIEW_WEB;
+            }
+            (void)mem_console_graph_view_mode_set(state, next_view_mode);
+        }
 
         result = load_graph_neighborhood(db, state);
         if (result.code != CORE_OK) {
@@ -325,8 +347,8 @@ void mem_console_app_apply_pending_action(CoreMemDb *db,
 
         (void)snprintf(state->status_line,
                        sizeof(state->status_line),
-                       "Graph scope %s (%d nodes, %d edges, kind=%s, limit=%d, hops=%d).",
-                       state->graph_scope_full_mode_enabled ? "full" : "focus",
+                       "Graph mode %s (%d nodes, %d edges, kind=%s, limit=%d, hops=%d).",
+                       mem_console_graph_view_mode_status_text(state),
                        state->graph_node_count,
                        state->graph_edge_count,
                        state->graph_kind_filter[0] ? state->graph_kind_filter : "all",
@@ -337,11 +359,12 @@ void mem_console_app_apply_pending_action(CoreMemDb *db,
     }
 
     if (action == MEM_CONSOLE_ACTION_REFRESH_GRAPH) {
-        result = load_graph_neighborhood(db, state);
+        result = refresh_state_from_db(db, state);
         if (result.code != CORE_OK) {
             mem_console_app_set_action_error_status(state, "Graph refresh failed", result);
             return;
         }
+        sync_edit_buffers_from_selection(state);
 
         (void)snprintf(state->status_line,
                        sizeof(state->status_line),

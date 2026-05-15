@@ -196,6 +196,7 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
     int has_graph_data = 0;
     int hovered_node_index = -1;
     int hovered_edge_index = -1;
+    int graph_view_mode = MEM_CONSOLE_GRAPH_VIEW_FOCUS;
 
     if (!render_ctx || !ui_ctx || !frame || !state) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid argument" };
@@ -214,6 +215,7 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
     node_count = state->graph_layout_node_count;
     edge_count = state->graph_layout_edge_count;
     has_graph_data = state->graph_layout_has_graph_data;
+    graph_view_mode = mem_console_graph_view_mode_get(state);
 
     if (input && has_graph_data && node_count > 0u &&
         kit_ui_point_in_rect(bounds, input->mouse_x, input->mouse_y)) {
@@ -289,6 +291,8 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         const char *edge_kind_label = "RELATED";
         KitRenderColor edge_draw_color;
         KitRenderColor label_outline_color;
+        uint8_t edge_alpha = 255u;
+        float line_thickness_scale = 1.0f;
         int is_hovered_edge = (int)i == hovered_edge_index;
         int is_hierarchy_edge = 0;
         if (state_edge_index >= 0 &&
@@ -301,6 +305,13 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         is_hierarchy_edge = graph_edge_is_hierarchy_kind(edge_kind_raw);
         if (!is_hierarchy_edge) {
             edge_draw_color = mix_color(edge_draw_color, edge_white, 0.38f);
+        }
+        if (graph_view_mode == MEM_CONSOLE_GRAPH_VIEW_WEB) {
+            line_thickness_scale = is_hierarchy_edge ? 0.88f : 0.76f;
+            edge_alpha = is_hierarchy_edge ? 184u : 142u;
+        } else if (graph_view_mode == MEM_CONSOLE_GRAPH_VIEW_FOCUS) {
+            line_thickness_scale = is_hierarchy_edge ? 0.94f : 0.84f;
+            edge_alpha = is_hierarchy_edge ? 204u : 166u;
         }
         if (route->point_count < 2u) {
             continue;
@@ -344,10 +355,12 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
                 line_cmd.thickness = is_hierarchy_edge
                                          ? (is_hovered_edge ? 4.0f : 2.8f)
                                          : (is_hovered_edge ? 3.0f : 1.6f);
+                line_cmd.thickness *= line_thickness_scale;
                 line_cmd.color = edge_draw_color;
                 if (is_hovered_edge) {
                     line_cmd.color = mix_color(edge_draw_color, edge_white, 0.26f);
                 }
+                line_cmd.color.a = is_hovered_edge ? 230u : edge_alpha;
                 line_cmd.transform = kit_render_identity_transform();
                 result = kit_render_push_line(frame, &line_cmd);
                 if (result.code != CORE_OK) {
@@ -364,12 +377,12 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         label_attach = compute_label_attach_point(label_bg_rect, label_anchor);
         line_cmd.p0 = label_anchor;
         line_cmd.p1 = label_attach;
-        line_cmd.thickness = is_hierarchy_edge ? 1.8f : 1.1f;
+        line_cmd.thickness = (is_hierarchy_edge ? 1.8f : 1.1f) * line_thickness_scale;
         line_cmd.color = edge_draw_color;
         if (is_hovered_edge) {
             line_cmd.color = mix_color(edge_draw_color, edge_white, 0.22f);
         }
-        line_cmd.color.a = 220u;
+        line_cmd.color.a = is_hovered_edge ? 224u : edge_alpha;
         line_cmd.transform = kit_render_identity_transform();
         result = kit_render_push_line(frame, &line_cmd);
         if (result.code != CORE_OK) {
@@ -388,7 +401,13 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         if (is_hovered_edge) {
             label_outline_color = mix_color(label_outline_color, edge_white, 0.20f);
         }
-        label_outline_color.a = 230u;
+        if (is_hovered_edge) {
+            label_outline_color.a = 228u;
+        } else if (edge_alpha >= 231u) {
+            label_outline_color.a = 255u;
+        } else {
+            label_outline_color.a = (uint8_t)(edge_alpha + 24u);
+        }
         result = draw_rect_outline(frame, label_bg_rect, 1.0f, label_outline_color);
         if (result.code != CORE_OK) {
             return result;
@@ -568,9 +587,7 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
             }
         }
 
-        if (state->graph_viewport.zoom < GRAPH_NODE_TEXT_MIN_ZOOM ||
-            node_w <= GRAPH_NODE_TEXT_HIDE_WIDTH_PX ||
-            node_h <= GRAPH_NODE_TEXT_HIDE_HEIGHT_PX) {
+        if (!graph_node_should_render_text(state, i, node_w, node_h)) {
             continue;
         }
         {

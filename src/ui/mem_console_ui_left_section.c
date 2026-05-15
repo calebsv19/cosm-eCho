@@ -826,20 +826,13 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
 
                     state->list_last_click_item_id = clicked_item_id;
                     state->list_last_click_ms = now_ms;
-                    state->selected_item_id = clicked_item_id;
-                    state->input_target = MEM_CONSOLE_INPUT_SEARCH;
                     state->graph_last_click_item_id = 0;
                     state->graph_last_click_ms = 0u;
-
-                    if (is_double_click) {
-                        state->graph_mode_enabled = 1;
-                        state->graph_center_item_id = clicked_item_id;
-                        state->graph_layout_valid = 0;
-                        kit_graph_struct_viewport_default(&state->graph_viewport);
-                        *io_action = MEM_CONSOLE_ACTION_REFRESH_GRAPH;
-                    } else if (*io_action == MEM_CONSOLE_ACTION_NONE) {
-                        *io_action = MEM_CONSOLE_ACTION_REFRESH;
-                    }
+                    mem_console_select_item_for_navigation(state,
+                                                           clicked_item_id,
+                                                           is_double_click,
+                                                           is_double_click,
+                                                           io_action);
                 }
                 if (state->visible_items[i].id == state->selected_item_id) {
                     button_result.state = KIT_UI_STATE_ACTIVE;

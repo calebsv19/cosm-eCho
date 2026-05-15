@@ -61,6 +61,20 @@ void apply_project_pod_layout(KitRenderRect bounds,
                               const MemConsoleState *state,
                               KitGraphStructNodeLayout *layouts,
                               uint32_t layout_count);
+void apply_free_web_layout(KitRenderRect bounds,
+                           const MemConsoleState *state,
+                           const KitGraphStructEdge *edges,
+                           uint32_t edge_count,
+                           KitGraphStructNodeLayout *layouts,
+                           uint32_t layout_count);
+float graph_mode_node_zoom_scale(const MemConsoleState *state, float zoom);
+float graph_mode_min_render_width_px(const MemConsoleState *state);
+float graph_mode_min_render_height_px(const MemConsoleState *state);
+float graph_mode_text_min_zoom(const MemConsoleState *state, int emphasized_node);
+int graph_node_should_render_text(const MemConsoleState *state,
+                                  uint32_t node_index,
+                                  float node_w,
+                                  float node_h);
 
 float graph_clampf(float value, float min_v, float max_v);
 void refine_edge_label_layouts_for_callouts(KitRenderRect bounds,
@@ -71,7 +85,7 @@ KitRenderVec2 compute_label_attach_point(KitRenderRect rect, KitRenderVec2 ancho
 
 void graph_camera_apply_to_layouts(KitGraphStructNodeLayout *layouts,
                                    uint32_t layout_count,
-                                   const KitGraphStructViewport *viewport,
+                                   const MemConsoleState *state,
                                    KitRenderRect graph_bounds);
 void graph_camera_pan_by_screen_delta(KitGraphStructViewport *viewport,
                                       float delta_x,

@@ -72,6 +72,12 @@ typedef enum MemConsoleGraphLayoutMode {
     MEM_CONSOLE_GRAPH_LAYOUT_TREE = 1
 } MemConsoleGraphLayoutMode;
 
+typedef enum MemConsoleGraphViewMode {
+    MEM_CONSOLE_GRAPH_VIEW_FOCUS = 0,
+    MEM_CONSOLE_GRAPH_VIEW_PODS = 1,
+    MEM_CONSOLE_GRAPH_VIEW_WEB = 2
+} MemConsoleGraphViewMode;
+
 typedef enum MemConsoleGraphSortMode {
     MEM_CONSOLE_GRAPH_SORT_RECENT_FIRST = 0,
     MEM_CONSOLE_GRAPH_SORT_OLDEST_FIRST = 1

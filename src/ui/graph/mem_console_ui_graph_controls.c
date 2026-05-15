@@ -539,40 +539,40 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
             graph_role_min_widths[i + 1] = graph_role_widths[i + 1];
         }
         graph_role_widths[graph_role_button_count + 0] = measure_compact_button_width(render_ctx,
-                                                                                       "DAG",
+                                                                                       "FOCUS",
                                                                                        CORE_FONT_ROLE_UI_MEDIUM,
                                                                                        CORE_FONT_TEXT_SIZE_CAPTION,
                                                                                        6.0f,
-                                                                                       26.0f,
-                                                                                       52.0f);
+                                                                                       42.0f,
+                                                                                       72.0f);
         graph_role_widths[graph_role_button_count + 1] = measure_compact_button_width(render_ctx,
-                                                                                       "TREE",
+                                                                                       "PODS",
                                                                                        CORE_FONT_ROLE_UI_MEDIUM,
                                                                                        CORE_FONT_TEXT_SIZE_CAPTION,
                                                                                        6.0f,
-                                                                                       30.0f,
-                                                                                       56.0f);
+                                                                                       38.0f,
+                                                                                       68.0f);
         graph_role_widths[graph_role_button_count + 2] = measure_compact_button_width(render_ctx,
+                                                                                       "WEB",
+                                                                                       CORE_FONT_ROLE_UI_MEDIUM,
+                                                                                       CORE_FONT_TEXT_SIZE_CAPTION,
+                                                                                       6.0f,
+                                                                                      30.0f,
+                                                                                       60.0f);
+        graph_role_widths[graph_role_button_count + 3] = measure_compact_button_width(render_ctx,
                                                                                        "NEW",
                                                                                        CORE_FONT_ROLE_UI_MEDIUM,
                                                                                        CORE_FONT_TEXT_SIZE_CAPTION,
                                                                                        6.0f,
                                                                                        30.0f,
                                                                                        56.0f);
-        graph_role_widths[graph_role_button_count + 3] = measure_compact_button_width(render_ctx,
+        graph_role_widths[graph_role_button_count + 4] = measure_compact_button_width(render_ctx,
                                                                                        "OLD",
                                                                                        CORE_FONT_ROLE_UI_MEDIUM,
                                                                                        CORE_FONT_TEXT_SIZE_CAPTION,
                                                                                        6.0f,
                                                                                        30.0f,
                                                                                        56.0f);
-        graph_role_widths[graph_role_button_count + 4] = measure_compact_button_width(render_ctx,
-                                                                                       "FULL",
-                                                                                       CORE_FONT_ROLE_UI_MEDIUM,
-                                                                                       CORE_FONT_TEXT_SIZE_CAPTION,
-                                                                                       6.0f,
-                                                                                       32.0f,
-                                                                                       60.0f);
         graph_role_widths[graph_role_button_count + 5] = measure_compact_button_width(render_ctx,
                                                                                        "FNL",
                                                                                        CORE_FONT_ROLE_UI_MEDIUM,
@@ -674,48 +674,43 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
             } else {
                 int mode_index = i - graph_role_button_count;
                 int changed = 0;
+                int current_view_mode = mem_console_graph_view_mode_get(state);
                 font_role = CORE_FONT_ROLE_UI_MEDIUM;
                 text_tier = CORE_FONT_TEXT_SIZE_CAPTION;
                 if (mode_index == 0) {
-                    label = "DAG";
-                    selected = state->graph_layout_mode == MEM_CONSOLE_GRAPH_LAYOUT_DAG ? 1 : 0;
+                    label = "FOCUS";
+                    selected = current_view_mode == MEM_CONSOLE_GRAPH_VIEW_FOCUS ? 1 : 0;
                 } else if (mode_index == 1) {
-                    label = "TREE";
-                    selected = state->graph_layout_mode == MEM_CONSOLE_GRAPH_LAYOUT_TREE ? 1 : 0;
+                    label = "PODS";
+                    selected = current_view_mode == MEM_CONSOLE_GRAPH_VIEW_PODS ? 1 : 0;
                 } else if (mode_index == 2) {
+                    label = "WEB";
+                    selected = current_view_mode == MEM_CONSOLE_GRAPH_VIEW_WEB ? 1 : 0;
+                } else if (mode_index == 3) {
                     label = "NEW";
                     selected = state->graph_sort_mode == MEM_CONSOLE_GRAPH_SORT_RECENT_FIRST ? 1 : 0;
-                } else if (mode_index == 3) {
+                } else if (mode_index == 4) {
                     label = "OLD";
                     selected = state->graph_sort_mode == MEM_CONSOLE_GRAPH_SORT_OLDEST_FIRST ? 1 : 0;
-                } else if (mode_index == 4) {
-                    label = "FULL";
-                    selected = state->graph_scope_full_mode_enabled ? 1 : 0;
                 } else {
                     label = "FNL";
                     selected = state->graph_anchor_funnel_enabled ? 1 : 0;
                 }
                 if (button_result.clicked) {
                     if (mode_index == 0) {
-                        int next_mode = mem_console_graph_layout_mode_clamp(MEM_CONSOLE_GRAPH_LAYOUT_DAG);
-                        changed = next_mode != state->graph_layout_mode ? 1 : 0;
-                        state->graph_layout_mode = next_mode;
+                        changed = mem_console_graph_view_mode_set(state, MEM_CONSOLE_GRAPH_VIEW_FOCUS);
                     } else if (mode_index == 1) {
-                        int next_mode = mem_console_graph_layout_mode_clamp(MEM_CONSOLE_GRAPH_LAYOUT_TREE);
-                        changed = next_mode != state->graph_layout_mode ? 1 : 0;
-                        state->graph_layout_mode = next_mode;
+                        changed = mem_console_graph_view_mode_set(state, MEM_CONSOLE_GRAPH_VIEW_PODS);
                     } else if (mode_index == 2) {
+                        changed = mem_console_graph_view_mode_set(state, MEM_CONSOLE_GRAPH_VIEW_WEB);
+                    } else if (mode_index == 3) {
                         int next_sort = mem_console_graph_sort_mode_clamp(MEM_CONSOLE_GRAPH_SORT_RECENT_FIRST);
                         changed = next_sort != state->graph_sort_mode ? 1 : 0;
                         state->graph_sort_mode = next_sort;
-                    } else if (mode_index == 3) {
+                    } else if (mode_index == 4) {
                         int next_sort = mem_console_graph_sort_mode_clamp(MEM_CONSOLE_GRAPH_SORT_OLDEST_FIRST);
                         changed = next_sort != state->graph_sort_mode ? 1 : 0;
                         state->graph_sort_mode = next_sort;
-                    } else if (mode_index == 4) {
-                        int next_value = state->graph_scope_full_mode_enabled ? 0 : 1;
-                        changed = next_value != state->graph_scope_full_mode_enabled ? 1 : 0;
-                        state->graph_scope_full_mode_enabled = next_value;
                     } else {
                         int next_value = state->graph_anchor_funnel_enabled ? 0 : 1;
                         changed = next_value != state->graph_anchor_funnel_enabled ? 1 : 0;
@@ -784,10 +779,6 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
         action_bar.width - (layout_cfg->action_block_pad * 2.0f),
         layout_cfg->action_button_h
     };
-    actions[action_button_count++] = (GraphActionDef){ state->graph_scope_full_mode_enabled ? "FULL VIEW" : "FOCUS VIEW",
-                                                        1,
-                                                        state->graph_scope_full_mode_enabled ? 1 : 0,
-                                                        MEM_CONSOLE_ACTION_TOGGLE_GRAPH_MODE };
     actions[action_button_count++] = (GraphActionDef){ "REFRESH", 1, 0, MEM_CONSOLE_ACTION_REFRESH_GRAPH };
     actions[action_button_count++] = (GraphActionDef){ "CENTER", 1, 0, MEM_CONSOLE_ACTION_CENTER_GRAPH };
     actions[action_button_count++] = (GraphActionDef){ "CENTER SEL",

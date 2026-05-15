@@ -17,43 +17,6 @@ static int graph_panel_is_anchor_stable_id(const char *stable_id) {
            strncmp(stable_id, "misc-", 5u) == 0;
 }
 
-static int apply_graph_node_preview_selection(MemConsoleState *state,
-                                              int64_t hit_item_id) {
-    int i;
-
-    if (!state || hit_item_id == 0) {
-        return 0;
-    }
-
-    for (i = 0; i < state->graph_node_count; ++i) {
-        if (state->graph_nodes[i].item_id == hit_item_id) {
-            state->selected_item_id = hit_item_id;
-            state->selected_created_ns = state->graph_nodes[i].created_ns;
-            state->selected_pinned = state->graph_nodes[i].pinned ? 1 : 0;
-            state->selected_canonical = state->graph_nodes[i].canonical ? 1 : 0;
-            (void)snprintf(state->selected_title,
-                           sizeof(state->selected_title),
-                           "%s",
-                           state->graph_nodes[i].title[0] ? state->graph_nodes[i].title : "UNTITLED");
-            (void)snprintf(state->selected_body,
-                           sizeof(state->selected_body),
-                           "%s",
-                           state->graph_nodes[i].body_preview[0] ? state->graph_nodes[i].body_preview : "-");
-            state->title_edit_mode = 0;
-            state->body_edit_mode = 0;
-            state->input_target = MEM_CONSOLE_INPUT_SEARCH;
-            sync_edit_buffers_from_selection(state);
-            mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
-            return 1;
-        }
-    }
-
-    state->selected_item_id = hit_item_id;
-    state->selected_created_ns = 0;
-    mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
-    return 1;
-}
-
 static int handle_graph_node_click(MemConsoleState *state,
                                    int64_t hit_item_id,
                                    MemConsoleAction *io_action) {
@@ -85,13 +48,9 @@ static int handle_graph_node_click(MemConsoleState *state,
     state->graph_last_click_ms = now_ms;
 
     if (is_double_click) {
-        (void)apply_graph_node_preview_selection(state, hit_item_id);
-        state->graph_center_item_id = hit_item_id;
-        kit_graph_struct_viewport_default(&state->graph_viewport);
-        state->graph_layout_valid = 0;
-        if (*io_action == MEM_CONSOLE_ACTION_NONE) {
-            *io_action = MEM_CONSOLE_ACTION_REFRESH_GRAPH;
-        }
+        state->list_last_click_item_id = 0;
+        state->list_last_click_ms = 0u;
+        mem_console_select_item_for_navigation(state, hit_item_id, 1, 1, io_action);
         return 1;
     }
 
@@ -116,7 +75,10 @@ static int handle_graph_node_click(MemConsoleState *state,
     }
 
     if (hit_item_id != state->selected_item_id) {
-        return apply_graph_node_preview_selection(state, hit_item_id);
+        state->list_last_click_item_id = 0;
+        state->list_last_click_ms = 0u;
+        mem_console_select_item_for_navigation(state, hit_item_id, 1, 0, io_action);
+        return 1;
     }
 
     return 0;
@@ -260,7 +222,9 @@ CoreResult mem_console_ui_draw_graph_panel(KitRenderContext *render_ctx,
                                                                              input->mouse_x,
                                                                              input->mouse_y,
                                                                              &next_item_id)) {
-                        (void)apply_graph_node_preview_selection(state, next_item_id);
+                        state->list_last_click_item_id = 0;
+                        state->list_last_click_ms = 0u;
+                        mem_console_select_item_for_navigation(state, next_item_id, 1, 0, io_action);
                     }
                 } else if (result.code != CORE_OK) {
                     return result;

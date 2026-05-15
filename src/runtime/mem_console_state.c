@@ -419,6 +419,34 @@ void sync_edit_buffers_from_selection(MemConsoleState *state) {
                                                           state->graph_edge_limit_cursor);
 }
 
+void mem_console_select_item_for_navigation(MemConsoleState *state,
+                                            int64_t item_id,
+                                            int enable_graph_mode,
+                                            int reset_graph_viewport,
+                                            MemConsoleAction *io_action) {
+    if (!state || item_id == 0) {
+        return;
+    }
+
+    state->selected_item_id = item_id;
+    state->graph_center_item_id = item_id;
+    state->selected_created_ns = 0;
+    state->title_edit_mode = 0;
+    state->body_edit_mode = 0;
+    state->input_target = MEM_CONSOLE_INPUT_SEARCH;
+    if (enable_graph_mode) {
+        state->graph_mode_enabled = 1;
+    }
+    if (reset_graph_viewport) {
+        mem_console_graph_view_mode_reset_viewport(state);
+    }
+    state->graph_layout_valid = 0;
+
+    if (io_action && *io_action == MEM_CONSOLE_ACTION_NONE) {
+        *io_action = MEM_CONSOLE_ACTION_REFRESH;
+    }
+}
+
 void begin_title_edit_mode(MemConsoleState *state) {
     if (!state || state->selected_item_id == 0) {
         return;

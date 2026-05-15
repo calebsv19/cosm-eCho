@@ -228,6 +228,164 @@ static int is_graph_node_limit_result(CoreResult result) {
            strcmp(result.message, "graph node limit reached") == 0;
 }
 
+static int64_t graph_priority_root_item_id(const MemConsoleState *state) {
+    if (!state) {
+        return 0;
+    }
+    if (state->selected_item_id != 0) {
+        return state->selected_item_id;
+    }
+    return state->graph_center_item_id;
+}
+
+static CoreResult load_priority_graph_nodes(CoreMemDb *db,
+                                            MemConsoleState *state,
+                                            int64_t root_item_id,
+                                            int reserve_hops,
+                                            int sort_oldest_first) {
+    CoreMemStmt stmt = {0};
+    CoreResult result;
+    int has_row = 0;
+
+    if (!db || !state) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid priority graph node load request" };
+    }
+    if (root_item_id == 0 || reserve_hops <= 0) {
+        return core_result_ok();
+    }
+
+    if (state->graph_node_count < MEM_CONSOLE_GRAPH_NODE_LIMIT) {
+        int node_index = -1;
+        result = ensure_graph_node(db, state, root_item_id, &node_index);
+        if (result.code != CORE_OK && !is_graph_node_limit_result(result)) {
+            return result;
+        }
+    }
+
+    result = core_memdb_prepare(db,
+                                sort_oldest_first
+                                    ? "WITH RECURSIVE walk(node_id, depth) AS ("
+                                      "  SELECT ?1, 0 "
+                                      "  UNION "
+                                      "  SELECT CASE WHEN l.from_item_id = walk.node_id THEN l.to_item_id ELSE l.from_item_id END, "
+                                      "         walk.depth + 1 "
+                                      "  FROM walk "
+                                      "  JOIN mem_link l ON (l.from_item_id = walk.node_id OR l.to_item_id = walk.node_id) "
+                                      "  JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
+                                      "                    AND (?4 = 0 OR src.project_key IN (?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)) "
+                                      "  JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
+                                      "                    AND (?4 = 0 OR dst.project_key IN (?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)) "
+                                      "  WHERE walk.depth < ?2 "
+                                      "    AND (?3 = '' OR l.kind = ?3)"
+                                      "), prioritized AS ("
+                                      "  SELECT node_id, MIN(depth) AS min_depth "
+                                      "  FROM walk "
+                                      "  GROUP BY node_id"
+                                      ") "
+                                      "SELECT i.id, i.kind "
+                                      "FROM prioritized p "
+                                      "JOIN mem_item i ON i.id = p.node_id "
+                                      "WHERE i.archived_ns IS NULL "
+                                      "ORDER BY p.min_depth ASC, i.updated_ns ASC, i.id ASC;"
+                                    : "WITH RECURSIVE walk(node_id, depth) AS ("
+                                      "  SELECT ?1, 0 "
+                                      "  UNION "
+                                      "  SELECT CASE WHEN l.from_item_id = walk.node_id THEN l.to_item_id ELSE l.from_item_id END, "
+                                      "         walk.depth + 1 "
+                                      "  FROM walk "
+                                      "  JOIN mem_link l ON (l.from_item_id = walk.node_id OR l.to_item_id = walk.node_id) "
+                                      "  JOIN mem_item src ON src.id = l.from_item_id AND src.archived_ns IS NULL "
+                                      "                    AND (?4 = 0 OR src.project_key IN (?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)) "
+                                      "  JOIN mem_item dst ON dst.id = l.to_item_id AND dst.archived_ns IS NULL "
+                                      "                    AND (?4 = 0 OR dst.project_key IN (?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)) "
+                                      "  WHERE walk.depth < ?2 "
+                                      "    AND (?3 = '' OR l.kind = ?3)"
+                                      "), prioritized AS ("
+                                      "  SELECT node_id, MIN(depth) AS min_depth "
+                                      "  FROM walk "
+                                      "  GROUP BY node_id"
+                                      ") "
+                                      "SELECT i.id, i.kind "
+                                      "FROM prioritized p "
+                                      "JOIN mem_item i ON i.id = p.node_id "
+                                      "WHERE i.archived_ns IS NULL "
+                                      "ORDER BY p.min_depth ASC, i.updated_ns DESC, i.id DESC;",
+                                &stmt);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+
+    result = core_memdb_stmt_bind_i64(&stmt, 1, root_item_id);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
+    result = core_memdb_stmt_bind_i64(&stmt, 2, reserve_hops);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
+    result = core_memdb_stmt_bind_text(&stmt, 3, state->graph_kind_filter);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
+    result = bind_project_filters(&stmt, 4, state);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
+
+    for (;;) {
+        int64_t item_id = 0;
+        CoreStr kind = {0};
+        char node_kind[32];
+        int node_index = -1;
+
+        if (state->graph_node_count >= MEM_CONSOLE_GRAPH_NODE_LIMIT) {
+            break;
+        }
+
+        result = core_memdb_stmt_step(&stmt, &has_row);
+        if (result.code != CORE_OK) {
+            goto cleanup;
+        }
+        if (!has_row) {
+            break;
+        }
+
+        result = core_memdb_stmt_column_i64(&stmt, 0, &item_id);
+        if (result.code != CORE_OK) {
+            goto cleanup;
+        }
+        result = core_memdb_stmt_column_text(&stmt, 1, &kind);
+        if (result.code != CORE_OK) {
+            goto cleanup;
+        }
+
+        copy_core_str(kind, node_kind, sizeof(node_kind));
+        normalize_ascii_in_place(node_kind);
+        if (!mem_console_graph_node_kind_is_enabled(state, node_kind)) {
+            continue;
+        }
+
+        result = ensure_graph_node(db, state, item_id, &node_index);
+        if (result.code != CORE_OK) {
+            if (is_graph_node_limit_result(result)) {
+                break;
+            }
+            goto cleanup;
+        }
+    }
+
+    result = core_result_ok();
+
+cleanup:
+    {
+        CoreResult finalize_result = core_memdb_stmt_finalize(&stmt);
+        if (result.code == CORE_OK && finalize_result.code != CORE_OK) {
+            result = finalize_result;
+        }
+    }
+    return result;
+}
+
 static CoreResult load_full_scope_graph_nodes(CoreMemDb *db,
                                               MemConsoleState *state,
                                               int sort_oldest_first) {
@@ -336,7 +494,8 @@ cleanup:
 
 static CoreResult load_full_scope_graph_edges(CoreMemDb *db,
                                               MemConsoleState *state,
-                                              int sort_oldest_first) {
+                                              int sort_oldest_first,
+                                              int query_edge_limit) {
     CoreMemStmt stmt = {0};
     CoreResult result;
     int has_row = 0;
@@ -378,7 +537,7 @@ static CoreResult load_full_scope_graph_edges(CoreMemDb *db,
     if (result.code != CORE_OK) {
         goto cleanup;
     }
-    result = core_memdb_stmt_bind_i64(&stmt, 2, MEM_CONSOLE_GRAPH_EDGE_LIMIT);
+    result = core_memdb_stmt_bind_i64(&stmt, 2, query_edge_limit);
     if (result.code != CORE_OK) {
         goto cleanup;
     }
@@ -460,9 +619,11 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
     int edge_limit = MEM_CONSOLE_GRAPH_EDGE_LIMIT;
     int query_edge_limit = MEM_CONSOLE_GRAPH_EDGE_LIMIT;
     int graph_hops = MEM_CONSOLE_GRAPH_HOPS_MIN;
+    int reserve_hops = 0;
     int use_full_scope = 0;
     int sort_oldest_first = 0;
     int64_t center_item_id = 0;
+    int64_t priority_root_item_id = 0;
 
     if (!db || !state) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid graph neighborhood request" };
@@ -470,21 +631,40 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
 
     edge_limit = mem_console_graph_edge_limit_clamp(state->graph_query_edge_limit);
     state->graph_query_edge_limit = edge_limit;
-    query_edge_limit = MEM_CONSOLE_GRAPH_EDGE_LIMIT;
+    query_edge_limit = edge_limit * 3;
+    if (query_edge_limit < edge_limit) {
+        query_edge_limit = edge_limit;
+    }
+    if (query_edge_limit > MEM_CONSOLE_GRAPH_EDGE_LIMIT) {
+        query_edge_limit = MEM_CONSOLE_GRAPH_EDGE_LIMIT;
+    }
     graph_hops = mem_console_graph_hops_clamp(state->graph_query_hops);
     state->graph_query_hops = graph_hops;
+    reserve_hops = graph_hops;
+    if (reserve_hops > 2) {
+        reserve_hops = 2;
+    }
     use_full_scope = state->graph_scope_full_mode_enabled ? 1 : 0;
     sort_oldest_first = state->graph_sort_mode == MEM_CONSOLE_GRAPH_SORT_OLDEST_FIRST ? 1 : 0;
+    priority_root_item_id = graph_priority_root_item_id(state);
 
     state->graph_node_count = 0;
     state->graph_edge_count = 0;
 
     if (use_full_scope) {
+        result = load_priority_graph_nodes(db,
+                                           state,
+                                           priority_root_item_id,
+                                           reserve_hops,
+                                           sort_oldest_first);
+        if (result.code != CORE_OK) {
+            return result;
+        }
         result = load_full_scope_graph_nodes(db, state, sort_oldest_first);
         if (result.code != CORE_OK) {
             return result;
         }
-        result = load_full_scope_graph_edges(db, state, sort_oldest_first);
+        result = load_full_scope_graph_edges(db, state, sort_oldest_first, query_edge_limit);
         if (result.code != CORE_OK) {
             return result;
         }

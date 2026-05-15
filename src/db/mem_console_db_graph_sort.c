@@ -23,6 +23,76 @@ static int64_t graph_node_effective_anchor_created_ns(const MemConsoleGraphNode 
     return node->created_ns;
 }
 
+static int graph_find_node_index_by_item_id(const MemConsoleState *state, int64_t item_id) {
+    int i;
+
+    if (!state || item_id == 0) {
+        return -1;
+    }
+
+    for (i = 0; i < state->graph_node_count; ++i) {
+        if (state->graph_nodes[i].item_id == item_id) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static int graph_distance_unreachable(void) {
+    return MEM_CONSOLE_GRAPH_NODE_LIMIT + MEM_CONSOLE_GRAPH_HOPS_MAX + 1;
+}
+
+static void graph_compute_node_distances(const MemConsoleState *state,
+                                         int node_count,
+                                         int edge_count,
+                                         int seed_index,
+                                         int *distances) {
+    int queue[MEM_CONSOLE_GRAPH_NODE_LIMIT];
+    int queue_head = 0;
+    int queue_tail = 0;
+    int i;
+
+    if (!state || !distances || node_count <= 0) {
+        return;
+    }
+
+    for (i = 0; i < node_count; ++i) {
+        distances[i] = graph_distance_unreachable();
+    }
+    if (seed_index < 0 || seed_index >= node_count) {
+        return;
+    }
+
+    distances[seed_index] = 0;
+    queue[queue_tail++] = seed_index;
+
+    while (queue_head < queue_tail) {
+        int current = queue[queue_head++];
+        int next_distance = distances[current] + 1;
+
+        for (i = 0; i < edge_count; ++i) {
+            int neighbor = -1;
+            if (state->graph_edges[i].from_index == current) {
+                neighbor = state->graph_edges[i].to_index;
+            } else if (state->graph_edges[i].to_index == current) {
+                neighbor = state->graph_edges[i].from_index;
+            }
+
+            if (neighbor < 0 || neighbor >= node_count) {
+                continue;
+            }
+            if (distances[neighbor] <= next_distance) {
+                continue;
+            }
+
+            distances[neighbor] = next_distance;
+            if (queue_tail < MEM_CONSOLE_GRAPH_NODE_LIMIT) {
+                queue[queue_tail++] = neighbor;
+            }
+        }
+    }
+}
+
 void mem_console_db_annotate_rollup_render_anchors(MemConsoleState *state) {
     int node_count;
     int edge_count;
@@ -89,13 +159,30 @@ void mem_console_db_annotate_rollup_render_anchors(MemConsoleState *state) {
 
 static int graph_sort_nodes_should_swap(const MemConsoleState *state,
                                         const MemConsoleGraphNode *left,
-                                        const MemConsoleGraphNode *right) {
+                                        const MemConsoleGraphNode *right,
+                                        int left_primary_depth,
+                                        int right_primary_depth,
+                                        int left_secondary_depth,
+                                        int right_secondary_depth) {
     int64_t left_anchor_created_ns;
     int64_t right_anchor_created_ns;
     int64_t left_anchor_item_id;
     int64_t right_anchor_item_id;
 
     if (!state || !left || !right) {
+        return 0;
+    }
+
+    if (left_primary_depth > right_primary_depth) {
+        return 1;
+    }
+    if (left_primary_depth < right_primary_depth) {
+        return 0;
+    }
+    if (left_secondary_depth > right_secondary_depth) {
+        return 1;
+    }
+    if (left_secondary_depth < right_secondary_depth) {
         return 0;
     }
 
@@ -139,8 +226,12 @@ void mem_console_db_apply_graph_node_sort(MemConsoleState *state) {
     MemConsoleGraphNode *sorted_nodes = 0;
     int *order = 0;
     int *old_to_new = 0;
+    int *primary_distances = 0;
+    int *secondary_distances = 0;
     int node_count = 0;
     int edge_count = 0;
+    int primary_seed_index = -1;
+    int secondary_seed_index = -1;
     int i;
     int j;
     int changed = 0;
@@ -167,12 +258,35 @@ void mem_console_db_apply_graph_node_sort(MemConsoleState *state) {
     sorted_nodes = (MemConsoleGraphNode *)malloc((size_t)node_count * sizeof(*sorted_nodes));
     order = (int *)malloc((size_t)node_count * sizeof(*order));
     old_to_new = (int *)malloc((size_t)node_count * sizeof(*old_to_new));
-    if (!sorted_nodes || !order || !old_to_new) {
+    primary_distances = (int *)malloc((size_t)node_count * sizeof(*primary_distances));
+    secondary_distances = (int *)malloc((size_t)node_count * sizeof(*secondary_distances));
+    if (!sorted_nodes || !order || !old_to_new || !primary_distances || !secondary_distances) {
         free(sorted_nodes);
         free(order);
         free(old_to_new);
+        free(primary_distances);
+        free(secondary_distances);
         return;
     }
+
+    primary_seed_index = graph_find_node_index_by_item_id(state, state->selected_item_id);
+    if (primary_seed_index < 0) {
+        primary_seed_index = graph_find_node_index_by_item_id(state, state->graph_center_item_id);
+    }
+    secondary_seed_index = graph_find_node_index_by_item_id(state, state->graph_center_item_id);
+    if (secondary_seed_index == primary_seed_index) {
+        secondary_seed_index = -1;
+    }
+    graph_compute_node_distances(state,
+                                 node_count,
+                                 edge_count,
+                                 primary_seed_index,
+                                 primary_distances);
+    graph_compute_node_distances(state,
+                                 node_count,
+                                 edge_count,
+                                 secondary_seed_index,
+                                 secondary_distances);
 
     for (i = 0; i < node_count; ++i) {
         order[i] = i;
@@ -184,7 +298,11 @@ void mem_console_db_apply_graph_node_sort(MemConsoleState *state) {
         while (j >= 0 &&
                graph_sort_nodes_should_swap(state,
                                             &state->graph_nodes[order[j]],
-                                            &state->graph_nodes[key])) {
+                                            &state->graph_nodes[key],
+                                            primary_distances[order[j]],
+                                            primary_distances[key],
+                                            secondary_distances[order[j]],
+                                            secondary_distances[key])) {
             order[j + 1] = order[j];
             j -= 1;
         }
@@ -201,6 +319,8 @@ void mem_console_db_apply_graph_node_sort(MemConsoleState *state) {
         free(sorted_nodes);
         free(order);
         free(old_to_new);
+        free(primary_distances);
+        free(secondary_distances);
         return;
     }
 
@@ -226,13 +346,55 @@ void mem_console_db_apply_graph_node_sort(MemConsoleState *state) {
     free(sorted_nodes);
     free(order);
     free(old_to_new);
+    free(primary_distances);
+    free(secondary_distances);
+}
+
+static int graph_edge_min_distance(const int *distances, int node_count, int from_index, int to_index) {
+    int unreachable = graph_distance_unreachable();
+    int from_distance = unreachable;
+    int to_distance = unreachable;
+
+    if (!distances) {
+        return unreachable;
+    }
+    if (from_index >= 0 && from_index < node_count) {
+        from_distance = distances[from_index];
+    }
+    if (to_index >= 0 && to_index < node_count) {
+        to_distance = distances[to_index];
+    }
+    return from_distance < to_distance ? from_distance : to_distance;
+}
+
+static int graph_edge_max_distance(const int *distances, int node_count, int from_index, int to_index) {
+    int unreachable = graph_distance_unreachable();
+    int from_distance = unreachable;
+    int to_distance = unreachable;
+
+    if (!distances) {
+        return unreachable;
+    }
+    if (from_index >= 0 && from_index < node_count) {
+        from_distance = distances[from_index];
+    }
+    if (to_index >= 0 && to_index < node_count) {
+        to_distance = distances[to_index];
+    }
+    return from_distance > to_distance ? from_distance : to_distance;
 }
 
 void mem_console_db_apply_graph_edge_priority(MemConsoleState *state, int edge_limit) {
     MemConsoleGraphEdge *kept_edges = 0;
     int *order = 0;
+    int *primary_distances = 0;
+    int *secondary_distances = 0;
     int node_count = 0;
     int edge_count = 0;
+    int center_index = -1;
+    int selected_index = -1;
+    int primary_seed_index = -1;
+    int secondary_seed_index = -1;
     int i;
     int j;
 
@@ -261,13 +423,39 @@ void mem_console_db_apply_graph_edge_priority(MemConsoleState *state, int edge_l
         return;
     }
 
+    center_index = graph_find_node_index_by_item_id(state, state->graph_center_item_id);
+    selected_index = graph_find_node_index_by_item_id(state, state->selected_item_id);
+    if (selected_index < 0) {
+        selected_index = center_index;
+    }
+
     kept_edges = (MemConsoleGraphEdge *)malloc((size_t)edge_limit * sizeof(*kept_edges));
     order = (int *)malloc((size_t)edge_count * sizeof(*order));
-    if (!kept_edges || !order) {
+    primary_distances = (int *)malloc((size_t)node_count * sizeof(*primary_distances));
+    secondary_distances = (int *)malloc((size_t)node_count * sizeof(*secondary_distances));
+    if (!kept_edges || !order || !primary_distances || !secondary_distances) {
         free(kept_edges);
         free(order);
+        free(primary_distances);
+        free(secondary_distances);
         return;
     }
+
+    primary_seed_index = selected_index >= 0 ? selected_index : center_index;
+    secondary_seed_index = center_index;
+    if (secondary_seed_index == primary_seed_index) {
+        secondary_seed_index = -1;
+    }
+    graph_compute_node_distances(state,
+                                 node_count,
+                                 edge_count,
+                                 primary_seed_index,
+                                 primary_distances);
+    graph_compute_node_distances(state,
+                                 node_count,
+                                 edge_count,
+                                 secondary_seed_index,
+                                 secondary_distances);
 
     for (i = 0; i < edge_count; ++i) {
         order[i] = i;
@@ -277,6 +465,11 @@ void mem_console_db_apply_graph_edge_priority(MemConsoleState *state, int edge_l
         int key = order[i];
         int key_from = state->graph_edges[key].from_index;
         int key_to = state->graph_edges[key].to_index;
+        int key_touches_selected = 0;
+        int key_touches_center = 0;
+        int key_primary_min_depth = graph_distance_unreachable();
+        int key_primary_max_depth = graph_distance_unreachable();
+        int key_secondary_min_depth = graph_distance_unreachable();
         int key_low = MEM_CONSOLE_GRAPH_NODE_LIMIT + 1;
         int key_high = MEM_CONSOLE_GRAPH_NODE_LIMIT + 1;
 
@@ -284,6 +477,17 @@ void mem_console_db_apply_graph_edge_priority(MemConsoleState *state, int edge_l
             key_to >= 0 && key_to < node_count) {
             key_low = key_from < key_to ? key_from : key_to;
             key_high = key_from > key_to ? key_from : key_to;
+            key_primary_min_depth = graph_edge_min_distance(primary_distances, node_count, key_from, key_to);
+            key_primary_max_depth = graph_edge_max_distance(primary_distances, node_count, key_from, key_to);
+            key_secondary_min_depth = graph_edge_min_distance(secondary_distances, node_count, key_from, key_to);
+            if (selected_index >= 0 &&
+                (key_from == selected_index || key_to == selected_index)) {
+                key_touches_selected = 1;
+            }
+            if (center_index >= 0 &&
+                (key_from == center_index || key_to == center_index)) {
+                key_touches_center = 1;
+            }
         }
 
         j = i - 1;
@@ -291,6 +495,11 @@ void mem_console_db_apply_graph_edge_priority(MemConsoleState *state, int edge_l
             int probe = order[j];
             int probe_from = state->graph_edges[probe].from_index;
             int probe_to = state->graph_edges[probe].to_index;
+            int probe_touches_selected = 0;
+            int probe_touches_center = 0;
+            int probe_primary_min_depth = graph_distance_unreachable();
+            int probe_primary_max_depth = graph_distance_unreachable();
+            int probe_secondary_min_depth = graph_distance_unreachable();
             int probe_low = MEM_CONSOLE_GRAPH_NODE_LIMIT + 1;
             int probe_high = MEM_CONSOLE_GRAPH_NODE_LIMIT + 1;
             int should_shift = 0;
@@ -299,13 +508,62 @@ void mem_console_db_apply_graph_edge_priority(MemConsoleState *state, int edge_l
                 probe_to >= 0 && probe_to < node_count) {
                 probe_low = probe_from < probe_to ? probe_from : probe_to;
                 probe_high = probe_from > probe_to ? probe_from : probe_to;
+                probe_primary_min_depth = graph_edge_min_distance(primary_distances, node_count, probe_from, probe_to);
+                probe_primary_max_depth = graph_edge_max_distance(primary_distances, node_count, probe_from, probe_to);
+                probe_secondary_min_depth = graph_edge_min_distance(secondary_distances, node_count, probe_from, probe_to);
+                if (selected_index >= 0 &&
+                    (probe_from == selected_index || probe_to == selected_index)) {
+                    probe_touches_selected = 1;
+                }
+                if (center_index >= 0 &&
+                    (probe_from == center_index || probe_to == center_index)) {
+                    probe_touches_center = 1;
+                }
             }
 
-            if (probe_low > key_low) {
+            if (probe_touches_selected < key_touches_selected) {
                 should_shift = 1;
-            } else if (probe_low == key_low && probe_high > key_high) {
+            } else if (probe_touches_selected == key_touches_selected &&
+                       probe_primary_min_depth > key_primary_min_depth) {
                 should_shift = 1;
-            } else if (probe_low == key_low && probe_high == key_high && probe > key) {
+            } else if (probe_touches_selected == key_touches_selected &&
+                       probe_primary_min_depth == key_primary_min_depth &&
+                       probe_touches_center < key_touches_center) {
+                should_shift = 1;
+            } else if (probe_touches_selected == key_touches_selected &&
+                       probe_primary_min_depth == key_primary_min_depth &&
+                       probe_touches_center == key_touches_center &&
+                       probe_secondary_min_depth > key_secondary_min_depth) {
+                should_shift = 1;
+            } else if (probe_touches_selected == key_touches_selected &&
+                       probe_primary_min_depth == key_primary_min_depth &&
+                       probe_touches_center == key_touches_center &&
+                       probe_secondary_min_depth == key_secondary_min_depth &&
+                       probe_primary_max_depth > key_primary_max_depth) {
+                should_shift = 1;
+            } else if (probe_touches_selected == key_touches_selected &&
+                       probe_primary_min_depth == key_primary_min_depth &&
+                       probe_touches_center == key_touches_center &&
+                       probe_secondary_min_depth == key_secondary_min_depth &&
+                       probe_primary_max_depth == key_primary_max_depth &&
+                       probe_low > key_low) {
+                should_shift = 1;
+            } else if (probe_touches_selected == key_touches_selected &&
+                       probe_primary_min_depth == key_primary_min_depth &&
+                       probe_touches_center == key_touches_center &&
+                       probe_secondary_min_depth == key_secondary_min_depth &&
+                       probe_primary_max_depth == key_primary_max_depth &&
+                       probe_low == key_low &&
+                       probe_high > key_high) {
+                should_shift = 1;
+            } else if (probe_touches_selected == key_touches_selected &&
+                       probe_primary_min_depth == key_primary_min_depth &&
+                       probe_touches_center == key_touches_center &&
+                       probe_secondary_min_depth == key_secondary_min_depth &&
+                       probe_primary_max_depth == key_primary_max_depth &&
+                       probe_low == key_low &&
+                       probe_high == key_high &&
+                       probe > key) {
                 should_shift = 1;
             }
 
@@ -327,6 +585,8 @@ void mem_console_db_apply_graph_edge_priority(MemConsoleState *state, int edge_l
 
     free(kept_edges);
     free(order);
+    free(primary_distances);
+    free(secondary_distances);
 }
 
 void mem_console_db_compact_graph_by_node_kind(MemConsoleState *state) {

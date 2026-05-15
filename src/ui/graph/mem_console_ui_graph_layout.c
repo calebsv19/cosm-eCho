@@ -596,7 +596,6 @@ static CoreResult compute_graph_preview_layout(const MemConsoleState *state,
                                                KitGraphStructNodeLayout *out_layouts,
                                                int *out_has_graph_data) {
     KitGraphStructLayoutStyle style;
-    KitGraphStructViewport viewport;
     KitGraphStructViewport layout_viewport;
     char node_labels[MEM_CONSOLE_GRAPH_NODE_LIMIT][32];
     uint32_t node_count = 0u;
@@ -665,7 +664,6 @@ static CoreResult compute_graph_preview_layout(const MemConsoleState *state,
     }
 
     mem_console_ui_graph_configure_layout_style(&style);
-    viewport = state->graph_viewport;
     kit_graph_struct_viewport_default(&layout_viewport);
 
     (void)render_ctx;
@@ -707,17 +705,24 @@ static CoreResult compute_graph_preview_layout(const MemConsoleState *state,
             return result;
         }
         mem_console_ui_graph_transpose_layouts_to_horizontal_flow(world_bounds, out_layouts, node_count);
-        if (state->graph_scope_full_mode_enabled && has_graph_data) {
+        if (mem_console_graph_view_mode_get(state) == MEM_CONSOLE_GRAPH_VIEW_PODS && has_graph_data) {
             apply_project_pod_layout(world_bounds, state, out_layouts, node_count);
-        } else if (has_graph_data) {
+        } else if (mem_console_graph_view_mode_get(state) == MEM_CONSOLE_GRAPH_VIEW_FOCUS && has_graph_data) {
             mem_console_ui_graph_apply_focus_anchor_priority_layout(world_bounds,
                                                state,
                                                out_edges,
                                                edge_count,
                                                out_layouts,
                                                node_count);
+        } else if (mem_console_graph_view_mode_get(state) == MEM_CONSOLE_GRAPH_VIEW_WEB && has_graph_data) {
+            apply_free_web_layout(world_bounds,
+                                  state,
+                                  out_edges,
+                                  edge_count,
+                                  out_layouts,
+                                  node_count);
         }
-        graph_camera_apply_to_layouts(out_layouts, node_count, &viewport, bounds);
+        graph_camera_apply_to_layouts(out_layouts, node_count, state, bounds);
     }
 
     *out_node_count = node_count;

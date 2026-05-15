@@ -9,3 +9,6 @@ This lane holds deterministic verification checks for `mem_console`.
 - `run_data_path_contract_checks.sh`: deterministic S1-S4 data-path contract conformance checks used by:
   - `make -C mem_console test`
   - `make -C mem_console run-data-path-contract-checks`
+- `run_graph_contract_checks.sh`: deterministic S5 graph contract conformance checks used by:
+  - `make -C mem_console test`
+  - `make -C mem_console run-graph-contract-checks`

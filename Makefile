@@ -162,6 +162,7 @@ APP_SRCS := src/app/mem_console.c \
 	src/ui/graph/mem_console_ui_graph_hud.c \
 	src/ui/graph/mem_console_ui_graph_layout.c \
 	src/ui/graph/mem_console_ui_graph_layout_focus_helpers.c \
+	src/ui/graph/mem_console_ui_graph_mode_policy.c \
 	src/ui/graph/mem_console_ui_graph_overlay.c \
 	src/ui/graph/mem_console_ui_graph_project_pods.c \
 	src/ui/graph/mem_console_ui_graph_types.c \
@@ -241,7 +242,7 @@ COMPILER_STAMP_DIR := $(TOOLCHAIN_BUILD_ROOT)/$(BUILD_TOOLCHAIN)/compiler
 COMPILER_STAMP := $(COMPILER_STAMP_DIR)/$(BUILD_TOOLCHAIN).stamp
 SHARED_CC := $(HOST_CC) $(ARCH_FLAGS)
 
-.PHONY: all clean run run-demo vk-renderer-lib test run-headless-smoke run-data-path-contract-checks visual-harness package-build-lane package-desktop package-desktop-smoke package-desktop-self-test package-desktop-copy-desktop package-desktop-sync package-desktop-open package-desktop-remove package-desktop-refresh release-contract release-clean release-build release-bundle-audit release-sign release-verify release-verify-signed release-notarize release-staple release-verify-notarized release-artifact release-distribute release-desktop-refresh FORCE
+.PHONY: all clean run run-demo vk-renderer-lib test run-headless-smoke run-data-path-contract-checks run-graph-contract-checks visual-harness package-build-lane package-desktop package-desktop-smoke package-desktop-self-test package-desktop-copy-desktop package-desktop-sync package-desktop-open package-desktop-remove package-desktop-refresh release-contract release-clean release-build release-bundle-audit release-sign release-verify release-verify-signed release-notarize release-staple release-verify-notarized release-artifact release-distribute release-desktop-refresh FORCE
 
 all: $(BIN)
 
@@ -302,12 +303,16 @@ run-demo: $(BIN)
 test:
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-headless-smoke
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-data-path-contract-checks
+	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-graph-contract-checks
 
 run-headless-smoke: $(BIN)
 	@BIN_PATH="$(BIN)" ./tests/run_headless_smoke.sh
 
 run-data-path-contract-checks:
 	./tests/run_data_path_contract_checks.sh
+
+run-graph-contract-checks:
+	./tests/run_graph_contract_checks.sh
 
 visual-harness: $(BIN)
 	@echo "visual harness build gate ready: $(BIN)"

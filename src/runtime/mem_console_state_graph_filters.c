@@ -74,6 +74,101 @@ int mem_console_graph_layout_mode_clamp(int value) {
     return MEM_CONSOLE_GRAPH_LAYOUT_TREE;
 }
 
+int mem_console_graph_view_mode_clamp(int value) {
+    if (value == MEM_CONSOLE_GRAPH_VIEW_PODS) {
+        return MEM_CONSOLE_GRAPH_VIEW_PODS;
+    }
+    if (value == MEM_CONSOLE_GRAPH_VIEW_WEB) {
+        return MEM_CONSOLE_GRAPH_VIEW_WEB;
+    }
+    return MEM_CONSOLE_GRAPH_VIEW_FOCUS;
+}
+
+int mem_console_graph_view_mode_get(const MemConsoleState *state) {
+    if (!state) {
+        return MEM_CONSOLE_GRAPH_VIEW_FOCUS;
+    }
+    if (!state->graph_scope_full_mode_enabled) {
+        return MEM_CONSOLE_GRAPH_VIEW_FOCUS;
+    }
+    if (state->graph_layout_mode == MEM_CONSOLE_GRAPH_LAYOUT_TREE) {
+        return MEM_CONSOLE_GRAPH_VIEW_PODS;
+    }
+    return MEM_CONSOLE_GRAPH_VIEW_WEB;
+}
+
+void mem_console_graph_view_mode_reset_viewport(MemConsoleState *state) {
+    int view_mode;
+
+    if (!state) {
+        return;
+    }
+
+    kit_graph_struct_viewport_default(&state->graph_viewport);
+    view_mode = mem_console_graph_view_mode_get(state);
+    if (view_mode == MEM_CONSOLE_GRAPH_VIEW_PODS) {
+        state->graph_viewport.zoom = 0.94f;
+    } else if (view_mode == MEM_CONSOLE_GRAPH_VIEW_WEB) {
+        state->graph_viewport.zoom = 1.02f;
+    } else {
+        state->graph_viewport.zoom = 1.14f;
+    }
+}
+
+int mem_console_graph_view_mode_set(MemConsoleState *state, int view_mode) {
+    int current_view_mode;
+    int changed = 0;
+
+    if (!state) {
+        return 0;
+    }
+
+    current_view_mode = mem_console_graph_view_mode_get(state);
+    view_mode = mem_console_graph_view_mode_clamp(view_mode);
+
+    switch (view_mode) {
+        case MEM_CONSOLE_GRAPH_VIEW_PODS:
+            if (!state->graph_scope_full_mode_enabled) {
+                state->graph_scope_full_mode_enabled = 1;
+                changed = 1;
+            }
+            if (state->graph_layout_mode != MEM_CONSOLE_GRAPH_LAYOUT_TREE) {
+                state->graph_layout_mode = MEM_CONSOLE_GRAPH_LAYOUT_TREE;
+                changed = 1;
+            }
+            break;
+        case MEM_CONSOLE_GRAPH_VIEW_WEB:
+            if (!state->graph_scope_full_mode_enabled) {
+                state->graph_scope_full_mode_enabled = 1;
+                changed = 1;
+            }
+            if (state->graph_layout_mode != MEM_CONSOLE_GRAPH_LAYOUT_DAG) {
+                state->graph_layout_mode = MEM_CONSOLE_GRAPH_LAYOUT_DAG;
+                changed = 1;
+            }
+            break;
+        case MEM_CONSOLE_GRAPH_VIEW_FOCUS:
+        default:
+            if (state->graph_scope_full_mode_enabled) {
+                state->graph_scope_full_mode_enabled = 0;
+                changed = 1;
+            }
+            if (state->graph_layout_mode != MEM_CONSOLE_GRAPH_LAYOUT_DAG) {
+                state->graph_layout_mode = MEM_CONSOLE_GRAPH_LAYOUT_DAG;
+                changed = 1;
+            }
+            break;
+    }
+
+    if (current_view_mode != view_mode) {
+        changed = 1;
+    }
+    if (changed && current_view_mode != view_mode) {
+        mem_console_graph_view_mode_reset_viewport(state);
+    }
+    return changed;
+}
+
 int mem_console_graph_sort_mode_clamp(int value) {
     if (value != MEM_CONSOLE_GRAPH_SORT_OLDEST_FIRST) {
         return MEM_CONSOLE_GRAPH_SORT_RECENT_FIRST;
