@@ -1,6 +1,8 @@
-# mem_console
+# eCho
 
-`mem_console` is the standalone Memory Console host for the Memory DB system.
+`eCho` is the standalone Memory Console host for the Memory DB system.
+
+The repository and source-level program key remain `mem_console`.
 
 This is a top-level program host, not a reusable shared kit.
 

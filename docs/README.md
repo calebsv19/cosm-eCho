@@ -1,6 +1,8 @@
-# mem_console Docs
+# eCho Docs
 
-This directory tracks the scaffold-oriented documentation lanes for `mem_console`.
+This directory tracks the scaffold-oriented documentation lanes for `eCho`.
+
+Repository and source-level identifiers still use `mem_console`.
 
 ## Files
 - `current_truth.md`: implemented behavior and structure that is live now.

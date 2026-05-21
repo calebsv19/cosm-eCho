@@ -1,8 +1,9 @@
-# mem_console Current Truth
+# eCho Current Truth
 
-Last updated: 2026-05-07
+Last updated: 2026-05-21
 
 ## Program Identity
+- Product name: `eCho`
 - Repository/program directory: `mem_console`
 - Canonical symbol/file prefix: `mem_console`
 - Primary private planning bucket:
@@ -37,6 +38,25 @@ Last updated: 2026-05-07
   - `Enter` applies; `Esc` or toggle-out cancels and restores the entry baseline
   - accepted changes persist through the existing per-DB `.ui.pack`
 
+## Runtime and Data Path Contract
+- Active DB startup resolution is explicit:
+  1. `CODEWORK_MEMDB_PATH` when set
+  2. last-used DB path from app prefs under `<output_root>/mem_console.app.pack`
+  3. fallback default DB at
+     `~/Library/Application Support/MemConsole/runtime/default.sqlite` on
+     macOS or `mem_console/data/default.sqlite` otherwise
+- Path roots are normalized together:
+  - `output_root` prefers the mutable app-data/runtime root when available
+  - `input_root` falls back to the active DB parent when no explicit
+    input-root hint survives normalization
+- In-session `LOAD DB` and `NEW DB` keep the same contract:
+  - `LOAD DB` uses the entered path directly
+  - `NEW DB` creates a bare-name target under `input_root` and uses explicit
+    paths directly
+- App-level startup prefs stay separate from per-DB UI prefs:
+  - app prefs default to `<output_root>/mem_console.app.pack`
+  - per-DB UI prefs persist in `<db_path>.ui.pack`
+
 ## Structure
 - Required lanes: `docs/`, `src/`, `include/`, `tests/`, `build/`
 - Support lanes: `data/`, `demo/`, `tmp/`, `third_party/`, `ide_files/`
@@ -57,7 +77,8 @@ Last updated: 2026-05-07
   - `make -C mem_console test`
   - `make -C mem_console run-data-path-contract-checks`
   - `make -C mem_console run-headless-smoke`
-  - `make -C mem_console visual-harness`
+  - `make -C mem_console visual-harness` builds the visual runtime target and
+    prints readiness output, but does not execute the interactive shell
 - Packaging gates:
   - `make -C mem_console package-desktop`
   - `make -C mem_console package-desktop-smoke`
