@@ -27,15 +27,15 @@ check_contains ".local/share/mem_console/mem_console.app.pack" \
 
 # S3 matrix lock: open/switch is reference mode and returns before suffix rewrite.
 check_contains "if (!state->db_modal_create_mode) {" \
-    "${ROOT_DIR}/src/runtime/mem_console_state.c"
+    "${ROOT_DIR}/src/runtime/mem_console_state_db_picker.c"
 check_contains "Open/switch is explicit reference mode: use the selected path as typed." \
-    "${ROOT_DIR}/src/runtime/mem_console_state.c"
+    "${ROOT_DIR}/src/runtime/mem_console_state_db_picker.c"
 
 # S3 create-name behavior: bare names route under input_root with sqlite suffix.
 check_contains "path_has_sqlite_suffix(out_path) ? \"%s/%s\" : \"%s/%s.sqlite\"" \
-    "${ROOT_DIR}/src/runtime/mem_console_state.c"
+    "${ROOT_DIR}/src/runtime/mem_console_state_db_picker.c"
 check_contains "const char *create_root = state->input_root[0] ? state->input_root : state->output_root;" \
-    "${ROOT_DIR}/src/runtime/mem_console_state.c"
+    "${ROOT_DIR}/src/runtime/mem_console_state_db_picker.c"
 
 # S2 keyboard controls remain present.
 check_contains "MEM_CONSOLE_ACTION_BEGIN_INPUT_ROOT_PICKER" \
@@ -45,9 +45,9 @@ check_contains "MEM_CONSOLE_ACTION_PICK_INPUT_ROOT_FOLDER" \
 
 # S6 list-picker behavior for LOAD DB.
 check_contains "void mem_console_db_picker_rescan_entries(" \
-    "${ROOT_DIR}/src/runtime/mem_console_state.c"
+    "${ROOT_DIR}/src/runtime/mem_console_state_db_picker.c"
 check_contains "int mem_console_db_picker_move_selection(" \
-    "${ROOT_DIR}/src/runtime/mem_console_state.c"
+    "${ROOT_DIR}/src/runtime/mem_console_state_db_picker.c"
 check_contains "db_picker_entry_names" \
     "${ROOT_DIR}/include/mem_console/mem_console_types.h"
 check_contains "db_picker_entry_paths" \

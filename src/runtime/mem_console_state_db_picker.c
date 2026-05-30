@@ -340,6 +340,7 @@ int mem_console_db_picker_build_path(const MemConsoleState *state,
     }
 
     if (!state->db_modal_create_mode) {
+        /* Open/switch is explicit reference mode: use the selected path as typed. */
         return 1;
     }
 
