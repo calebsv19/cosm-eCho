@@ -1,6 +1,6 @@
 # eCho Current Truth
 
-Last updated: 2026-05-21
+Last updated: 2026-05-30
 
 ## Program Identity
 - Product name: `eCho`
@@ -65,6 +65,7 @@ Last updated: 2026-05-21
 - Recent helper seams added in the live worktree:
   - `src/app/mem_console_app_loop_input.c`
   - `src/runtime/mem_console_runtime_refresh.c`
+  - `src/runtime/mem_console_state_db_picker.c`
   - corresponding internal headers for loop/runtime decomposition
 - Workspace Authoring seams:
   - `include/mem_console/mem_console_workspace_authoring.h`
@@ -74,9 +75,11 @@ Last updated: 2026-05-21
 ## Verification Contract
 - Core gates:
   - `make -C mem_console clean && make -C mem_console`
-  - `make -C mem_console test`
+  - `make -C mem_console test` aggregates the headless, data-path, and graph
+    contract checks
   - `make -C mem_console run-data-path-contract-checks`
   - `make -C mem_console run-headless-smoke`
+  - `make -C mem_console run-graph-contract-checks`
   - `make -C mem_console visual-harness` builds the visual runtime target and
     prints readiness output, but does not execute the interactive shell
 - Packaging gates:
