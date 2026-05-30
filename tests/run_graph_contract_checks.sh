@@ -52,15 +52,15 @@ check_contains "label = \"WEB\";" \
 
 # S5 center-aware budgeting: broad/full graph loads reserve the root neighborhood first.
 check_contains "static CoreResult load_priority_graph_nodes(CoreMemDb *db," \
-    "${ROOT_DIR}/src/db/mem_console_db.c"
+    "${ROOT_DIR}/src/db/mem_console_db_graph_load.c"
 check_contains "priority_root_item_id = graph_priority_root_item_id(state);" \
-    "${ROOT_DIR}/src/db/mem_console_db.c"
+    "${ROOT_DIR}/src/db/mem_console_db_graph_load.c"
 check_contains "result = load_priority_graph_nodes(db," \
-    "${ROOT_DIR}/src/db/mem_console_db.c"
+    "${ROOT_DIR}/src/db/mem_console_db_graph_load.c"
 check_contains "result = load_full_scope_graph_nodes(db, state, sort_oldest_first);" \
-    "${ROOT_DIR}/src/db/mem_console_db.c"
+    "${ROOT_DIR}/src/db/mem_console_db_graph_load.c"
 check_contains "state->graph_center_item_id = state->selected_item_id;" \
-    "${ROOT_DIR}/src/db/mem_console_db.c"
+    "${ROOT_DIR}/src/db/mem_console_db_graph_load.c"
 
 # S5 node/edge ranking: distance-aware prioritization must remain active.
 check_contains "static void graph_compute_node_distances(const MemConsoleState *state," \

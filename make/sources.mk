@@ -9,15 +9,18 @@ APP_SRCS := src/app/mem_console.c \
 	src/app/mem_console_workspace_authoring_host.c \
 	src/app/mem_console_kernel_bridge.c \
 	src/db/mem_console_db.c \
+	src/db/mem_console_db_graph_load.c \
 	src/db/mem_console_db_graph_sort.c \
 	src/db/mem_console_db_filters.c \
 	src/db/mem_console_db_mutations.c \
 	src/db/mem_console_db_reads.c \
 	src/runtime/mem_console_prefs.c \
+	src/runtime/mem_console_prefs_versions.c \
 	src/runtime/mem_console_prefs_app_io.c \
 	src/runtime/mem_console_runtime.c \
 	src/runtime/mem_console_runtime_refresh.c \
 	src/runtime/mem_console_state.c \
+	src/runtime/mem_console_state_db_picker.c \
 	src/runtime/mem_console_state_core.c \
 	src/runtime/mem_console_state_graph_filters.c \
 	src/runtime/mem_console_state_paths.c \
@@ -28,6 +31,7 @@ APP_SRCS := src/app/mem_console.c \
 	src/ui/mem_console_ui_chrome.c \
 	src/ui/mem_console_ui_common.c \
 	src/ui/mem_console_ui_detail_panel.c \
+	src/ui/mem_console_ui_detail_references.c \
 	src/ui/mem_console_ui_detail_section.c \
 	src/ui/mem_console_ui_hud.c \
 	src/ui/mem_console_workspace_authoring_overlay.c \
