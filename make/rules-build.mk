@@ -42,7 +42,7 @@ $(eval $(call build_copy_static_lib,CORE_PACK,,$(CORE_BASE_LIB)))
 $(eval $(call build_copy_static_lib,VK_RENDERER,,))
 
 $(BIN): $(APP_OBJS) $(APP_SHARED_LIBS) | $(BIN_DIR)
-	$(HOST_CC) $(ARCH_FLAGS) $(CFLAGS) $(INC) $(APP_OBJS) $(APP_SHARED_LIBS) $(VULKAN_LIBS) $(SDL_LIBS) $(SDL_TTF_LIBS) $(APPLE_FW) -lm -o $@
+	$(HOST_CC) $(ARCH_FLAGS) $(CFLAGS) $(INC) $(APP_OBJS) $(APP_SHARED_LIBS) $(VULKAN_LIBS) $(SDL_LIBS) $(SDL_TTF_LIBS) $(APPLE_FW) -lm $(FISICS_MEMCHECK_LINK_LIBS) -o $@
 
 clean:
 	rm -rf $(BUILD_ROOT)

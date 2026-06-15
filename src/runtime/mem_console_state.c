@@ -218,6 +218,8 @@ void mem_console_select_item_for_navigation(MemConsoleState *state,
     state->selected_created_ns = 0;
     state->title_edit_mode = 0;
     state->body_edit_mode = 0;
+    state->detail_connection_scroll = 0.0f;
+    state->relationship_action_link_id = 0;
     state->input_target = MEM_CONSOLE_INPUT_SEARCH;
     if (enable_graph_mode) {
         state->graph_mode_enabled = 1;

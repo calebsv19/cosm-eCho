@@ -12,6 +12,9 @@ test:
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-headless-smoke
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-data-path-contract-checks
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-graph-contract-checks
+	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-detail-relationship-contract-checks
+	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-relationship-mutation-test
+	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-browse-filter-contract-checks
 
 run-headless-smoke: $(BIN)
 	@BIN_PATH="$(BIN)" ./tests/run_headless_smoke.sh
@@ -31,6 +34,26 @@ run-data-path-contract-checks:
 
 run-graph-contract-checks:
 	./tests/run_graph_contract_checks.sh
+
+run-detail-relationship-contract-checks:
+	./tests/run_detail_relationship_contract_checks.sh
+
+run-relationship-mutation-test:
+	@mkdir -p $(TARGET_BUILD_ROOT)/tests
+	@echo "Compiling mem_console relationship mutation test..."
+	@$(HOST_CC) $(CFLAGS) -DSQLITE_ENABLE_FTS5 $(INC) \
+		tests/mem_console_relationship_mutation_test.c \
+		src/db/mem_console_db_relationship_mutations.c \
+		$(CORE_MEMDB_DIR)/src/core_memdb.c \
+		$(CORE_MEMDB_DIR)/external/sqlite3.c \
+		$(CORE_BASE_DIR)/src/core_base.c \
+		-o $(TARGET_BUILD_ROOT)/tests/mem_console_relationship_mutation_test \
+		-lm || (echo "mem_console relationship mutation test compile failed."; exit 1)
+	@echo "Running mem_console relationship mutation test..."
+	@$(TARGET_BUILD_ROOT)/tests/mem_console_relationship_mutation_test || (echo "mem_console relationship mutation test failed."; exit 1)
+
+run-browse-filter-contract-checks:
+	./tests/run_browse_filter_contract_checks.sh
 
 visual-harness: $(BIN)
 	@echo "visual harness build gate ready: $(BIN)"

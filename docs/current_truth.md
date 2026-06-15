@@ -1,6 +1,6 @@
 # eCho Current Truth
 
-Last updated: 2026-05-30
+Last updated: 2026-06-14
 
 ## Program Identity
 - Product name: `eCho`
@@ -24,6 +24,30 @@ Last updated: 2026-05-30
   - bounded edge-kind filters
   - node-kind filters
   - scope-full project pod overlays
+  - `FOCUS` mode with stronger selected-root composition, ranked hop-1
+    neighbors, earlier emphasized labels, and de-emphasized non-selected edges
+  - `WEB` mode now uses a dedicated topology helper that separates visible
+    connected components into islands and ranks bridge/high-degree
+    cross-project nodes toward component centers
+- Selected-memory detail now includes a relationship inspector:
+  - bounded `mem_link` rows load beside the selected title/body
+  - inbound/outbound groups are separated by link kind
+  - rows show neighbor id, project, kind, and title
+  - row clicks select the neighbor through the shared list/graph navigation
+    transition and refresh graph/detail
+  - a compact target-id input can add a selected-memory outgoing `related`
+    link to an active target memory
+  - row-scoped `KIND` and `DEL` controls change or remove only links that
+    touch the selected memory
+- Left browse is now a faceted investigation path:
+  - search and project filters remain the base query controls
+  - pinned-only, canonical-only, and kind-cycle facets narrow the list without
+    changing the DB model
+  - matching count and visible list windows both honor the same browse facets
+  - async refresh captures browse facets as part of request intent so stale
+    unfiltered results are not applied after a facet change
+  - result rows show id, pinned/canonical flags, project, kind, compact updated
+    time, and title in a stable scan order
 - DB switching/input-root flows are active in-app:
   - `LOAD DB` and `NEW DB` path modal flow
   - discovered `.sqlite` selection from `input_root`
@@ -80,6 +104,9 @@ Last updated: 2026-05-30
   - `make -C mem_console run-data-path-contract-checks`
   - `make -C mem_console run-headless-smoke`
   - `make -C mem_console run-graph-contract-checks`
+  - `make -C mem_console run-detail-relationship-contract-checks`
+  - `make -C mem_console run-relationship-mutation-test`
+  - `make -C mem_console run-browse-filter-contract-checks`
   - `make -C mem_console visual-harness` builds the visual runtime target and
     prints readiness output, but does not execute the interactive shell
 - Packaging gates:
@@ -104,8 +131,10 @@ Last updated: 2026-05-30
   - launcher now seeds real runtime shader copies for Intel retest safety
 
 ## Current Boundary
-- Manual visual acceptance for the new Workspace Authoring host is the next runtime check.
-- After acceptance, continue graph/UI affordance hardening under the existing verification contract.
+- Continue `MCU1-S6` with repeatable visual verification fixtures for graph
+  readability across `FOCUS`, `PODS`, and `WEB`.
+- Manual visual acceptance for the Workspace Authoring host remains a separate
+  runtime check.
 
 ## History and Deep Lane References
 - Full execution history is in:

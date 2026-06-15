@@ -11,7 +11,7 @@ fail() {
 check_contains() {
     local pattern="$1"
     local file="$2"
-    if ! rg -n --fixed-strings "${pattern}" "${file}" >/dev/null; then
+    if ! rg -n --fixed-strings -e "${pattern}" "${file}" >/dev/null; then
         fail "missing pattern in ${file}: ${pattern}"
     fi
 }
@@ -74,4 +74,36 @@ check_contains "probe_primary_min_depth > key_primary_min_depth" \
 check_contains "probe_touches_selected < key_touches_selected" \
     "${ROOT_DIR}/src/db/mem_console_db_graph_sort.c"
 
-echo "graph contract checks ok: S5 invariants present"
+# MCU1-S1 focus readability contract: selected-root focus mode keeps primary
+# neighbors visually ranked and keeps non-root edges from dominating the view.
+check_contains "static void focus_layout_rank_root_neighbors(" \
+    "${ROOT_DIR}/src/ui/graph/mem_console_ui_graph_layout_focus_helpers.c"
+check_contains "static float focus_primary_neighbor_angle(" \
+    "${ROOT_DIR}/src/ui/graph/mem_console_ui_graph_layout_focus_helpers.c"
+check_contains "focus_layout_rank_root_neighbors(edges," \
+    "${ROOT_DIR}/src/ui/graph/mem_console_ui_graph_layout_focus_helpers.c"
+check_contains "edge_touches_selected" \
+    "${ROOT_DIR}/src/ui/graph/mem_console_ui_graph_draw.c"
+check_contains "return emphasized_node ? 0.68f : 0.90f;" \
+    "${ROOT_DIR}/src/ui/graph/mem_console_ui_graph_mode_policy.c"
+
+# MCU1-S5 free-web topology contract: WEB owns a dedicated topology helper
+# with component discovery, bridge scoring, and separated component anchors.
+check_contains "src/ui/graph/mem_console_ui_graph_layout_web.c" \
+    "${ROOT_DIR}/make/sources.mk"
+check_contains "void apply_free_web_layout(KitRenderRect bounds," \
+    "${ROOT_DIR}/src/ui/graph/mem_console_ui_graph_layout_web.c"
+check_contains "static void web_discover_components(" \
+    "${ROOT_DIR}/src/ui/graph/mem_console_ui_graph_layout_web.c"
+check_contains "static void web_compute_degree_and_bridge_score(" \
+    "${ROOT_DIR}/src/ui/graph/mem_console_ui_graph_layout_web.c"
+check_contains "static void web_component_anchor_for_rank(" \
+    "${ROOT_DIR}/src/ui/graph/mem_console_ui_graph_layout_web.c"
+check_contains "static void web_place_component_nodes(" \
+    "${ROOT_DIR}/src/ui/graph/mem_console_ui_graph_layout_web.c"
+check_contains "web_sort_nodes_by_bridge_score(bridge_score, degree, node_indices, count);" \
+    "${ROOT_DIR}/src/ui/graph/mem_console_ui_graph_layout_web.c"
+check_contains "apply_free_web_layout(world_bounds," \
+    "${ROOT_DIR}/src/ui/graph/mem_console_ui_graph_layout.c"
+
+echo "graph contract checks ok: S5 + MCU1-S1 + MCU1-S5 invariants present"

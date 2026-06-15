@@ -12,6 +12,15 @@ CoreResult set_selected_flag(CoreMemDb *db,
                              const MemConsoleState *state,
                              const char *field_name,
                              int field_value);
+CoreResult create_selected_relationship_to_target(CoreMemDb *db,
+                                                  const MemConsoleState *state,
+                                                  int64_t *out_link_id);
+CoreResult cycle_selected_relationship_kind(CoreMemDb *db,
+                                            const MemConsoleState *state,
+                                            int64_t *out_link_id);
+CoreResult remove_selected_relationship(CoreMemDb *db,
+                                        const MemConsoleState *state,
+                                        int64_t *out_link_id);
 
 CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state);
 CoreResult refresh_state_from_db(CoreMemDb *db, MemConsoleState *state);

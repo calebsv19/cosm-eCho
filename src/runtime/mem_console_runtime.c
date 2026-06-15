@@ -139,6 +139,9 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
     int64_t current_selected_item_id = 0;
     int64_t current_graph_center_item_id = 0;
     int current_list_query_offset = 0;
+    int current_browse_pinned_only = 0;
+    int current_browse_canonical_only = 0;
+    int current_browse_kind_index = 0;
     char current_selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
     int current_selected_project_count = 0;
     char current_graph_kind_filter[32];
@@ -175,6 +178,9 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                                                   &current_selected_item_id,
                                                   &current_graph_center_item_id,
                                                   &current_list_query_offset,
+                                                  &current_browse_pinned_only,
+                                                  &current_browse_canonical_only,
+                                                  &current_browse_kind_index,
                                                   current_selected_project_keys,
                                                   &current_selected_project_count,
                                                   current_graph_kind_filter,
@@ -198,6 +204,9 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                                             current_selected_item_id,
                                             current_graph_center_item_id,
                                             current_list_query_offset,
+                                            current_browse_pinned_only,
+                                            current_browse_canonical_only,
+                                            current_browse_kind_index,
                                             current_selected_project_keys,
                                             current_selected_project_count,
                                             current_graph_kind_filter,
@@ -214,6 +223,9 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                                             runtime->in_flight_selected_item_id,
                                             runtime->in_flight_graph_center_item_id,
                                             runtime->in_flight_list_query_offset,
+                                            runtime->in_flight_browse_pinned_only,
+                                            runtime->in_flight_browse_canonical_only,
+                                            runtime->in_flight_browse_kind_index,
                                             runtime->in_flight_selected_project_keys,
                                             runtime->in_flight_selected_project_count,
                                             runtime->in_flight_graph_kind_filter,
@@ -231,6 +243,9 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                                                 current_selected_item_id,
                                                 current_graph_center_item_id,
                                                 current_list_query_offset,
+                                                current_browse_pinned_only,
+                                                current_browse_canonical_only,
+                                                current_browse_kind_index,
                                                 current_selected_project_keys,
                                                 current_selected_project_count,
                                                 current_graph_kind_filter,
@@ -247,6 +262,9 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                                                 runtime->pending_selected_item_id,
                                                 runtime->pending_graph_center_item_id,
                                                 runtime->pending_list_query_offset,
+                                                runtime->pending_browse_pinned_only,
+                                                runtime->pending_browse_canonical_only,
+                                                runtime->pending_browse_kind_index,
                                                 runtime->pending_selected_project_keys,
                                                 runtime->pending_selected_project_count,
                                                 runtime->pending_graph_kind_filter,
@@ -268,6 +286,10 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
             runtime->pending_selected_item_id = current_selected_item_id;
             runtime->pending_graph_center_item_id = current_graph_center_item_id;
             runtime->pending_list_query_offset = current_list_query_offset;
+            runtime->pending_browse_pinned_only = current_browse_pinned_only ? 1 : 0;
+            runtime->pending_browse_canonical_only = current_browse_canonical_only ? 1 : 0;
+            runtime->pending_browse_kind_index =
+                mem_console_browse_kind_index_clamp(current_browse_kind_index);
             mem_console_runtime_copy_selected_project_filters(runtime->pending_selected_project_keys,
                                                               &runtime->pending_selected_project_count,
                                                               current_selected_project_keys,
@@ -336,6 +358,9 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
         if (completion->selected_item_id != state->selected_item_id ||
             completion->graph_center_item_id != state->graph_center_item_id ||
             completion->list_query_offset != state->list_query_offset ||
+            completion->browse_pinned_only != (state->browse_pinned_only ? 1 : 0) ||
+            completion->browse_canonical_only != (state->browse_canonical_only ? 1 : 0) ||
+            completion->browse_kind_index != mem_console_browse_kind_index_clamp(state->browse_kind_index) ||
             strcmp(completion->search_text, state->search_text) != 0 ||
             strcmp(completion->graph_kind_filter, state->graph_kind_filter) != 0 ||
             completion->graph_kind_filter_mask != state_graph_kind_filter_mask ||
@@ -413,6 +438,10 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
         pending_state.selected_item_id = runtime->pending_selected_item_id;
         pending_state.graph_center_item_id = runtime->pending_graph_center_item_id;
         pending_state.list_query_offset = runtime->pending_list_query_offset;
+        pending_state.browse_pinned_only = runtime->pending_browse_pinned_only ? 1 : 0;
+        pending_state.browse_canonical_only = runtime->pending_browse_canonical_only ? 1 : 0;
+        pending_state.browse_kind_index =
+            mem_console_browse_kind_index_clamp(runtime->pending_browse_kind_index);
         mem_console_runtime_copy_selected_project_filters(pending_state.selected_project_keys,
                                                           &pending_state.selected_project_count,
                                                           runtime->pending_selected_project_keys,
@@ -444,6 +473,9 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                                                pending_state.selected_item_id,
                                                pending_state.graph_center_item_id,
                                                pending_state.list_query_offset,
+                                               pending_state.browse_pinned_only,
+                                               pending_state.browse_canonical_only,
+                                               pending_state.browse_kind_index,
                                                pending_state.selected_project_keys,
                                                pending_state.selected_project_count,
                                                pending_state.graph_kind_filter,
@@ -460,6 +492,9 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                                                state->selected_item_id,
                                                state->graph_center_item_id,
                                                state->list_query_offset,
+                                               state->browse_pinned_only,
+                                               state->browse_canonical_only,
+                                               state->browse_kind_index,
                                                state->selected_project_keys,
                                                state->selected_project_count,
                                                state->graph_kind_filter,

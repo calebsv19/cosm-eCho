@@ -1,12 +1,14 @@
 #include "mem_console_ui_left_section.h"
 
 #include "mem_console_ui_common.h"
+#include "mem_console_ui_left_browse_filters.h"
 #include "mem_console_ui_left_panel.h"
 
 #include <SDL2/SDL.h>
 #include <limits.h>
 #include <math.h>
 #include <stdio.h>
+#include <time.h>
 
 static float left_panel_clampf(float value, float min_value, float max_value) {
     if (value < min_value) {
@@ -69,6 +71,7 @@ static void left_panel_compute_bounds(const MemConsoleState *state,
                 (layout_cfg->left_reload_h * 2.0f) +
                 (layout_cfg->left_section_h * 2.0f) +
                 layout_cfg->left_search_h +
+                48.0f +
                 layout_cfg->left_project_filters_h +
                 (ui_gap * 8.0f) +
                 8.0f;
@@ -142,6 +145,33 @@ static void left_panel_compute_bounds(const MemConsoleState *state,
     if (out_max_ratio) {
         *out_max_ratio = max_ratio;
     }
+}
+
+static void left_panel_format_updated_ns(int64_t updated_ns, char *out_text, size_t out_cap) {
+    time_t seconds;
+    struct tm tm_value;
+
+    if (!out_text || out_cap == 0u) {
+        return;
+    }
+    out_text[0] = '\0';
+    if (updated_ns <= 0) {
+        (void)snprintf(out_text, out_cap, "time ?");
+        return;
+    }
+
+    seconds = (time_t)(updated_ns / 1000000000LL);
+    if (localtime_r(&seconds, &tm_value) == NULL) {
+        (void)snprintf(out_text, out_cap, "time ?");
+        return;
+    }
+    (void)snprintf(out_text,
+                   out_cap,
+                   "%02d/%02d %02d:%02d",
+                   tm_value.tm_mon + 1,
+                   tm_value.tm_mday,
+                   tm_value.tm_hour,
+                   tm_value.tm_min);
 }
 
 int mem_console_ui_left_begin_panel_drag(MemConsoleState *state,
@@ -541,6 +571,21 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
     }
 
     {
+        KitRenderRect browse_box;
+        CoreResult result = kit_ui_stack_next(&top_layout, 48.0f, 0.0f, &browse_box);
+        if (result.code != CORE_OK) return result;
+        result = mem_console_ui_left_draw_browse_filters(render_ctx,
+                                                         ui_ctx,
+                                                         frame,
+                                                         state,
+                                                         input,
+                                                         browse_box,
+                                                         !has_any_edit_mode,
+                                                         io_action);
+        if (result.code != CORE_OK) return result;
+    }
+
+    {
         CoreResult result = kit_ui_stack_next(&top_layout, layout_cfg->left_section_h, 0.0f, &row);
         if (result.code != CORE_OK) return result;
         result = mem_console_ui_draw_info_line_custom(ui_ctx,
@@ -798,15 +843,25 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
                 }
 
                 {
+                    char updated_text[32];
+                    const char *project_text = state->visible_items[i].project_key[0]
+                                             ? state->visible_items[i].project_key
+                                             : "no_project";
+                    const char *kind_text = state->visible_items[i].kind[0]
+                                          ? state->visible_items[i].kind
+                                          : "note";
+                    left_panel_format_updated_ns(state->visible_items[i].updated_ns,
+                                                 updated_text,
+                                                 sizeof(updated_text));
                     (void)snprintf(state->list_item_labels[i],
                                    sizeof(state->list_item_labels[i]),
-                                   "%lld %s%s%s%s%s%s",
+                                   "%lld %s%s[%s/%s] %s | %s",
                                    (long long)state->visible_items[i].id,
-                                   state->visible_items[i].pinned ? "[P] " : "",
-                                   state->visible_items[i].canonical ? "[C] " : "",
-                                   state->visible_items[i].project_key[0] ? "[" : "",
-                                   state->visible_items[i].project_key[0] ? state->visible_items[i].project_key : "",
-                                   state->visible_items[i].project_key[0] ? "] " : "",
+                                   state->visible_items[i].pinned ? "P " : "",
+                                   state->visible_items[i].canonical ? "C " : "",
+                                   project_text,
+                                   kind_text,
+                                   updated_text,
                                    state->visible_items[i].title[0] ? state->visible_items[i].title : "UNTITLED");
                 }
 

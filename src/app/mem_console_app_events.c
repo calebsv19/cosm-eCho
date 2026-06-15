@@ -153,7 +153,8 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
                 if (ctrl_or_cmd && event->key.keysym.sym == SDLK_v) {
                     char *clipboard_text = SDL_GetClipboardText();
                     if (clipboard_text && clipboard_text[0] != '\0') {
-                        if (state->input_target == MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT) {
+                        if (state->input_target == MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT ||
+                            state->input_target == MEM_CONSOLE_INPUT_RELATIONSHIP_TARGET) {
                             append_graph_edge_limit_digits(state, clipboard_text);
                         } else {
                             append_active_input_text(state, clipboard_text);
@@ -233,6 +234,8 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
                         }
                     } else if (state->input_target == MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT) {
                         commit_graph_edge_limit_input(state, keyboard_action);
+                    } else if (state->input_target == MEM_CONSOLE_INPUT_RELATIONSHIP_TARGET) {
+                        *keyboard_action = MEM_CONSOLE_ACTION_ADD_RELATIONSHIP;
                     } else if (state->input_target == MEM_CONSOLE_INPUT_DB_PATH) {
                         *keyboard_action = MEM_CONSOLE_ACTION_CONFIRM_DB_PICKER;
                     } else {
@@ -244,7 +247,8 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
             break;
         case SDL_TEXTINPUT:
             mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_INPUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
-            if (state->input_target == MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT) {
+            if (state->input_target == MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT ||
+                state->input_target == MEM_CONSOLE_INPUT_RELATIONSHIP_TARGET) {
                 append_graph_edge_limit_digits(state, event->text.text);
             } else {
                 append_active_input_text(state, event->text.text);

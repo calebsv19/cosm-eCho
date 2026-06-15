@@ -20,8 +20,10 @@ enum {
     MEM_CONSOLE_SCOPE_FILTER_LIMIT = 16,
     MEM_CONSOLE_DETAIL_BODY_WRAP_LINE_LIMIT = 96,
     MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT = 48,
+    MEM_CONSOLE_DETAIL_RELATIONSHIP_LIMIT = 32,
     MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT = 12,
     MEM_CONSOLE_GRAPH_HUD_LINE_LIMIT = 64,
+    MEM_CONSOLE_BROWSE_KIND_COUNT = 8,
     MEM_CONSOLE_DB_PICKER_LIST_LIMIT = 64
 };
 
@@ -47,7 +49,13 @@ typedef enum MemConsoleAction {
     MEM_CONSOLE_ACTION_CONFIRM_DB_PICKER = 18,
     MEM_CONSOLE_ACTION_BEGIN_INPUT_ROOT_PICKER = 19,
     MEM_CONSOLE_ACTION_PICK_INPUT_ROOT_FOLDER = 20,
-    MEM_CONSOLE_ACTION_OPEN_REFERENCE_PATH = 21
+    MEM_CONSOLE_ACTION_OPEN_REFERENCE_PATH = 21,
+    MEM_CONSOLE_ACTION_ADD_RELATIONSHIP = 22,
+    MEM_CONSOLE_ACTION_CYCLE_RELATIONSHIP_KIND = 23,
+    MEM_CONSOLE_ACTION_REMOVE_RELATIONSHIP = 24,
+    MEM_CONSOLE_ACTION_TOGGLE_BROWSE_PINNED = 25,
+    MEM_CONSOLE_ACTION_TOGGLE_BROWSE_CANONICAL = 26,
+    MEM_CONSOLE_ACTION_CYCLE_BROWSE_KIND = 27
 } MemConsoleAction;
 
 typedef enum MemConsoleInputTarget {
@@ -55,7 +63,8 @@ typedef enum MemConsoleInputTarget {
     MEM_CONSOLE_INPUT_TITLE_EDIT = 1,
     MEM_CONSOLE_INPUT_BODY_EDIT = 2,
     MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT = 3,
-    MEM_CONSOLE_INPUT_DB_PATH = 4
+    MEM_CONSOLE_INPUT_DB_PATH = 4,
+    MEM_CONSOLE_INPUT_RELATIONSHIP_TARGET = 5
 } MemConsoleInputTarget;
 
 typedef enum MemConsoleRedrawReason {
@@ -85,6 +94,7 @@ typedef enum MemConsoleGraphSortMode {
 
 typedef struct MemConsoleListItem {
     int64_t id;
+    int64_t updated_ns;
     int pinned;
     int canonical;
     char title[160];
@@ -113,6 +123,18 @@ typedef struct MemConsoleGraphEdge {
     int to_index;
     char kind[32];
 } MemConsoleGraphEdge;
+
+typedef struct MemConsoleRelationshipItem {
+    int64_t link_id;
+    int64_t from_item_id;
+    int64_t to_item_id;
+    int64_t neighbor_item_id;
+    int outgoing;
+    char kind[32];
+    char neighbor_title[160];
+    char neighbor_project_key[64];
+    char neighbor_kind[64];
+} MemConsoleRelationshipItem;
 
 typedef struct MemConsoleState {
     const char *db_path;
@@ -158,6 +180,8 @@ typedef struct MemConsoleState {
     char graph_status_line[96];
     char graph_kind_filter[32];
     char graph_edge_limit_text[16];
+    char relationship_target_text[32];
+    char browse_filter_summary_line[128];
     char project_filter_summary_line[128];
     char list_item_labels[MEM_CONSOLE_LIST_FETCH_LIMIT][220];
     char project_filter_labels[MEM_CONSOLE_SCOPE_FILTER_LIMIT][96];
@@ -191,6 +215,11 @@ typedef struct MemConsoleState {
     int db_picker_entry_count;
     int db_picker_selected_index;
     int graph_edge_limit_cursor;
+    int relationship_target_cursor;
+    int64_t relationship_action_link_id;
+    int browse_pinned_only;
+    int browse_canonical_only;
+    int browse_kind_index;
     int graph_mode_enabled;
     int graph_query_edge_limit;
     int graph_query_hops;
@@ -275,6 +304,13 @@ typedef struct MemConsoleState {
     int detail_title_line_count;
     char detail_connection_summary_text[640];
     char detail_connection_summary_lines[MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT][256];
+    MemConsoleRelationshipItem detail_relationships[MEM_CONSOLE_DETAIL_RELATIONSHIP_LIMIT];
+    int detail_relationship_count;
+    int detail_relationship_out_count;
+    int detail_relationship_in_count;
+    char detail_relationship_summary_line[128];
+    char detail_relationship_group_labels[MEM_CONSOLE_DETAIL_RELATIONSHIP_LIMIT][96];
+    char detail_relationship_row_labels[MEM_CONSOLE_DETAIL_RELATIONSHIP_LIMIT][256];
     char detail_reference_path[1024];
     int64_t detail_reference_scan_item_id;
     int detail_reference_path_available;

@@ -12,3 +12,12 @@ This lane holds deterministic verification checks for `mem_console`.
 - `run_graph_contract_checks.sh`: deterministic S5 graph contract conformance checks used by:
   - `make -C mem_console test`
   - `make -C mem_console run-graph-contract-checks`
+- `run_detail_relationship_contract_checks.sh`: deterministic MCU1-S2 selected-detail relationship inspector checks used by:
+  - `make -C mem_console test`
+  - `make -C mem_console run-detail-relationship-contract-checks`
+- `mem_console_relationship_mutation_test.c`: temp-DB MCU1-S3 link create/cycle/remove mutation test used by:
+  - `make -C mem_console test`
+  - `make -C mem_console run-relationship-mutation-test`
+- `run_browse_filter_contract_checks.sh`: deterministic MCU1-S4 browse/filter wiring checks used by:
+  - `make -C mem_console test`
+  - `make -C mem_console run-browse-filter-contract-checks`

@@ -319,14 +319,13 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                                               const KitUiInputState *input,
                                               int wheel_y,
                                               const MemConsoleLayoutConfig *layout_cfg,
-                                              KitUiStackLayout *out_right_layout) {
+                                              KitUiStackLayout *out_right_layout,
+                                              MemConsoleAction *io_action) {
     KitUiStackLayout meta_layout;
     KitUiStackLayout body_layout;
     KitRenderRect row;
     KitRenderRect detail_meta_line_rect;
     KitRenderRect detail_title_row;
-    KitRenderRect connections_panel;
-    KitRenderRect summary_content;
     KitRenderRect body_panel;
     KitRenderRect body_content;
     KitRenderRect body_text_viewport;
@@ -490,43 +489,14 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         return result;
     }
 
-    mem_console_ui_detail_build_connection_summary(state,
-                                                   state->detail_connection_summary_text,
-                                                   sizeof(state->detail_connection_summary_text));
-    connections_panel = (KitRenderRect){
-        state->pane_right_detail_connections.x + layout_cfg->panel_inner_padding,
-        state->pane_right_detail_connections.y + layout_cfg->panel_inner_padding,
-        state->pane_right_detail_connections.width - (layout_cfg->panel_inner_padding * 2.0f),
-        state->pane_right_detail_connections.height - (layout_cfg->panel_inner_padding * 2.0f)
-    };
-    result = mem_console_ui_push_themed_rect(render_ctx,
-                                             frame,
-                                             connections_panel,
-                                             8.0f,
-                                             CORE_THEME_COLOR_SURFACE_1);
-    if (result.code != CORE_OK) {
-        return result;
-    }
-
-    summary_content = (KitRenderRect){
-        connections_panel.x + 6.0f,
-        connections_panel.y + 5.0f,
-        connections_panel.width - 12.0f,
-        connections_panel.height - 10.0f
-    };
-    result = detail_draw_scrollable_wrapped_text(ui_ctx,
-                                                 frame,
-                                                 state->detail_connection_summary_lines,
-                                                 MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT,
-                                                 summary_content,
-                                                 state->detail_connection_summary_text,
-                                                 CORE_THEME_COLOR_TEXT_MUTED,
-                                                 CORE_FONT_TEXT_SIZE_CAPTION,
-                                                 input,
-                                                 wheel_y,
-                                                 &state->detail_connection_scroll,
-                                                 0,
-                                                 0);
+    result = mem_console_ui_detail_draw_relationships(render_ctx,
+                                                      ui_ctx,
+                                                      frame,
+                                                      state,
+                                                      input,
+                                                      wheel_y,
+                                                      layout_cfg,
+                                                      io_action);
     if (result.code != CORE_OK) {
         return result;
     }

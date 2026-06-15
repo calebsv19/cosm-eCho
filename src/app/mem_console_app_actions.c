@@ -435,6 +435,125 @@ void mem_console_app_apply_pending_action(CoreMemDb *db,
         return;
     }
 
+    if (action == MEM_CONSOLE_ACTION_ADD_RELATIONSHIP) {
+        int64_t link_id = 0;
+
+        result = create_selected_relationship_to_target(db, state, &link_id);
+        if (result.code != CORE_OK) {
+            mem_console_app_set_action_error_status(state, "Add relationship failed", result);
+            return;
+        }
+
+        result = refresh_state_from_db(db, state);
+        if (result.code != CORE_OK) {
+            mem_console_app_set_action_error_status(state, "Refresh failed", result);
+            return;
+        }
+        sync_edit_buffers_from_selection(state);
+        state->relationship_target_text[0] = '\0';
+        state->relationship_target_cursor = 0;
+        state->relationship_action_link_id = 0;
+        mem_console_runtime_note_local_write(runtime, SDL_GetTicks64());
+
+        (void)snprintf(state->status_line,
+                       sizeof(state->status_line),
+                       "Added related link %lld.",
+                       (long long)link_id);
+        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        return;
+    }
+
+    if (action == MEM_CONSOLE_ACTION_CYCLE_RELATIONSHIP_KIND) {
+        int64_t link_id = 0;
+
+        result = cycle_selected_relationship_kind(db, state, &link_id);
+        if (result.code != CORE_OK) {
+            mem_console_app_set_action_error_status(state, "Change relationship kind failed", result);
+            return;
+        }
+
+        result = refresh_state_from_db(db, state);
+        if (result.code != CORE_OK) {
+            mem_console_app_set_action_error_status(state, "Refresh failed", result);
+            return;
+        }
+        sync_edit_buffers_from_selection(state);
+        state->relationship_action_link_id = 0;
+        mem_console_runtime_note_local_write(runtime, SDL_GetTicks64());
+
+        (void)snprintf(state->status_line,
+                       sizeof(state->status_line),
+                       "Changed relationship kind for link %lld.",
+                       (long long)link_id);
+        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        return;
+    }
+
+    if (action == MEM_CONSOLE_ACTION_REMOVE_RELATIONSHIP) {
+        int64_t link_id = 0;
+
+        result = remove_selected_relationship(db, state, &link_id);
+        if (result.code != CORE_OK) {
+            mem_console_app_set_action_error_status(state, "Remove relationship failed", result);
+            return;
+        }
+
+        result = refresh_state_from_db(db, state);
+        if (result.code != CORE_OK) {
+            mem_console_app_set_action_error_status(state, "Refresh failed", result);
+            return;
+        }
+        sync_edit_buffers_from_selection(state);
+        state->relationship_action_link_id = 0;
+        mem_console_runtime_note_local_write(runtime, SDL_GetTicks64());
+
+        (void)snprintf(state->status_line,
+                       sizeof(state->status_line),
+                       "Removed relationship link %lld.",
+                       (long long)link_id);
+        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        return;
+    }
+
+    if (action == MEM_CONSOLE_ACTION_TOGGLE_BROWSE_PINNED) {
+        state->browse_pinned_only = state->browse_pinned_only ? 0 : 1;
+        mem_console_browse_reset_window(state);
+        mem_console_app_refresh_and_report(db, state, "Browse filter failed");
+        (void)snprintf(state->status_line,
+                       sizeof(state->status_line),
+                       "Browse pinned filter %s.",
+                       state->browse_pinned_only ? "enabled" : "disabled");
+        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        return;
+    }
+
+    if (action == MEM_CONSOLE_ACTION_TOGGLE_BROWSE_CANONICAL) {
+        state->browse_canonical_only = state->browse_canonical_only ? 0 : 1;
+        mem_console_browse_reset_window(state);
+        mem_console_app_refresh_and_report(db, state, "Browse filter failed");
+        (void)snprintf(state->status_line,
+                       sizeof(state->status_line),
+                       "Browse canonical filter %s.",
+                       state->browse_canonical_only ? "enabled" : "disabled");
+        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        return;
+    }
+
+    if (action == MEM_CONSOLE_ACTION_CYCLE_BROWSE_KIND) {
+        const char *kind = "";
+
+        (void)mem_console_browse_kind_cycle(state);
+        mem_console_browse_reset_window(state);
+        mem_console_app_refresh_and_report(db, state, "Browse filter failed");
+        kind = mem_console_browse_kind_for_index(state->browse_kind_index);
+        (void)snprintf(state->status_line,
+                       sizeof(state->status_line),
+                       "Browse kind filter: %s.",
+                       kind[0] ? kind : "all");
+        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        return;
+    }
+
     if (action == MEM_CONSOLE_ACTION_BEGIN_DB_PICKER) {
         begin_db_picker_mode(state, 0);
         (void)snprintf(state->status_line,

@@ -10,6 +10,9 @@ typedef struct MemConsoleRefreshCompletion {
     int64_t selected_item_id;
     int64_t graph_center_item_id;
     int list_query_offset;
+    int browse_pinned_only;
+    int browse_canonical_only;
+    int browse_kind_index;
     int selected_project_count;
     char selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
     char graph_kind_filter[32];
@@ -76,6 +79,9 @@ void mem_console_runtime_capture_intent_from_state(
     int64_t *out_selected_item_id,
     int64_t *out_graph_center_item_id,
     int *out_list_query_offset,
+    int *out_browse_pinned_only,
+    int *out_browse_canonical_only,
+    int *out_browse_kind_index,
     char out_selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64],
     int *out_selected_project_count,
     char *out_graph_kind_filter,
@@ -95,6 +101,9 @@ int mem_console_runtime_intent_matches(
     int64_t selected_item_id_a,
     int64_t graph_center_item_id_a,
     int list_query_offset_a,
+    int browse_pinned_only_a,
+    int browse_canonical_only_a,
+    int browse_kind_index_a,
     const char selected_project_keys_a[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64],
     int selected_project_count_a,
     const char *graph_kind_filter_a,
@@ -111,6 +120,9 @@ int mem_console_runtime_intent_matches(
     int64_t selected_item_id_b,
     int64_t graph_center_item_id_b,
     int list_query_offset_b,
+    int browse_pinned_only_b,
+    int browse_canonical_only_b,
+    int browse_kind_index_b,
     const char selected_project_keys_b[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64],
     int selected_project_count_b,
     const char *graph_kind_filter_b,

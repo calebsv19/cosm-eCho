@@ -11,6 +11,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                                               const KitUiInputState *input,
                                               int wheel_y,
                                               const MemConsoleLayoutConfig *layout_cfg,
-                                              KitUiStackLayout *out_right_layout);
+                                              KitUiStackLayout *out_right_layout,
+                                              MemConsoleAction *io_action);
 
 #endif

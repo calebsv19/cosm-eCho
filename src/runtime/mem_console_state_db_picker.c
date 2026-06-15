@@ -174,6 +174,10 @@ static void resolve_active_input_buffer(MemConsoleState *state,
         *out_text = state->graph_edge_limit_text;
         *out_cap = sizeof(state->graph_edge_limit_text);
         *out_cursor = &state->graph_edge_limit_cursor;
+    } else if (state->input_target == MEM_CONSOLE_INPUT_RELATIONSHIP_TARGET) {
+        *out_text = state->relationship_target_text;
+        *out_cap = sizeof(state->relationship_target_text);
+        *out_cursor = &state->relationship_target_cursor;
     } else {
         *out_text = state->search_text;
         *out_cap = sizeof(state->search_text);
@@ -204,6 +208,8 @@ void sync_edit_buffers_from_selection(MemConsoleState *state) {
     db_picker_normalize_selection(state);
     state->graph_edge_limit_cursor = clamp_cursor_to_text(state->graph_edge_limit_text,
                                                           state->graph_edge_limit_cursor);
+    state->relationship_target_cursor = clamp_cursor_to_text(state->relationship_target_text,
+                                                             state->relationship_target_cursor);
 }
 
 void begin_db_picker_mode(MemConsoleState *state, int create_mode) {

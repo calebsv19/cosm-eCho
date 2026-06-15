@@ -64,6 +64,11 @@ CoreResult refresh_state_from_db(CoreMemDb *db, MemConsoleState *state) {
         return result;
     }
 
+    result = read_selected_relationships(db, state);
+    if (result.code != CORE_OK) {
+        return result;
+    }
+
     result = load_graph_neighborhood(db, state);
     if (result.code != CORE_OK) {
         return result;

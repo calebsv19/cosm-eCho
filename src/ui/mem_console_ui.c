@@ -757,7 +757,8 @@ int run_frame(KitRenderContext *render_ctx,
                                                 &blocked_input,
                                                 wheel_y,
                                                 layout_cfg,
-                                                &right_layout);
+                                                &right_layout,
+                                                out_action);
     if (result.code != CORE_OK) {
         (void)kit_ui_clip_pop(ui_ctx, &frame);
         fprintf(stderr,

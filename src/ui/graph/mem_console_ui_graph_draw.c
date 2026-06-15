@@ -295,10 +295,26 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
         float line_thickness_scale = 1.0f;
         int is_hovered_edge = (int)i == hovered_edge_index;
         int is_hierarchy_edge = 0;
+        int edge_touches_selected = 0;
         if (state_edge_index >= 0 &&
             state_edge_index < state->graph_edge_count &&
             state->graph_edges[state_edge_index].kind[0] != '\0') {
             edge_kind_raw = state->graph_edges[state_edge_index].kind;
+        }
+        if (state_edge_index >= 0 && state_edge_index < state->graph_edge_count) {
+            int from_index = state->graph_edges[state_edge_index].from_index;
+            int to_index = state->graph_edges[state_edge_index].to_index;
+
+            if (from_index >= 0 &&
+                from_index < state->graph_node_count &&
+                state->graph_nodes[from_index].item_id == state->selected_item_id) {
+                edge_touches_selected = 1;
+            }
+            if (to_index >= 0 &&
+                to_index < state->graph_node_count &&
+                state->graph_nodes[to_index].item_id == state->selected_item_id) {
+                edge_touches_selected = 1;
+            }
         }
         edge_kind_label = graph_edge_display_label_for_kind(edge_kind_raw);
         edge_draw_color = graph_edge_color_for_kind(edge_kind_raw);
@@ -310,8 +326,13 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
             line_thickness_scale = is_hierarchy_edge ? 0.88f : 0.76f;
             edge_alpha = is_hierarchy_edge ? 184u : 142u;
         } else if (graph_view_mode == MEM_CONSOLE_GRAPH_VIEW_FOCUS) {
-            line_thickness_scale = is_hierarchy_edge ? 0.94f : 0.84f;
-            edge_alpha = is_hierarchy_edge ? 204u : 166u;
+            if (edge_touches_selected) {
+                line_thickness_scale = is_hierarchy_edge ? 1.06f : 0.94f;
+                edge_alpha = is_hierarchy_edge ? 222u : 190u;
+            } else {
+                line_thickness_scale = is_hierarchy_edge ? 0.72f : 0.56f;
+                edge_alpha = is_hierarchy_edge ? 138u : 96u;
+            }
         }
         if (route->point_count < 2u) {
             continue;

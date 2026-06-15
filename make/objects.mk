@@ -62,7 +62,7 @@ ifeq ($(BUILD_TOOLCHAIN),clang)
 APP_CC := $(HOST_CC)
 TOOLCHAIN_DEP :=
 else ifeq ($(BUILD_TOOLCHAIN),fisics)
-APP_CC := $(FISICS_CC)
+APP_CC := $(FISICS_CC) $(FISICS_FLAGS)
 TOOLCHAIN_DEP := $(FISICS_CC)
 else
 $(error Unsupported BUILD_TOOLCHAIN '$(BUILD_TOOLCHAIN)'; expected clang or fisics)

@@ -13,6 +13,9 @@ typedef struct MemConsoleRefreshTask {
     int64_t selected_item_id;
     int64_t graph_center_item_id;
     int list_query_offset;
+    int browse_pinned_only;
+    int browse_canonical_only;
+    int browse_kind_index;
     int selected_project_count;
     char selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
     char graph_kind_filter[32];
@@ -100,6 +103,9 @@ int mem_console_runtime_refreshed_non_graph_payload_changed(const MemConsoleStat
         current->matching_count != refreshed->matching_count ||
         current->visible_start_index != refreshed->visible_start_index ||
         current->visible_count != refreshed->visible_count ||
+        current->browse_pinned_only != refreshed->browse_pinned_only ||
+        current->browse_canonical_only != refreshed->browse_canonical_only ||
+        current->browse_kind_index != refreshed->browse_kind_index ||
         current->project_filter_option_count != refreshed->project_filter_option_count ||
         current->selected_project_count != refreshed->selected_project_count ||
         current->selected_item_id != refreshed->selected_item_id ||
@@ -200,6 +206,9 @@ void mem_console_runtime_apply_refreshed_state(MemConsoleState *state,
     state->matching_count = refreshed->matching_count;
     state->visible_start_index = refreshed->visible_start_index;
     state->visible_count = refreshed->visible_count;
+    state->browse_pinned_only = refreshed->browse_pinned_only ? 1 : 0;
+    state->browse_canonical_only = refreshed->browse_canonical_only ? 1 : 0;
+    state->browse_kind_index = mem_console_browse_kind_index_clamp(refreshed->browse_kind_index);
     state->project_filter_option_count = refreshed->project_filter_option_count;
     state->selected_project_count = refreshed->selected_project_count;
     memcpy(state->visible_items, refreshed->visible_items, sizeof(state->visible_items));
@@ -275,6 +284,9 @@ void mem_console_runtime_capture_intent_from_state(
     int64_t *out_selected_item_id,
     int64_t *out_graph_center_item_id,
     int *out_list_query_offset,
+    int *out_browse_pinned_only,
+    int *out_browse_canonical_only,
+    int *out_browse_kind_index,
     char out_selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64],
     int *out_selected_project_count,
     char *out_graph_kind_filter,
@@ -292,7 +304,9 @@ void mem_console_runtime_capture_intent_from_state(
 
     if (!state || !out_search_text || out_search_cap == 0u || !out_selected_item_id ||
         !out_graph_center_item_id ||
-        !out_list_query_offset || !out_selected_project_keys || !out_selected_project_count ||
+        !out_list_query_offset ||
+        !out_browse_pinned_only || !out_browse_canonical_only || !out_browse_kind_index ||
+        !out_selected_project_keys || !out_selected_project_count ||
         !out_graph_kind_filter || out_graph_kind_filter_cap == 0u ||
         !out_graph_kind_filter_mask || !out_graph_kind_filter_all_override ||
         !out_graph_edge_limit || !out_graph_hops ||
@@ -305,6 +319,9 @@ void mem_console_runtime_capture_intent_from_state(
     *out_selected_item_id = state->selected_item_id;
     *out_graph_center_item_id = state->graph_center_item_id;
     *out_list_query_offset = state->list_query_offset;
+    *out_browse_pinned_only = state->browse_pinned_only ? 1 : 0;
+    *out_browse_canonical_only = state->browse_canonical_only ? 1 : 0;
+    *out_browse_kind_index = mem_console_browse_kind_index_clamp(state->browse_kind_index);
     mem_console_runtime_copy_selected_project_filters(out_selected_project_keys,
                                                       out_selected_project_count,
                                                       state->selected_project_keys,
@@ -334,6 +351,9 @@ int mem_console_runtime_intent_matches(
     int64_t selected_item_id_a,
     int64_t graph_center_item_id_a,
     int list_query_offset_a,
+    int browse_pinned_only_a,
+    int browse_canonical_only_a,
+    int browse_kind_index_a,
     const char selected_project_keys_a[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64],
     int selected_project_count_a,
     const char *graph_kind_filter_a,
@@ -350,6 +370,9 @@ int mem_console_runtime_intent_matches(
     int64_t selected_item_id_b,
     int64_t graph_center_item_id_b,
     int list_query_offset_b,
+    int browse_pinned_only_b,
+    int browse_canonical_only_b,
+    int browse_kind_index_b,
     const char selected_project_keys_b[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64],
     int selected_project_count_b,
     const char *graph_kind_filter_b,
@@ -369,6 +392,10 @@ int mem_console_runtime_intent_matches(
            selected_item_id_a == selected_item_id_b &&
            graph_center_item_id_a == graph_center_item_id_b &&
            list_query_offset_a == list_query_offset_b &&
+           (browse_pinned_only_a ? 1 : 0) == (browse_pinned_only_b ? 1 : 0) &&
+           (browse_canonical_only_a ? 1 : 0) == (browse_canonical_only_b ? 1 : 0) &&
+           mem_console_browse_kind_index_clamp(browse_kind_index_a) ==
+               mem_console_browse_kind_index_clamp(browse_kind_index_b) &&
            strcmp(graph_kind_filter_a, graph_kind_filter_b) == 0 &&
            graph_kind_filter_mask_a == graph_kind_filter_mask_b &&
            graph_kind_filter_all_override_a == graph_kind_filter_all_override_b &&
@@ -409,6 +436,9 @@ static void *refresh_worker_task(void *task_ctx) {
     completion->selected_item_id = task->selected_item_id;
     completion->graph_center_item_id = task->graph_center_item_id;
     completion->list_query_offset = task->list_query_offset;
+    completion->browse_pinned_only = task->browse_pinned_only ? 1 : 0;
+    completion->browse_canonical_only = task->browse_canonical_only ? 1 : 0;
+    completion->browse_kind_index = mem_console_browse_kind_index_clamp(task->browse_kind_index);
     (void)snprintf(completion->search_text, sizeof(completion->search_text), "%s", task->search_text);
     mem_console_runtime_copy_selected_project_filters(completion->selected_project_keys,
                                                       &completion->selected_project_count,
@@ -437,6 +467,9 @@ static void *refresh_worker_task(void *task_ctx) {
     worker_state->selected_item_id = task->selected_item_id;
     worker_state->graph_center_item_id = task->graph_center_item_id;
     worker_state->list_query_offset = task->list_query_offset;
+    worker_state->browse_pinned_only = task->browse_pinned_only ? 1 : 0;
+    worker_state->browse_canonical_only = task->browse_canonical_only ? 1 : 0;
+    worker_state->browse_kind_index = mem_console_browse_kind_index_clamp(task->browse_kind_index);
     worker_state->list_scroll = 0.0f;
     (void)snprintf(worker_state->search_text, sizeof(worker_state->search_text), "%s", task->search_text);
     mem_console_runtime_copy_selected_project_filters(worker_state->selected_project_keys,
@@ -519,6 +552,9 @@ CoreResult mem_console_runtime_schedule_refresh(MemConsoleRuntime *runtime,
                                                   &task->selected_item_id,
                                                   &task->graph_center_item_id,
                                                   &task->list_query_offset,
+                                                  &task->browse_pinned_only,
+                                                  &task->browse_canonical_only,
+                                                  &task->browse_kind_index,
                                                   task->selected_project_keys,
                                                   &task->selected_project_count,
                                                   task->graph_kind_filter,
@@ -550,6 +586,10 @@ CoreResult mem_console_runtime_schedule_refresh(MemConsoleRuntime *runtime,
     runtime->in_flight_selected_item_id = task->selected_item_id;
     runtime->in_flight_graph_center_item_id = task->graph_center_item_id;
     runtime->in_flight_list_query_offset = task->list_query_offset;
+    runtime->in_flight_browse_pinned_only = task->browse_pinned_only ? 1 : 0;
+    runtime->in_flight_browse_canonical_only = task->browse_canonical_only ? 1 : 0;
+    runtime->in_flight_browse_kind_index =
+        mem_console_browse_kind_index_clamp(task->browse_kind_index);
     mem_console_runtime_copy_selected_project_filters(runtime->in_flight_selected_project_keys,
                                                       &runtime->in_flight_selected_project_count,
                                                       task->selected_project_keys,

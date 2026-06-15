@@ -13,6 +13,7 @@ APP_SRCS := src/app/mem_console.c \
 	src/db/mem_console_db_graph_sort.c \
 	src/db/mem_console_db_filters.c \
 	src/db/mem_console_db_mutations.c \
+	src/db/mem_console_db_relationship_mutations.c \
 	src/db/mem_console_db_reads.c \
 	src/runtime/mem_console_prefs.c \
 	src/runtime/mem_console_prefs_versions.c \
@@ -31,10 +32,12 @@ APP_SRCS := src/app/mem_console.c \
 	src/ui/mem_console_ui_chrome.c \
 	src/ui/mem_console_ui_common.c \
 	src/ui/mem_console_ui_detail_panel.c \
+	src/ui/mem_console_ui_detail_relationships.c \
 	src/ui/mem_console_ui_detail_references.c \
 	src/ui/mem_console_ui_detail_section.c \
 	src/ui/mem_console_ui_hud.c \
 	src/ui/mem_console_workspace_authoring_overlay.c \
+	src/ui/mem_console_ui_left_browse_filters.c \
 	src/ui/mem_console_ui_left_panel.c \
 	src/ui/mem_console_ui_left_section.c \
 	src/ui/graph/mem_console_ui_graph.c \
@@ -45,6 +48,7 @@ APP_SRCS := src/app/mem_console.c \
 	src/ui/graph/mem_console_ui_graph_hud.c \
 	src/ui/graph/mem_console_ui_graph_layout.c \
 	src/ui/graph/mem_console_ui_graph_layout_focus_helpers.c \
+	src/ui/graph/mem_console_ui_graph_layout_web.c \
 	src/ui/graph/mem_console_ui_graph_mode_policy.c \
 	src/ui/graph/mem_console_ui_graph_overlay.c \
 	src/ui/graph/mem_console_ui_graph_project_pods.c \

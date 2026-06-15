@@ -13,5 +13,6 @@ CoreResult read_matching_count(CoreMemDb *db, MemConsoleState *state);
 CoreResult read_visible_items(CoreMemDb *db, MemConsoleState *state);
 void clamp_list_query_offset(MemConsoleState *state);
 CoreResult read_selected_detail(CoreMemDb *db, MemConsoleState *state);
+CoreResult read_selected_relationships(CoreMemDb *db, MemConsoleState *state);
 
 #endif

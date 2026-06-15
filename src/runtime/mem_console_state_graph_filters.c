@@ -34,6 +34,17 @@ static const MemConsoleNodeKindBitEntry k_node_kind_bit_entries[] = {
     { "runtime", 1u << 6 }
 };
 
+static const char *k_browse_kind_order[MEM_CONSOLE_BROWSE_KIND_COUNT] = {
+    "",
+    "plan",
+    "decision",
+    "issue",
+    "scope",
+    "summary",
+    "policy",
+    "runtime"
+};
+
 void build_like_pattern(const char *search_text, char *out_pattern, size_t out_cap) {
     if (!out_pattern || out_cap == 0u) {
         return;
@@ -414,6 +425,42 @@ int mem_console_graph_node_kind_toggle_all_override(MemConsoleState *state) {
         state->graph_node_kind_filter_mask = mem_console_graph_node_kind_filter_all_mask();
     }
     return before != state->graph_node_kind_filter_all_override ? 1 : 0;
+}
+
+int mem_console_browse_kind_index_clamp(int index) {
+    if (index < 0 || index >= MEM_CONSOLE_BROWSE_KIND_COUNT) {
+        return 0;
+    }
+    return index;
+}
+
+const char *mem_console_browse_kind_for_index(int index) {
+    index = mem_console_browse_kind_index_clamp(index);
+    return k_browse_kind_order[index];
+}
+
+void mem_console_browse_reset_window(MemConsoleState *state) {
+    if (!state) {
+        return;
+    }
+    state->list_scroll = 0.0f;
+    state->list_query_offset = 0;
+    state->visible_start_index = 0;
+    state->search_refresh_pending = 0;
+}
+
+int mem_console_browse_kind_cycle(MemConsoleState *state) {
+    int before;
+
+    if (!state) {
+        return 0;
+    }
+    before = state->browse_kind_index;
+    state->browse_kind_index = mem_console_browse_kind_index_clamp(state->browse_kind_index + 1);
+    if (state->browse_kind_index == before) {
+        state->browse_kind_index = 0;
+    }
+    return state->browse_kind_index != before ? 1 : 0;
 }
 
 int mem_console_graph_anchor_hidden_is_set(const MemConsoleState *state, int64_t item_id) {

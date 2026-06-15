@@ -10,6 +10,7 @@ Repository and source-level identifiers still use `mem_console`.
 - `architecture.md`: subsystem ownership and lifecycle shape.
 - `migration.md`: scaffold standardization phase tracker and verification contract.
 - `desktop_packaging.md`: `.app` packaging contract, launcher behavior, and validation workflow.
+- `memory_check_audit.md`: opt-in fisiCs memory-check audit command and latest clean graph allocation result.
 
 ## Current Emphasis
 - async refresh/runtime-loop hardening is part of the shipped host contract now

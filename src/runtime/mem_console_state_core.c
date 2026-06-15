@@ -300,6 +300,9 @@ void seed_state(MemConsoleState *state, const char *db_path) {
     state->visible_start_index = 0;
     state->project_filter_scroll = 0.0f;
     state->detail_connection_scroll = 0.0f;
+    state->detail_relationship_count = 0;
+    state->detail_relationship_out_count = 0;
+    state->detail_relationship_in_count = 0;
     state->detail_body_scroll = 0.0f;
     state->title_edit_mode = 0;
     state->body_edit_mode = 0;
@@ -316,6 +319,15 @@ void seed_state(MemConsoleState *state, const char *db_path) {
     state->db_modal_selection_end = 0;
     state->db_modal_drag_select_active = 0;
     state->graph_edge_limit_cursor = 0;
+    state->relationship_target_text[0] = '\0';
+    state->relationship_target_cursor = 0;
+    state->relationship_action_link_id = 0;
+    state->browse_pinned_only = 0;
+    state->browse_canonical_only = 0;
+    state->browse_kind_index = 0;
+    (void)snprintf(state->browse_filter_summary_line,
+                   sizeof(state->browse_filter_summary_line),
+                   "Browse: all active");
     state->search_refresh_pending = 0;
     state->search_last_input_ms = 0u;
     state->project_filter_option_count = 0;

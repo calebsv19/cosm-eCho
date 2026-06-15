@@ -123,6 +123,90 @@ static void focus_layout_sort_indices_by_score(int *indices,
     }
 }
 
+static int focus_edge_touches_node(const KitGraphStructEdge *edges,
+                                   uint32_t edge_count,
+                                   int node_index,
+                                   int other_index) {
+    uint32_t i;
+
+    if (!edges || node_index < 0 || other_index < 0) {
+        return 0;
+    }
+    for (i = 0u; i < edge_count; ++i) {
+        int from_index = (int)edges[i].from_id - 1;
+        int to_index = (int)edges[i].to_id - 1;
+
+        if ((from_index == node_index && to_index == other_index) ||
+            (from_index == other_index && to_index == node_index)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void focus_layout_rank_root_neighbors(const KitGraphStructEdge *edges,
+                                             uint32_t edge_count,
+                                             const int *degree,
+                                             int root_index,
+                                             int *indices,
+                                             int count) {
+    int i;
+
+    if (!edges || !degree || !indices || count <= 1 || root_index < 0) {
+        return;
+    }
+
+    for (i = 1; i < count; ++i) {
+        int key = indices[i];
+        int j = i - 1;
+        while (j >= 0) {
+            int probe = indices[j];
+            int probe_touches_root = focus_edge_touches_node(edges, edge_count, root_index, probe);
+            int key_touches_root = focus_edge_touches_node(edges, edge_count, root_index, key);
+            int should_shift = 0;
+
+            if (probe_touches_root < key_touches_root) {
+                should_shift = 1;
+            } else if (probe_touches_root == key_touches_root && degree[probe] < degree[key]) {
+                should_shift = 1;
+            } else if (probe_touches_root == key_touches_root &&
+                       degree[probe] == degree[key] &&
+                       probe > key) {
+                should_shift = 1;
+            }
+            if (!should_shift) {
+                break;
+            }
+            indices[j + 1] = probe;
+            j -= 1;
+        }
+        indices[j + 1] = key;
+    }
+}
+
+static float focus_primary_neighbor_angle(int slot, int count) {
+    static const float k_focus_primary_angles[] = {
+        -1.57079632679f,
+        -0.62831853072f,
+        0.62831853072f,
+        1.57079632679f,
+        2.51327412287f,
+        -2.51327412287f,
+        0.0f,
+        3.14159265359f
+    };
+    int angle_count = (int)(sizeof(k_focus_primary_angles) / sizeof(k_focus_primary_angles[0]));
+    const float full_turn = 6.28318530718f;
+
+    if (slot < angle_count) {
+        return k_focus_primary_angles[slot];
+    }
+    if (count < 1) {
+        count = 1;
+    }
+    return -1.57079632679f + ((((float)slot) / (float)count) * full_turn);
+}
+
 void mem_console_ui_graph_apply_focus_anchor_priority_layout(KitRenderRect bounds,
                                                const MemConsoleState *state,
                                                const KitGraphStructEdge *edges,
@@ -288,10 +372,14 @@ void mem_console_ui_graph_apply_focus_anchor_priority_layout(KitRenderRect bound
         int level_count = level_counts[i];
         int slot;
         int sorted_indices[MEM_CONSOLE_GRAPH_NODE_LIMIT];
-        int ring_capacity = 8 + (i * 5);
+        int ring_capacity = i == 1 ? 10 : 8 + (i * 5);
         int ring_count = 1;
-        float radius_x = 60.0f + ((float)(i - 1) * (42.0f + (crowd * 8.0f)));
-        float radius_y = 46.0f + ((float)(i - 1) * (34.0f + (crowd * 6.0f)));
+        float radius_x = i == 1
+                             ? 74.0f + (crowd * 8.0f)
+                             : 112.0f + ((float)(i - 2) * (40.0f + (crowd * 8.0f)));
+        float radius_y = i == 1
+                             ? 52.0f + (crowd * 6.0f)
+                             : 84.0f + ((float)(i - 2) * (32.0f + (crowd * 6.0f)));
 
         if (level_count <= 0) {
             continue;
@@ -334,6 +422,14 @@ void mem_console_ui_graph_apply_focus_anchor_priority_layout(KitRenderRect bound
             sorted_indices[slot] = node_index;
         }
         focus_layout_sort_indices_by_score(sorted_indices, level_count, score_x);
+        if (i == 1) {
+            focus_layout_rank_root_neighbors(edges,
+                                             edge_count,
+                                             degree,
+                                             root_index,
+                                             sorted_indices,
+                                             level_count);
+        }
 
         for (slot = 0; slot < level_count; ++slot) {
             int node_index = sorted_indices[slot];
@@ -358,14 +454,20 @@ void mem_console_ui_graph_apply_focus_anchor_priority_layout(KitRenderRect bound
                 ring_radius_y += ((float)ring_count - 1.0f) * 2.0f;
             }
 
-            if (slots_in_ring == 1) {
+            if (i == 1) {
+                angle = focus_primary_neighbor_angle(slot, level_count);
+            } else if (slots_in_ring == 1) {
                 angle = -quarter_turn;
             } else {
                 angle = -quarter_turn + ((((float)ring_slot) / (float)slots_in_ring) * full_turn);
             }
 
-            angle += focus_hash_signed((uint32_t)(node_index + 3) * 3266489917u) *
-                     (0.05f + (((float)i - 1.0f) * 0.01f));
+            if (i == 1) {
+                angle += focus_hash_signed((uint32_t)(node_index + 3) * 3266489917u) * 0.018f;
+            } else {
+                angle += focus_hash_signed((uint32_t)(node_index + 3) * 3266489917u) *
+                         (0.05f + (((float)i - 1.0f) * 0.01f));
+            }
             angle_by_node[node_index] = angle;
             target_center_x[node_index] = root_center_x + (cosf(angle) * ring_radius_x);
             target_center_y[node_index] = root_center_y + (sinf(angle) * ring_radius_y);
@@ -409,8 +511,14 @@ void mem_console_ui_graph_apply_focus_anchor_priority_layout(KitRenderRect bound
 
                 dx = center_x[a] - center_x[b];
                 dy = center_y[a] - center_y[b];
-                min_dx = (layouts[a].rect.width + layouts[b].rect.width) * 0.5f + 12.0f + (crowd * 9.0f);
-                min_dy = (layouts[a].rect.height + layouts[b].rect.height) * 0.5f + 10.0f + (crowd * 6.0f);
+                min_dx = (layouts[a].rect.width + layouts[b].rect.width) * 0.5f +
+                         12.0f + (crowd * 9.0f);
+                min_dy = (layouts[a].rect.height + layouts[b].rect.height) * 0.5f +
+                         10.0f + (crowd * 6.0f);
+                if (depth[a] == 1 || depth[b] == 1) {
+                    min_dx += 5.0f;
+                    min_dy += 3.0f;
+                }
                 if (fabsf(dx) >= min_dx || fabsf(dy) >= min_dy) {
                     continue;
                 }

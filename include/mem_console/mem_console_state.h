@@ -74,6 +74,10 @@ int mem_console_graph_node_kind_toggle_all_override(MemConsoleState *state);
 int mem_console_graph_anchor_hidden_is_set(const MemConsoleState *state, int64_t item_id);
 int mem_console_graph_anchor_hidden_set(MemConsoleState *state, int64_t item_id, int hidden);
 int mem_console_graph_anchor_hidden_toggle(MemConsoleState *state, int64_t item_id, int *out_hidden);
+int mem_console_browse_kind_index_clamp(int index);
+const char *mem_console_browse_kind_for_index(int index);
+int mem_console_browse_kind_cycle(MemConsoleState *state);
+void mem_console_browse_reset_window(MemConsoleState *state);
 
 void format_text_for_width(char *out_text,
                            size_t out_cap,
