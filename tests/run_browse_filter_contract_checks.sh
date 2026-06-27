@@ -72,4 +72,4 @@ check_contains "in_flight_browse_pinned_only" \
     include/mem_console/mem_console_runtime.h \
     "runtime in-flight pinned filter"
 
-echo "browse filter contract checks passed."
+echo "browse filter source contract checks passed."

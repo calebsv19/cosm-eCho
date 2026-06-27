@@ -51,6 +51,18 @@ void graph_build_node_label_text(const MemConsoleGraphNode *node,
                                  char *out_text,
                                  size_t out_cap);
 int graph_edge_is_hierarchy_kind(const char *kind);
+void graph_status_format_view_line(MemConsoleState *state,
+                                   uint32_t node_count,
+                                   uint32_t edge_count);
+void graph_status_format_node_hud(MemConsoleState *state,
+                                  const MemConsoleGraphNode *node);
+void graph_status_format_edge_hud(MemConsoleState *state,
+                                  const MemConsoleGraphNode *from_node,
+                                  const MemConsoleGraphNode *to_node,
+                                  const char *edge_kind_label);
+void graph_status_format_anchor_visibility_line(MemConsoleState *state,
+                                                const MemConsoleGraphNode *node,
+                                                int now_hidden);
 
 int graph_collect_project_pods(const MemConsoleState *state,
                                const KitGraphStructNodeLayout *layouts,
@@ -87,9 +99,15 @@ void graph_camera_apply_to_layouts(KitGraphStructNodeLayout *layouts,
                                    uint32_t layout_count,
                                    const MemConsoleState *state,
                                    KitRenderRect graph_bounds);
-void graph_camera_pan_by_screen_delta(KitGraphStructViewport *viewport,
-                                      float delta_x,
-                                      float delta_y);
+void graph_camera_apply_focus_initial_fit(MemConsoleState *state,
+                                          KitRenderRect graph_bounds,
+                                          const KitGraphStructEdge *edges,
+                                          uint32_t edge_count,
+                                          const KitGraphStructNodeLayout *layouts,
+                                          uint32_t layout_count);
+void graph_camera_pan_live_viewport_by_screen_delta(MemConsoleState *state,
+                                                    float delta_x,
+                                                    float delta_y);
 
 CoreResult draw_rect_outline(KitRenderFrame *frame,
                              KitRenderRect rect,

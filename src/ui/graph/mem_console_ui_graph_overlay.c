@@ -1,6 +1,5 @@
 #include "mem_console_ui_graph_internal.h"
 
-#include <stdio.h>
 #include <string.h>
 
 static KitRenderColor graph_darkened_surface(KitRenderColor base, float factor, uint8_t alpha) {
@@ -66,18 +65,6 @@ CoreResult draw_rect_outline(KitRenderFrame *frame,
 
     rect_cmd.rect = (KitRenderRect){ rect.x + rect.width - inset, rect.y + inset, inset, vertical_h };
     return kit_render_push_rect(frame, &rect_cmd);
-}
-
-static const char *graph_view_mode_text(const MemConsoleState *state) {
-    int view_mode = mem_console_graph_view_mode_get(state);
-
-    if (view_mode == MEM_CONSOLE_GRAPH_VIEW_PODS) {
-        return "pods";
-    }
-    if (view_mode == MEM_CONSOLE_GRAPH_VIEW_WEB) {
-        return "web";
-    }
-    return "focus";
 }
 
 CoreResult draw_project_pod_overlays(const KitRenderContext *render_ctx,
@@ -441,16 +428,7 @@ CoreResult draw_graph_view_diagnostics(KitUiContext *ui_ctx,
         bar_rect.y = bounds.y + 2.0f;
     }
 
-    (void)snprintf(state->graph_status_line,
-                   sizeof(state->graph_status_line),
-                   "mode:%s  sort:%s  lbl:%s  fnl:%s  zoom:%.2fx  n:%u e:%u",
-                   graph_view_mode_text(state),
-                   state->graph_sort_mode == MEM_CONSOLE_GRAPH_SORT_OLDEST_FIRST ? "old" : "new",
-                   state->graph_edge_labels_enabled ? "on" : "off",
-                   state->graph_anchor_funnel_enabled ? "on" : "off",
-                   state->graph_viewport.zoom,
-                   node_count,
-                   edge_count);
+    graph_status_format_view_line(state, node_count, edge_count);
 
     result = mem_console_ui_resolve_theme_color(render_ctx, CORE_THEME_COLOR_SURFACE_0, &bar_color);
     if (result.code != CORE_OK) {

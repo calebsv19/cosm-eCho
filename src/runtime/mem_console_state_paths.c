@@ -14,6 +14,43 @@ static int path_is_absolute(const char *path) {
     return path && path[0] == '/';
 }
 
+static int path_has_control_byte(const char *path) {
+    size_t i = 0u;
+
+    if (!path) {
+        return 0;
+    }
+    while (path[i] != '\0') {
+        unsigned char c = (unsigned char)path[i];
+        if (c < 32u || c == 127u) {
+            return 1;
+        }
+        i += 1u;
+    }
+    return 0;
+}
+
+static int path_has_parent_segment(const char *path) {
+    const char *segment = path;
+
+    if (!path || !path[0]) {
+        return 0;
+    }
+    while (*segment != '\0') {
+        const char *slash = strchr(segment, '/');
+        size_t len = slash ? (size_t)(slash - segment) : strlen(segment);
+
+        if (len == 2u && segment[0] == '.' && segment[1] == '.') {
+            return 1;
+        }
+        if (!slash) {
+            break;
+        }
+        segment = slash + 1;
+    }
+    return 0;
+}
+
 static int path_is_inside_prefix(const char *path, const char *prefix) {
     size_t prefix_len = 0u;
 
@@ -235,6 +272,39 @@ int mem_console_path_is_mutable_root_safe(const char *path) {
     return safe;
 }
 
+int mem_console_path_has_sqlite_suffix(const char *path) {
+    size_t len;
+
+    if (!path) {
+        return 0;
+    }
+    len = strlen(path);
+    return len >= 7u && strcmp(path + len - 7u, ".sqlite") == 0;
+}
+
+const char *mem_console_db_path_policy_error(const char *path) {
+    if (!path || !path[0]) {
+        return "DB path is empty";
+    }
+    if (strlen(path) >= 1024u) {
+        return "DB path is too long";
+    }
+    if (path_has_control_byte(path)) {
+        return "DB path contains control characters";
+    }
+    if (path_has_parent_segment(path)) {
+        return "DB path cannot contain parent-directory segments";
+    }
+    if (!mem_console_path_has_sqlite_suffix(path)) {
+        return "DB path must end in .sqlite";
+    }
+    return 0;
+}
+
+int mem_console_db_path_is_safe(const char *path) {
+    return mem_console_db_path_policy_error(path) == 0 ? 1 : 0;
+}
+
 int resolve_default_db_path(char *out_path, size_t out_cap) {
     const char *env_db_path = 0;
     char data_dir[1024];
@@ -324,6 +394,9 @@ int mem_console_path_contract_normalize(const char *input_root_hint,
             return 0;
         }
     }
+    if (!mem_console_db_path_is_safe(resolved_active_db)) {
+        return 0;
+    }
     if (!mem_console_ensure_parent_directory(resolved_active_db)) {
         return 0;
     }
@@ -365,7 +438,11 @@ int mem_console_path_contract_normalize(const char *input_root_hint,
 }
 
 void print_usage(const char *argv0) {
-    fprintf(stderr, "usage: %s [--db <path>] [--kernel-bridge]\n", argv0);
+    fprintf(stderr,
+            "usage: %s [--db <path>] [--kernel-bridge] [--visual-review "
+            "[--visual-review-mode focus|pods|web] [--visual-review-selected-id <id>]] "
+            "[--visual-artifact <path>]\n",
+            argv0);
 }
 
 const char *find_flag_value(int argc, char **argv, const char *flag) {
@@ -412,6 +489,18 @@ int has_unknown_flag(int argc, char **argv) {
         }
         if (strcmp(argv[i], "--kernel-bridge") == 0) {
             continue;
+        }
+        if (strcmp(argv[i], "--visual-review") == 0) {
+            continue;
+        }
+        if (strcmp(argv[i], "--visual-review-mode") == 0 ||
+            strcmp(argv[i], "--visual-review-selected-id") == 0 ||
+            strcmp(argv[i], "--visual-artifact") == 0) {
+            if ((i + 1) < argc) {
+                i += 1;
+                continue;
+            }
+            return 1;
         }
         return 1;
     }

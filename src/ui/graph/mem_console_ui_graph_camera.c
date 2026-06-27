@@ -115,14 +115,212 @@ void graph_camera_apply_to_layouts(KitGraphStructNodeLayout *layouts,
     }
 }
 
-void graph_camera_pan_by_screen_delta(KitGraphStructViewport *viewport,
-                                      float delta_x,
-                                      float delta_y) {
+static float graph_camera_absf(float value) {
+    return value < 0.0f ? -value : value;
+}
+
+static void graph_camera_store_live_viewport(KitGraphStructViewport *viewport,
+                                             float pan_x,
+                                             float pan_y,
+                                             float zoom) {
+    if (!viewport) {
+        return;
+    }
+    viewport->pan_x = pan_x;
+    viewport->pan_y = pan_y;
+    viewport->zoom = zoom;
+}
+
+static int graph_camera_viewport_is_default_focus_reset(const KitGraphStructViewport *viewport) {
+    if (!viewport) {
+        return 0;
+    }
+    return graph_camera_absf(viewport->pan_x) <= 0.01f &&
+           graph_camera_absf(viewport->pan_y) <= 0.01f &&
+           graph_camera_absf(viewport->zoom - 1.14f) <= 0.015f;
+}
+
+static int graph_camera_layout_index_for_state_node(const KitGraphStructNodeLayout *layouts,
+                                                    uint32_t layout_count,
+                                                    int state_node_index) {
+    uint32_t target_node_id;
+    uint32_t i;
+
+    if (!layouts || state_node_index < 0) {
+        return -1;
+    }
+    target_node_id = (uint32_t)state_node_index + 1u;
+    for (i = 0u; i < layout_count; ++i) {
+        if (layouts[i].node_id == target_node_id) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
+static int graph_camera_focus_root_state_index(const MemConsoleState *state,
+                                               uint32_t layout_count) {
+    uint32_t i;
+
+    if (!state) {
+        return -1;
+    }
+    for (i = 0u; i < layout_count && i < (uint32_t)state->graph_node_count; ++i) {
+        if (state->graph_nodes[i].item_id == state->selected_item_id) {
+            return (int)i;
+        }
+    }
+    for (i = 0u; i < layout_count && i < (uint32_t)state->graph_node_count; ++i) {
+        if (state->graph_nodes[i].item_id == state->graph_center_item_id) {
+            return (int)i;
+        }
+    }
+    return layout_count > 0u ? 0 : -1;
+}
+
+static int graph_camera_edge_touches_state_index(const KitGraphStructEdge *edges,
+                                                 uint32_t edge_count,
+                                                 int root_state_index,
+                                                 int probe_state_index) {
+    uint32_t i;
+
+    if (!edges || root_state_index < 0 || probe_state_index < 0) {
+        return 0;
+    }
+    for (i = 0u; i < edge_count; ++i) {
+        int from_index = (int)edges[i].from_id - 1;
+        int to_index = (int)edges[i].to_id - 1;
+        if ((from_index == root_state_index && to_index == probe_state_index) ||
+            (from_index == probe_state_index && to_index == root_state_index)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void graph_camera_apply_focus_initial_fit(MemConsoleState *state,
+                                          KitRenderRect graph_bounds,
+                                          const KitGraphStructEdge *edges,
+                                          uint32_t edge_count,
+                                          const KitGraphStructNodeLayout *layouts,
+                                          uint32_t layout_count) {
+    int root_state_index;
+    int root_layout_index;
+    float min_x;
+    float min_y;
+    float max_x;
+    float max_y;
+    float fit_w;
+    float fit_h;
+    float margin_x;
+    float margin_y;
+    float zoom_x;
+    float zoom_y;
+    float next_zoom;
+    float world_center_x;
+    float world_center_y;
+    float target_screen_x;
+    float target_screen_y;
+    uint32_t i;
+    int included_count = 0;
+
+    if (!state || !edges || !layouts || layout_count == 0u) {
+        return;
+    }
+    if (mem_console_graph_view_mode_get(state) != MEM_CONSOLE_GRAPH_VIEW_FOCUS) {
+        return;
+    }
+    if (!graph_camera_viewport_is_default_focus_reset(&state->graph_viewport)) {
+        return;
+    }
+
+    root_state_index = graph_camera_focus_root_state_index(state, layout_count);
+    root_layout_index = graph_camera_layout_index_for_state_node(layouts, layout_count, root_state_index);
+    if (root_layout_index < 0) {
+        return;
+    }
+
+    min_x = layouts[root_layout_index].rect.x;
+    min_y = layouts[root_layout_index].rect.y;
+    max_x = layouts[root_layout_index].rect.x + layouts[root_layout_index].rect.width;
+    max_y = layouts[root_layout_index].rect.y + layouts[root_layout_index].rect.height;
+    included_count = 1;
+
+    for (i = 0u; i < layout_count && i < (uint32_t)state->graph_node_count; ++i) {
+        int layout_index;
+        KitRenderRect rect;
+
+        if ((int)i == root_state_index) {
+            continue;
+        }
+        if (!graph_camera_edge_touches_state_index(edges, edge_count, root_state_index, (int)i)) {
+            continue;
+        }
+
+        layout_index = graph_camera_layout_index_for_state_node(layouts, layout_count, (int)i);
+        if (layout_index < 0) {
+            continue;
+        }
+        rect = layouts[layout_index].rect;
+        if (rect.x < min_x) min_x = rect.x;
+        if (rect.y < min_y) min_y = rect.y;
+        if (rect.x + rect.width > max_x) max_x = rect.x + rect.width;
+        if (rect.y + rect.height > max_y) max_y = rect.y + rect.height;
+        included_count += 1;
+    }
+
+    if (included_count <= 1) {
+        return;
+    }
+
+    margin_x = graph_bounds.width * 0.12f;
+    margin_y = graph_bounds.height * 0.16f;
+    if (margin_x < 72.0f) {
+        margin_x = 72.0f;
+    }
+    if (margin_y < 64.0f) {
+        margin_y = 64.0f;
+    }
+    fit_w = max_x - min_x;
+    fit_h = max_y - min_y;
+    if (fit_w < 1.0f || fit_h < 1.0f ||
+        graph_bounds.width <= margin_x * 2.0f ||
+        graph_bounds.height <= margin_y * 2.0f) {
+        return;
+    }
+
+    zoom_x = (graph_bounds.width - (margin_x * 2.0f)) / fit_w;
+    zoom_y = (graph_bounds.height - (margin_y * 2.0f)) / fit_h;
+    next_zoom = zoom_x < zoom_y ? zoom_x : zoom_y;
+    next_zoom = graph_clampf(next_zoom, 1.24f, 2.20f);
+    world_center_x = (min_x + max_x) * 0.5f;
+    world_center_y = (min_y + max_y) * 0.5f;
+    target_screen_x = graph_bounds.x + (graph_bounds.width * 0.50f);
+    target_screen_y = graph_bounds.y + (graph_bounds.height * 0.46f);
+
+    graph_camera_store_live_viewport(&state->graph_viewport,
+                                     target_screen_y - graph_bounds.y - (world_center_y * next_zoom),
+                                     target_screen_x - graph_bounds.x - (world_center_x * next_zoom),
+                                     next_zoom);
+}
+
+static void graph_camera_pan_viewport_by_screen_delta(KitGraphStructViewport *viewport,
+                                                      float delta_x,
+                                                      float delta_y) {
     if (!viewport) {
         return;
     }
     viewport->pan_x += delta_y;
     viewport->pan_y += delta_x;
+}
+
+void graph_camera_pan_live_viewport_by_screen_delta(MemConsoleState *state,
+                                                    float delta_x,
+                                                    float delta_y) {
+    if (!state) {
+        return;
+    }
+    graph_camera_pan_viewport_by_screen_delta(&state->graph_viewport, delta_x, delta_y);
 }
 
 static void graph_camera_zoom_anchor_at_screen_point(KitGraphStructViewport *viewport,
@@ -157,9 +355,9 @@ static void graph_camera_zoom_anchor_at_screen_point(KitGraphStructViewport *vie
                                  anchor_world,
                                  &anchored_screen_x,
                                  &anchored_screen_y);
-    graph_camera_pan_by_screen_delta(viewport,
-                                     screen_x - anchored_screen_x,
-                                     screen_y - anchored_screen_y);
+    graph_camera_pan_viewport_by_screen_delta(viewport,
+                                              screen_x - anchored_screen_x,
+                                              screen_y - anchored_screen_y);
 }
 
 static void graph_shift_cached_layout_for_pan(MemConsoleState *state,
@@ -237,7 +435,7 @@ int mem_console_ui_graph_handle_viewport_interaction(MemConsoleState *state,
             float abs_dx = delta_x < 0.0f ? -delta_x : delta_x;
             float abs_dy = delta_y < 0.0f ? -delta_y : delta_y;
             graph_shift_cached_layout_for_pan(state, delta_x, delta_y);
-            graph_camera_pan_by_screen_delta(&state->graph_viewport, delta_x, delta_y);
+            graph_camera_pan_live_viewport_by_screen_delta(state, delta_x, delta_y);
             state->graph_drag_last_x = input->mouse_x;
             state->graph_drag_last_y = input->mouse_y;
             if (!state->graph_drag_moved && (abs_dx >= 0.5f || abs_dy >= 0.5f)) {

@@ -1,7 +1,7 @@
 #include "mem_console_ui_graph_panel.h"
 
 #include "mem_console_ui_common.h"
-#include "mem_console_ui_graph.h"
+#include "mem_console_ui_graph_internal.h"
 
 #include <SDL2/SDL.h>
 #include <string.h>
@@ -59,13 +59,10 @@ static int handle_graph_node_click(MemConsoleState *state,
         int changed = mem_console_graph_anchor_hidden_toggle(state, hit_item_id, &now_hidden);
         if (changed) {
             state->graph_layout_valid = 0;
-            state->pane_prefs_dirty = 1;
-            (void)snprintf(state->status_line,
-                           sizeof(state->status_line),
-                           "%s anchor %s.",
-                           state->graph_nodes[hit_node_index].title[0] ?
-                               state->graph_nodes[hit_node_index].title : "Top-level",
-                           now_hidden ? "hidden" : "shown");
+            mem_console_pane_prefs_mark_dirty(state);
+            graph_status_format_anchor_visibility_line(state,
+                                                       &state->graph_nodes[hit_node_index],
+                                                       now_hidden);
             mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_LAYOUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
             if (*io_action == MEM_CONSOLE_ACTION_NONE) {
                 *io_action = MEM_CONSOLE_ACTION_REFRESH_GRAPH;
@@ -77,7 +74,7 @@ static int handle_graph_node_click(MemConsoleState *state,
     if (hit_item_id != state->selected_item_id) {
         state->list_last_click_item_id = 0;
         state->list_last_click_ms = 0u;
-        mem_console_select_item_for_navigation(state, hit_item_id, 1, 0, io_action);
+        mem_console_select_item_for_inspection(state, hit_item_id, 1, io_action);
         return 1;
     }
 
@@ -224,7 +221,7 @@ CoreResult mem_console_ui_draw_graph_panel(KitRenderContext *render_ctx,
                                                                              &next_item_id)) {
                         state->list_last_click_item_id = 0;
                         state->list_last_click_ms = 0u;
-                        mem_console_select_item_for_navigation(state, next_item_id, 1, 0, io_action);
+                        mem_console_select_item_for_inspection(state, next_item_id, 1, io_action);
                     }
                 } else if (result.code != CORE_OK) {
                     return result;

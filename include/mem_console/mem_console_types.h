@@ -20,11 +20,23 @@ enum {
     MEM_CONSOLE_SCOPE_FILTER_LIMIT = 16,
     MEM_CONSOLE_DETAIL_BODY_WRAP_LINE_LIMIT = 96,
     MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT = 48,
+    MEM_CONSOLE_DETAIL_TITLE_LINE_LIMIT = 8,
+    MEM_CONSOLE_DETAIL_TEXT_LINE_CAP = 256,
+    MEM_CONSOLE_DETAIL_META_LINE_CAP = 96,
+    MEM_CONSOLE_DETAIL_CONNECTION_LINE_CAP = 256,
     MEM_CONSOLE_DETAIL_RELATIONSHIP_LIMIT = 32,
+    MEM_CONSOLE_DETAIL_RELATIONSHIP_SUMMARY_LINE_CAP = 128,
+    MEM_CONSOLE_DETAIL_RELATIONSHIP_GROUP_LABEL_CAP = 96,
+    MEM_CONSOLE_DETAIL_RELATIONSHIP_ROW_LABEL_CAP = 256,
+    MEM_CONSOLE_GRAPH_EDGE_LABEL_CAP = 96,
+    MEM_CONSOLE_GRAPH_NODE_LABEL_CAP = 192,
     MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT = 12,
     MEM_CONSOLE_GRAPH_HUD_LINE_LIMIT = 64,
     MEM_CONSOLE_BROWSE_KIND_COUNT = 8,
-    MEM_CONSOLE_DB_PICKER_LIST_LIMIT = 64
+    MEM_CONSOLE_DB_PICKER_LIST_LIMIT = 64,
+    MEM_CONSOLE_LEFT_SUMMARY_LINE_CAP = 384,
+    MEM_CONSOLE_LEFT_PATH_SUMMARY_LINE_CAP = 1100,
+    MEM_CONSOLE_LIST_ITEM_LABEL_CAP = 220
 };
 
 typedef enum MemConsoleAction {
@@ -55,7 +67,8 @@ typedef enum MemConsoleAction {
     MEM_CONSOLE_ACTION_REMOVE_RELATIONSHIP = 24,
     MEM_CONSOLE_ACTION_TOGGLE_BROWSE_PINNED = 25,
     MEM_CONSOLE_ACTION_TOGGLE_BROWSE_CANONICAL = 26,
-    MEM_CONSOLE_ACTION_CYCLE_BROWSE_KIND = 27
+    MEM_CONSOLE_ACTION_CYCLE_BROWSE_KIND = 27,
+    MEM_CONSOLE_ACTION_REFRESH_DETAIL = 28
 } MemConsoleAction;
 
 typedef enum MemConsoleInputTarget {
@@ -151,8 +164,10 @@ typedef struct MemConsoleState {
     char db_modal_active_line[1100];
     char db_picker_entry_names[MEM_CONSOLE_DB_PICKER_LIST_LIMIT][128];
     char db_picker_entry_paths[MEM_CONSOLE_DB_PICKER_LIST_LIMIT][1024];
-    char db_summary_line[384];
-    char db_summary_draw_line[384];
+    char db_summary_line[MEM_CONSOLE_LEFT_SUMMARY_LINE_CAP];
+    char db_summary_draw_line[MEM_CONSOLE_LEFT_SUMMARY_LINE_CAP];
+    char input_root_summary_line[MEM_CONSOLE_LEFT_PATH_SUMMARY_LINE_CAP];
+    char input_root_summary_draw_line[MEM_CONSOLE_LEFT_SUMMARY_LINE_CAP];
     char schema_version[32];
     char status_line[160];
     char status_draw_line[160];
@@ -164,8 +179,8 @@ typedef struct MemConsoleState {
     char title_edit_text[160];
     char body_edit_text[1024];
     char schema_summary_line[96];
-    char runtime_summary_line[128];
-    char runtime_summary_draw_line[128];
+    char runtime_summary_line[224];
+    char runtime_summary_draw_line[224];
     char kernel_summary_line[96];
     char kernel_summary_draw_line[96];
     char redraw_summary_line[96];
@@ -173,7 +188,7 @@ typedef struct MemConsoleState {
     char theme_summary_line[96];
     char font_summary_line[96];
     char visible_summary_line[96];
-    char detail_meta_line[96];
+    char detail_meta_line[MEM_CONSOLE_DETAIL_META_LINE_CAP];
     char pinned_button_label[32];
     char canonical_button_label[32];
     char graph_mode_button_label[32];
@@ -183,12 +198,12 @@ typedef struct MemConsoleState {
     char relationship_target_text[32];
     char browse_filter_summary_line[128];
     char project_filter_summary_line[128];
-    char list_item_labels[MEM_CONSOLE_LIST_FETCH_LIMIT][220];
+    char list_item_labels[MEM_CONSOLE_LIST_FETCH_LIMIT][MEM_CONSOLE_LIST_ITEM_LABEL_CAP];
     char project_filter_labels[MEM_CONSOLE_SCOPE_FILTER_LIMIT][96];
     char project_filter_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
     int64_t project_filter_counts[MEM_CONSOLE_SCOPE_FILTER_LIMIT];
     char selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64];
-    char wrapped_body_lines[MEM_CONSOLE_DETAIL_BODY_WRAP_LINE_LIMIT][256];
+    char wrapped_body_lines[MEM_CONSOLE_DETAIL_BODY_WRAP_LINE_LIMIT][MEM_CONSOLE_DETAIL_TEXT_LINE_CAP];
     CoreThemePresetId theme_preset_id;
     CoreFontPresetId font_preset_id;
     int text_zoom_step;
@@ -245,6 +260,8 @@ typedef struct MemConsoleState {
     uint64_t runtime_refresh_dropped;
     uint64_t runtime_refresh_errors;
     uint64_t runtime_refresh_coalesced;
+    uint64_t runtime_latest_refresh_error_id;
+    char runtime_latest_refresh_error_message[160];
     uint64_t redraw_frame_count;
     uint64_t redraw_last_frame_ms;
     uint32_t redraw_pending_reasons;
@@ -278,9 +295,9 @@ typedef struct MemConsoleState {
     KitGraphStructNodeLayout graph_layout_node_layouts[MEM_CONSOLE_GRAPH_NODE_LIMIT];
     KitGraphStructEdgeRoute graph_layout_edge_routes[MEM_CONSOLE_GRAPH_EDGE_LIMIT];
     KitGraphStructEdgeLabelLayout graph_layout_edge_label_layouts[MEM_CONSOLE_GRAPH_EDGE_LIMIT];
-    char graph_draw_edge_labels[MEM_CONSOLE_GRAPH_EDGE_LIMIT][96];
+    char graph_draw_edge_labels[MEM_CONSOLE_GRAPH_EDGE_LIMIT][MEM_CONSOLE_GRAPH_EDGE_LABEL_CAP];
     char graph_draw_pod_labels[MEM_CONSOLE_GRAPH_PROJECT_POD_LIMIT][96];
-    char graph_draw_node_labels[MEM_CONSOLE_GRAPH_NODE_LIMIT][192];
+    char graph_draw_node_labels[MEM_CONSOLE_GRAPH_NODE_LIMIT][MEM_CONSOLE_GRAPH_NODE_LABEL_CAP];
     char graph_hud_id_line[48];
     char graph_hud_title_raw[176];
     char graph_hud_title[176];
@@ -300,17 +317,17 @@ typedef struct MemConsoleState {
     CoreFontTextSizeTier graph_hud_cache_row_tiers[MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT];
     float graph_hud_cache_row_line_steps[MEM_CONSOLE_GRAPH_HUD_ROW_LIMIT];
     char graph_hud_cache_lines[MEM_CONSOLE_GRAPH_HUD_LINE_LIMIT][256];
-    char detail_title_lines[8][256];
+    char detail_title_lines[MEM_CONSOLE_DETAIL_TITLE_LINE_LIMIT][MEM_CONSOLE_DETAIL_TEXT_LINE_CAP];
     int detail_title_line_count;
     char detail_connection_summary_text[640];
-    char detail_connection_summary_lines[MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT][256];
+    char detail_connection_summary_lines[MEM_CONSOLE_DETAIL_CONNECTION_WRAP_LINE_LIMIT][MEM_CONSOLE_DETAIL_CONNECTION_LINE_CAP];
     MemConsoleRelationshipItem detail_relationships[MEM_CONSOLE_DETAIL_RELATIONSHIP_LIMIT];
     int detail_relationship_count;
     int detail_relationship_out_count;
     int detail_relationship_in_count;
-    char detail_relationship_summary_line[128];
-    char detail_relationship_group_labels[MEM_CONSOLE_DETAIL_RELATIONSHIP_LIMIT][96];
-    char detail_relationship_row_labels[MEM_CONSOLE_DETAIL_RELATIONSHIP_LIMIT][256];
+    char detail_relationship_summary_line[MEM_CONSOLE_DETAIL_RELATIONSHIP_SUMMARY_LINE_CAP];
+    char detail_relationship_group_labels[MEM_CONSOLE_DETAIL_RELATIONSHIP_LIMIT][MEM_CONSOLE_DETAIL_RELATIONSHIP_GROUP_LABEL_CAP];
+    char detail_relationship_row_labels[MEM_CONSOLE_DETAIL_RELATIONSHIP_LIMIT][MEM_CONSOLE_DETAIL_RELATIONSHIP_ROW_LABEL_CAP];
     char detail_reference_path[1024];
     int64_t detail_reference_scan_item_id;
     int detail_reference_path_available;

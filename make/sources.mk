@@ -1,10 +1,12 @@
 APP_SRCS := src/app/mem_console.c \
+	src/app/mem_console_action_roles.c \
 	src/app/mem_console_app_main.c \
 	src/app/mem_console_app_actions.c \
 	src/app/mem_console_app_db_switch.c \
 	src/app/mem_console_app_events.c \
 	src/app/mem_console_app_loop.c \
 	src/app/mem_console_app_loop_input.c \
+	src/app/mem_console_app_status.c \
 	src/app/mem_console_app_theme.c \
 	src/app/mem_console_workspace_authoring_host.c \
 	src/app/mem_console_kernel_bridge.c \
@@ -21,6 +23,7 @@ APP_SRCS := src/app/mem_console.c \
 	src/runtime/mem_console_runtime.c \
 	src/runtime/mem_console_runtime_refresh.c \
 	src/runtime/mem_console_state.c \
+	src/runtime/mem_console_state_roles.c \
 	src/runtime/mem_console_state_db_picker.c \
 	src/runtime/mem_console_state_core.c \
 	src/runtime/mem_console_state_graph_filters.c \
@@ -36,6 +39,7 @@ APP_SRCS := src/app/mem_console.c \
 	src/ui/mem_console_ui_detail_references.c \
 	src/ui/mem_console_ui_detail_section.c \
 	src/ui/mem_console_ui_hud.c \
+	src/ui/mem_console_visual_artifact.c \
 	src/ui/mem_console_workspace_authoring_overlay.c \
 	src/ui/mem_console_ui_left_browse_filters.c \
 	src/ui/mem_console_ui_left_panel.c \
@@ -52,5 +56,6 @@ APP_SRCS := src/app/mem_console.c \
 	src/ui/graph/mem_console_ui_graph_mode_policy.c \
 	src/ui/graph/mem_console_ui_graph_overlay.c \
 	src/ui/graph/mem_console_ui_graph_project_pods.c \
+	src/ui/graph/mem_console_ui_graph_status.c \
 	src/ui/graph/mem_console_ui_graph_types.c \
 	src/ui/graph/mem_console_ui_graph_panel.c

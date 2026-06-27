@@ -585,7 +585,7 @@ static void apply_multi_edge_route_lanes(const KitGraphStructEdge *edges,
     }
 }
 
-static CoreResult compute_graph_preview_layout(const MemConsoleState *state,
+static CoreResult compute_graph_preview_layout(MemConsoleState *state,
                                                const KitRenderContext *render_ctx,
                                                KitRenderRect bounds,
                                                KitGraphStructNode *out_nodes,
@@ -722,6 +722,12 @@ static CoreResult compute_graph_preview_layout(const MemConsoleState *state,
                                   out_layouts,
                                   node_count);
         }
+        graph_camera_apply_focus_initial_fit(state,
+                                             bounds,
+                                             out_edges,
+                                             edge_count,
+                                             out_layouts,
+                                             node_count);
         graph_camera_apply_to_layouts(out_layouts, node_count, state, bounds);
     }
 
@@ -836,6 +842,7 @@ CoreResult mem_console_ui_graph_ensure_layout_cache(const KitRenderContext *rend
                                            state->graph_layout_edge_count,
                                            state->graph_layout_edge_label_layouts);
 
+    signature = mem_console_ui_graph_preview_layout_signature(state, bounds);
     state->graph_layout_signature = signature;
     state->graph_layout_bounds = bounds;
     state->graph_layout_valid = 1;
@@ -859,7 +866,7 @@ CoreResult mem_console_ui_graph_center_layout_view(MemConsoleState *state) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid graph center request" };
     }
     if (!state->graph_layout_valid || state->graph_layout_node_count == 0u) {
-        return (CoreResult){ CORE_ERR_INVALID_ARG, "graph layout unavailable" };
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "graph layout unavailable; refresh graph first" };
     }
 
     min_x = state->graph_layout_node_layouts[0].rect.x;
@@ -884,7 +891,7 @@ CoreResult mem_console_ui_graph_center_layout_view(MemConsoleState *state) {
     target_center_y = state->graph_layout_bounds.y + (state->graph_layout_bounds.height * 0.5f);
     delta_x = target_center_x - current_center_x;
     delta_y = target_center_y - current_center_y;
-    graph_camera_pan_by_screen_delta(&state->graph_viewport, delta_x, delta_y);
+    graph_camera_pan_live_viewport_by_screen_delta(state, delta_x, delta_y);
 
     state->graph_layout_valid = 0;
     return core_result_ok();
@@ -905,10 +912,10 @@ CoreResult mem_console_ui_graph_center_selected_view(MemConsoleState *state) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid graph focus request" };
     }
     if (state->selected_item_id == 0) {
-        return (CoreResult){ CORE_ERR_INVALID_ARG, "no selected node" };
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "select a memory before centering selected graph node" };
     }
     if (!state->graph_layout_valid || state->graph_layout_node_count == 0u) {
-        return (CoreResult){ CORE_ERR_INVALID_ARG, "graph layout unavailable" };
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "graph layout unavailable; refresh graph first" };
     }
 
     for (i = 0; i < state->graph_node_count; ++i) {
@@ -918,7 +925,7 @@ CoreResult mem_console_ui_graph_center_selected_view(MemConsoleState *state) {
         }
     }
     if (selected_node_id == 0u) {
-        return (CoreResult){ CORE_ERR_INVALID_ARG, "selected node not present in graph" };
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "selected memory not present in graph" };
     }
 
     for (i = 0; i < (int)state->graph_layout_node_count; ++i) {
@@ -939,7 +946,7 @@ CoreResult mem_console_ui_graph_center_selected_view(MemConsoleState *state) {
     target_center_y = state->graph_layout_bounds.y + (state->graph_layout_bounds.height * 0.5f);
     delta_x = target_center_x - current_center_x;
     delta_y = target_center_y - current_center_y;
-    graph_camera_pan_by_screen_delta(&state->graph_viewport, delta_x, delta_y);
+    graph_camera_pan_live_viewport_by_screen_delta(state, delta_x, delta_y);
 
     state->graph_layout_valid = 0;
     return core_result_ok();

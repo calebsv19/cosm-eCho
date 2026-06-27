@@ -31,12 +31,24 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
     (void)snprintf(input_root, sizeof(input_root), "%s", state->input_root);
     (void)snprintf(output_root, sizeof(output_root), "%s", state->output_root);
 
+    {
+        const char *path_error = mem_console_db_path_policy_error(next_db_path);
+        if (path_error) {
+            result = (CoreResult){ CORE_ERR_INVALID_ARG, path_error };
+            mem_console_app_set_path_result_status(state, "DB path validation", next_db_path, result);
+            return result;
+        }
+    }
+
     if (!mem_console_ensure_parent_directory(next_db_path)) {
-        return (CoreResult){ CORE_ERR_IO, "failed to create DB directory" };
+        result = (CoreResult){ CORE_ERR_IO, "failed to create DB directory" };
+        mem_console_app_set_path_result_status(state, "DB directory creation", next_db_path, result);
+        return result;
     }
 
     result = core_memdb_open(next_db_path, &next_db);
     if (result.code != CORE_OK) {
+        mem_console_app_set_path_result_status(state, "DB open", next_db_path, result);
         return result;
     }
 
@@ -44,6 +56,7 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
         result = mem_console_prefs_save(prefs_path, state);
         if (result.code != CORE_OK) {
             (void)core_memdb_close(&next_db);
+            mem_console_app_set_path_result_status(state, "Previous UI prefs save", prefs_path, result);
             return result;
         }
     }
@@ -51,6 +64,7 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
     result = core_memdb_close(db);
     if (result.code != CORE_OK) {
         (void)core_memdb_close(&next_db);
+        mem_console_app_set_path_result_status(state, "Current DB close", state->db_path, result);
         return result;
     }
 
@@ -62,7 +76,7 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
     if (*prefs_path_valid) {
         result = mem_console_prefs_load(prefs_path, state);
         if (result.code != CORE_OK) {
-            (void)snprintf(state->status_line, sizeof(state->status_line), "UI prefs load failed.");
+            mem_console_app_set_path_result_status(state, "UI prefs load", prefs_path, result);
         }
     }
 
@@ -70,19 +84,23 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
 
     result = refresh_state_from_db(db, state);
     if (result.code != CORE_OK) {
+        mem_console_app_set_path_result_status(state, "DB refresh after switch", state->db_path, result);
         return result;
     }
     sync_edit_buffers_from_selection(state);
     result = kit_render_set_theme_preset(render_ctx, state->theme_preset_id);
     if (result.code != CORE_OK) {
+        mem_console_app_set_path_result_status(state, "Theme apply after DB switch", state->db_path, result);
         return result;
     }
     result = kit_render_set_font_preset(render_ctx, state->font_preset_id);
     if (result.code != CORE_OK) {
+        mem_console_app_set_path_result_status(state, "Font apply after DB switch", state->db_path, result);
         return result;
     }
     result = kit_render_set_text_zoom_step(render_ctx, state->text_zoom_step);
     if (result.code != CORE_OK) {
+        mem_console_app_set_path_result_status(state, "Text zoom apply after DB switch", state->db_path, result);
         return result;
     }
     (void)kit_ui_style_apply_theme_scale(ui_ctx);
@@ -91,7 +109,7 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
     if (*prefs_path_valid) {
         *prefs_last_saved_signature = mem_console_prefs_state_signature(state);
         *prefs_signature_valid = 1;
-        state->pane_prefs_dirty = 0;
+        mem_console_pane_prefs_mark_clean(state);
     } else {
         *prefs_signature_valid = 0;
     }
@@ -103,11 +121,12 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
                                             state->output_root,
                                             state->active_db_path);
         if (result.code != CORE_OK) {
+            mem_console_app_set_path_result_status(state, "App prefs save", app_prefs_path, result);
             return result;
         }
     }
 
-    (void)snprintf(state->status_line, sizeof(state->status_line), "Active DB switched to %s.", state->db_path);
-    mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT | MEM_CONSOLE_REDRAW_REASON_LAYOUT);
+    mem_console_app_set_statusf(state, "Active DB switched to %s.", state->db_path);
+    mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_LAYOUT);
     return core_result_ok();
 }

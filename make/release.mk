@@ -46,6 +46,11 @@ release-bundle-audit: release-build
 	done
 	@! rg -q '/opt/homebrew|/usr/local|/Users/' "$(RELEASE_DIR)"/otool_*.txt || (echo "Found non-portable dylib linkage"; exit 1)
 	@! rg -q '@rpath/' "$(RELEASE_DIR)"/otool_*.txt || (echo "Found unresolved @rpath dylib linkage"; exit 1)
+	@find "$(PACKAGE_APP_DIR)" -print > "$(RELEASE_DIR)/bundle_manifest.txt"
+	@! rg -q '(^|/)(_private_workspace_artifacts|demo|tmp|ide_files)(/|$$)' "$(RELEASE_DIR)/bundle_manifest.txt" || (echo "Found private/generated path in release bundle"; exit 1)
+	@! rg -q '(^|/)data/.*\.ui\.pack$$' "$(RELEASE_DIR)/bundle_manifest.txt" || (echo "Found packaged UI prefs sidecar in release bundle"; exit 1)
+	@extra_data="$$(find "$(PACKAGE_RESOURCES_DIR)/data" -type f ! -name default.sqlite -print -quit)"; \
+		[ -z "$$extra_data" ] || (echo "Unexpected release data sidecar: $$extra_data"; exit 1)
 	@"$(PACKAGE_MACOS_DIR)/mem-console-launcher" --print-config > "$(RELEASE_DIR)/print_config.txt"
 	@rg -q '^MEM_CONSOLE_RUNTIME_DIR=' "$(RELEASE_DIR)/print_config.txt" || (echo "Missing MEM_CONSOLE_RUNTIME_DIR in launcher config"; exit 1)
 	@rg -q '^VK_ICD_FILENAMES=' "$(RELEASE_DIR)/print_config.txt" || (echo "Missing VK_ICD_FILENAMES in launcher config"; exit 1)

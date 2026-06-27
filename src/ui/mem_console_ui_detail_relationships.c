@@ -1,106 +1,18 @@
 #include "mem_console_ui_detail_section_internal.h"
 
+#include "mem_console_state_roles.h"
 #include "mem_console_ui_common.h"
-
-#include <stdio.h>
-#include <string.h>
-
-static int relationship_group_changed(const MemConsoleRelationshipItem *prev,
-                                      const MemConsoleRelationshipItem *item) {
-    if (!item) {
-        return 0;
-    }
-    if (!prev) {
-        return 1;
-    }
-    if (prev->outgoing != item->outgoing) {
-        return 1;
-    }
-    if (strncmp(prev->kind, item->kind, sizeof(item->kind)) != 0) {
-        return 1;
-    }
-    return 0;
-}
-
-static int relationship_group_count(const MemConsoleState *state) {
-    const MemConsoleRelationshipItem *prev = 0;
-    int count = 0;
-    int i;
-
-    if (!state) {
-        return 0;
-    }
-
-    for (i = 0; i < state->detail_relationship_count; ++i) {
-        const MemConsoleRelationshipItem *item = &state->detail_relationships[i];
-        if (relationship_group_changed(prev, item)) {
-            count += 1;
-        }
-        prev = item;
-    }
-    return count;
-}
-
-static void relationship_format_group_label(MemConsoleState *state,
-                                            int group_index,
-                                            const MemConsoleRelationshipItem *item) {
-    const char *direction;
-    const char *kind;
-
-    if (!state || group_index < 0 || group_index >= MEM_CONSOLE_DETAIL_RELATIONSHIP_LIMIT || !item) {
-        return;
-    }
-
-    direction = item->outgoing ? "OUT" : "IN";
-    kind = item->kind[0] ? item->kind : "RELATED";
-    (void)snprintf(state->detail_relationship_group_labels[group_index],
-                   sizeof(state->detail_relationship_group_labels[group_index]),
-                   "%s %s",
-                   direction,
-                   kind);
-}
-
-static void relationship_format_row_label(MemConsoleState *state,
-                                          int row_index,
-                                          const MemConsoleRelationshipItem *item) {
-    const char *arrow;
-    const char *project_key;
-    const char *neighbor_kind;
-    const char *title;
-
-    if (!state || row_index < 0 || row_index >= MEM_CONSOLE_DETAIL_RELATIONSHIP_LIMIT || !item) {
-        return;
-    }
-
-    arrow = item->outgoing ? "->" : "<-";
-    project_key = item->neighbor_project_key[0] ? item->neighbor_project_key : "misc";
-    neighbor_kind = item->neighbor_kind[0] ? item->neighbor_kind : "memory";
-    title = item->neighbor_title[0] ? item->neighbor_title : "UNTITLED";
-
-    (void)snprintf(state->detail_relationship_row_labels[row_index],
-                   sizeof(state->detail_relationship_row_labels[row_index]),
-                   "%s %lld [%s] %s | %s",
-                   arrow,
-                   (long long)item->neighbor_item_id,
-                   project_key,
-                   neighbor_kind,
-                   title);
-}
 
 static CoreResult relationship_draw_empty(KitUiContext *ui_ctx,
                                           KitRenderFrame *frame,
                                           KitRenderRect bounds,
-                                          MemConsoleState *state) {
-    (void)snprintf(state->detail_connection_summary_lines[0],
-                   sizeof(state->detail_connection_summary_lines[0]),
-                   "%s",
-                   state->selected_item_id == 0
-                       ? "Select a memory to inspect relationships."
-                       : "No relationships for selected memory.");
+                                          const MemConsoleDetailRenderState *view,
+                                          MemConsoleDetailRenderStorage *storage) {
+    mem_console_detail_derive_empty_relationship_line(view, storage);
     return mem_console_ui_draw_info_line_custom(ui_ctx,
                                                 frame,
                                                 bounds,
-                                                state->detail_connection_summary_lines[0],
+                                                storage->connection_summary_lines[0],
                                                 CORE_THEME_COLOR_TEXT_MUTED,
                                                 CORE_FONT_ROLE_UI_REGULAR,
                                                 CORE_FONT_TEXT_SIZE_CAPTION);
@@ -190,7 +102,7 @@ static CoreResult relationship_draw_add_controls(KitRenderContext *render_ctx,
     }
     if (input->mouse_released && kit_ui_point_in_rect(input_rect, input->mouse_x, input->mouse_y)) {
         float text_origin_x = input_rect.x + ui_ctx->style.padding;
-        state->input_target = MEM_CONSOLE_INPUT_RELATIONSHIP_TARGET;
+        mem_console_input_target_set(state, MEM_CONSOLE_INPUT_RELATIONSHIP_TARGET);
         state->relationship_target_cursor = mem_console_ui_cursor_index_for_click(state->relationship_target_text,
                                                                                   render_ctx,
                                                                                   input->mouse_x,
@@ -228,6 +140,8 @@ CoreResult mem_console_ui_detail_draw_relationships(KitRenderContext *render_ctx
                                                     int wheel_y,
                                                     const MemConsoleLayoutConfig *layout_cfg,
                                                     MemConsoleAction *io_action) {
+    MemConsoleDetailRenderState render_view;
+    MemConsoleDetailRenderStorage render_storage;
     KitRenderRect panel;
     KitRenderRect header_rect;
     KitRenderRect content_viewport;
@@ -248,6 +162,10 @@ CoreResult mem_console_ui_detail_draw_relationships(KitRenderContext *render_ctx
 
     if (!render_ctx || !ui_ctx || !frame || !state || !input || !layout_cfg) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid relationship inspector draw request" };
+    }
+    if (!mem_console_detail_render_state_from_state(state, &render_view) ||
+        !mem_console_detail_render_storage_from_state(state, &render_storage)) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid relationship render state" };
     }
 
     panel = (KitRenderRect){
@@ -275,9 +193,7 @@ CoreResult mem_console_ui_detail_draw_relationships(KitRenderContext *render_ctx
     result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                   frame,
                                                   header_rect,
-                                                  state->detail_relationship_summary_line[0]
-                                                      ? state->detail_relationship_summary_line
-                                                      : "RELATIONSHIPS",
+                                                  mem_console_detail_relationship_header_label(&render_view),
                                                   CORE_THEME_COLOR_TEXT_MUTED,
                                                   CORE_FONT_ROLE_UI_MEDIUM,
                                                   CORE_FONT_TEXT_SIZE_CAPTION);
@@ -313,17 +229,18 @@ CoreResult mem_console_ui_detail_draw_relationships(KitRenderContext *render_ctx
         return core_result_ok();
     }
 
-    if (state->detail_relationship_count <= 0) {
+    if (render_view.relationship_count <= 0) {
         return relationship_draw_empty(ui_ctx,
                                        frame,
                                        content_viewport,
-                                       state);
+                                       &render_view,
+                                       &render_storage);
     }
 
-    group_total = relationship_group_count(state);
+    group_total = mem_console_detail_relationship_group_count(&render_view);
     content_height = top_pad +
                      ((float)group_total * group_h) +
-                     ((float)state->detail_relationship_count * row_h) +
+                     ((float)render_view.relationship_count * row_h) +
                      8.0f;
     if (content_height < content_viewport.height) {
         content_height = content_viewport.height;
@@ -370,18 +287,21 @@ CoreResult mem_console_ui_detail_draw_relationships(KitRenderContext *render_ctx
         content_viewport.width,
         group_h
     };
-    for (i = 0; i < state->detail_relationship_count; ++i) {
-        const MemConsoleRelationshipItem *item = &state->detail_relationships[i];
+    for (i = 0; i < render_view.relationship_count; ++i) {
+        const MemConsoleRelationshipItem *item = &render_view.relationships[i];
 
-        if (relationship_group_changed(prev, item)) {
-            relationship_format_group_label(state, group_index, item);
+        if (mem_console_detail_relationship_group_changed(prev, item)) {
+            (void)mem_console_detail_derive_relationship_group_label(&render_view,
+                                                                     &render_storage,
+                                                                     group_index,
+                                                                     item);
             draw_rect.height = group_h;
             if (draw_rect.y + draw_rect.height >= content_viewport.y &&
                 draw_rect.y <= content_viewport.y + content_viewport.height) {
                 result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                               frame,
                                                               draw_rect,
-                                                              state->detail_relationship_group_labels[group_index],
+                                                              render_storage.relationship_group_labels[group_index],
                                                               CORE_THEME_COLOR_TEXT_MUTED,
                                                               CORE_FONT_ROLE_UI_MEDIUM,
                                                               CORE_FONT_TEXT_SIZE_CAPTION);
@@ -394,7 +314,10 @@ CoreResult mem_console_ui_detail_draw_relationships(KitRenderContext *render_ctx
             group_index += 1;
         }
 
-        relationship_format_row_label(state, i, item);
+        (void)mem_console_detail_derive_relationship_row_label(&render_view,
+                                                               &render_storage,
+                                                               i,
+                                                               item);
         draw_rect.height = row_h;
         if (draw_rect.y + draw_rect.height >= content_viewport.y &&
             draw_rect.y <= content_viewport.y + content_viewport.height) {
@@ -438,9 +361,8 @@ CoreResult mem_console_ui_detail_draw_relationships(KitRenderContext *render_ctx
                 button.state = KIT_UI_STATE_ACTIVE;
             }
             if (button.clicked && (!io_action || *io_action == MEM_CONSOLE_ACTION_NONE)) {
-                mem_console_select_item_for_navigation(state,
+                mem_console_select_item_for_inspection(state,
                                                        item->neighbor_item_id,
-                                                       1,
                                                        1,
                                                        io_action);
             }
@@ -448,7 +370,7 @@ CoreResult mem_console_ui_detail_draw_relationships(KitRenderContext *render_ctx
             result = mem_console_ui_draw_button_custom(ui_ctx,
                                                        frame,
                                                        nav_rect,
-                                                       state->detail_relationship_row_labels[i],
+                                                       render_storage.relationship_row_labels[i],
                                                        button.state,
                                                        CORE_FONT_ROLE_UI_REGULAR,
                                                        CORE_FONT_TEXT_SIZE_CAPTION);

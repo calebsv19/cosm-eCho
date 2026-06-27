@@ -1,7 +1,5 @@
 #include "mem_console_app_internal.h"
 
-#include <stdio.h>
-
 static void mark_search_input_changed(MemConsoleState *state);
 static void append_graph_edge_limit_digits(MemConsoleState *state, const char *text);
 static void commit_graph_edge_limit_input(MemConsoleState *state,
@@ -51,10 +49,7 @@ static void commit_graph_edge_limit_input(MemConsoleState *state,
 
     *keyboard_action = MEM_CONSOLE_ACTION_REFRESH_GRAPH;
     if (changed) {
-        (void)snprintf(state->status_line,
-                       sizeof(state->status_line),
-                       "Graph edge limit set to %d.",
-                       parsed_limit);
+        mem_console_app_set_statusf(state, "Graph edge limit set to %d.", parsed_limit);
     }
     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
 }
@@ -122,10 +117,9 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
                 }
                 if (ctrl_or_cmd && event->key.keysym.sym == SDLK_l) {
                     state->graph_edge_labels_enabled = state->graph_edge_labels_enabled ? 0 : 1;
-                    (void)snprintf(state->status_line,
-                                   sizeof(state->status_line),
-                                   "Edge labels %s.",
-                                   state->graph_edge_labels_enabled ? "enabled" : "disabled");
+                    mem_console_app_set_statusf(state,
+                                                "Edge labels %s.",
+                                                state->graph_edge_labels_enabled ? "enabled" : "disabled");
                     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
                     break;
                 }

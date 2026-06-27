@@ -134,7 +134,7 @@ CoreResult create_selected_relationship_to_target(CoreMemDb *db,
     }
     *out_link_id = 0;
     if (state->selected_item_id <= 0) {
-        return (CoreResult){ CORE_ERR_INVALID_ARG, "no selected item" };
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "select a memory before adding relationship" };
     }
     if (!parse_target_item_id(state->relationship_target_text, &target_item_id)) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "enter a numeric target memory id" };
@@ -208,8 +208,11 @@ CoreResult cycle_selected_relationship_kind(CoreMemDb *db,
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid argument" };
     }
     *out_link_id = 0;
-    if (state->selected_item_id <= 0 || state->relationship_action_link_id <= 0) {
-        return (CoreResult){ CORE_ERR_INVALID_ARG, "select a relationship first" };
+    if (state->selected_item_id <= 0) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "select a memory before changing relationship kind" };
+    }
+    if (state->relationship_action_link_id <= 0) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "select a relationship before changing kind" };
     }
 
     result = core_memdb_prepare(db,
@@ -310,8 +313,11 @@ CoreResult remove_selected_relationship(CoreMemDb *db,
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid argument" };
     }
     *out_link_id = 0;
-    if (state->selected_item_id <= 0 || state->relationship_action_link_id <= 0) {
-        return (CoreResult){ CORE_ERR_INVALID_ARG, "select a relationship first" };
+    if (state->selected_item_id <= 0) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "select a memory before removing relationship" };
+    }
+    if (state->relationship_action_link_id <= 0) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "select a relationship before removing" };
     }
 
     result = core_memdb_prepare(db,

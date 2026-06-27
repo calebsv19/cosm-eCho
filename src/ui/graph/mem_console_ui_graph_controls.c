@@ -437,7 +437,7 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
             !has_any_edit_mode &&
             kit_ui_point_in_rect(graph_edge_input_rect, input->mouse_x, input->mouse_y)) {
             float text_origin_x = graph_edge_input_rect.x + 6.0f + ui_ctx->style.padding;
-            state->input_target = MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT;
+            mem_console_input_target_set(state, MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT);
             state->graph_edge_limit_cursor = mem_console_ui_cursor_index_for_click(state->graph_edge_limit_text,
                                                                                    render_ctx,
                                                                                    input->mouse_x,
@@ -737,9 +737,9 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
             }
         }
     } else {
-        state->input_target = state->input_target == MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT
-                                  ? MEM_CONSOLE_INPUT_SEARCH
-                                  : state->input_target;
+        if (state->input_target == MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT) {
+            mem_console_input_target_set(state, MEM_CONSOLE_INPUT_SEARCH);
+        }
         result = kit_ui_stack_next(right_layout, layout_cfg->graph_collapsed_hint_h, 0.0f, &graph_hint_row);
         if (result.code != CORE_OK) {
             return result;

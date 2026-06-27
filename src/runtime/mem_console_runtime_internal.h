@@ -37,6 +37,7 @@ typedef struct MemConsoleRuntimeMetricsSnapshot {
     uint64_t refresh_dropped_editing;
     uint64_t refresh_errors;
     uint64_t refresh_coalesced;
+    uint64_t latest_refresh_error_id;
     int refresh_in_flight;
     int pending_intent_valid;
 } MemConsoleRuntimeMetricsSnapshot;

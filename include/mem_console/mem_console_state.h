@@ -13,6 +13,9 @@ int mem_console_path_parent(const char *path, char *out_path, size_t out_cap);
 int mem_console_ensure_directory(const char *path);
 int mem_console_ensure_parent_directory(const char *path);
 int mem_console_path_is_mutable_root_safe(const char *path);
+int mem_console_path_has_sqlite_suffix(const char *path);
+const char *mem_console_db_path_policy_error(const char *path);
+int mem_console_db_path_is_safe(const char *path);
 int mem_console_resolve_app_data_dir(char *out_path, size_t out_cap);
 int resolve_default_db_path(char *out_path, size_t out_cap);
 int mem_console_path_contract_normalize(const char *input_root_hint,
@@ -41,6 +44,14 @@ int state_adjust_text_zoom_step(MemConsoleState *state, int delta);
 int state_reset_text_zoom_step(MemConsoleState *state);
 
 void seed_state(MemConsoleState *state, const char *db_path);
+void mem_console_input_target_set(MemConsoleState *state, MemConsoleInputTarget input_target);
+void mem_console_pane_prefs_mark_dirty(MemConsoleState *state);
+void mem_console_pane_prefs_mark_clean(MemConsoleState *state);
+void mem_console_selection_set(MemConsoleState *state, int64_t item_id);
+void mem_console_selection_clear(MemConsoleState *state);
+void mem_console_graph_center_set(MemConsoleState *state, int64_t item_id);
+void mem_console_selection_center_on(MemConsoleState *state, int64_t item_id);
+void mem_console_selection_apply_refreshed(MemConsoleState *state, const MemConsoleState *refreshed);
 void mem_console_state_set_path_contract(MemConsoleState *state,
                                          const char *input_root,
                                          const char *output_root,
@@ -91,6 +102,10 @@ void mem_console_project_filter_prune_to_options(MemConsoleState *state);
 
 int selected_id_in_visible_items(const MemConsoleState *state);
 void sync_edit_buffers_from_selection(MemConsoleState *state);
+void mem_console_select_item_for_inspection(MemConsoleState *state,
+                                            int64_t item_id,
+                                            int enable_graph_mode,
+                                            MemConsoleAction *io_action);
 void mem_console_select_item_for_navigation(MemConsoleState *state,
                                             int64_t item_id,
                                             int enable_graph_mode,

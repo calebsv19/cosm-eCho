@@ -21,3 +21,9 @@ Reset helper:
 
 Example:
 - `./mem_console/demo/reset_demo_db.sh`
+
+Safety:
+- destructive demo helpers do not default to `CODEWORK_MEMDB_PATH`
+- helper writes are limited to `.sqlite` files under `mem_console/demo` or
+  `mem_console/build` unless `MEM_CONSOLE_ALLOW_NON_DEMO_DB=1` is set for an
+  intentional non-demo target

@@ -14,6 +14,7 @@
 
 #include "mem_console_app_internal.h"
 #include "mem_console_prefs.h"
+#include "ui/mem_console_visual_artifact.h"
 
 static int mem_console_build_legacy_app_prefs_path(char *out_path, size_t out_cap) {
     const char *home_path = getenv("HOME");
@@ -56,6 +57,8 @@ typedef struct MemConsoleAppMainContext {
     char **argv;
     const char *db_path;
     const char *db_flag;
+    const char *visual_review_mode_flag;
+    const char *visual_review_selected_id_flag;
     char app_prefs_path[1200];
     char app_prefs_legacy_path[1200];
     char app_prefs_db_path[1024];
@@ -79,6 +82,9 @@ typedef struct MemConsoleAppMainContext {
     MemConsoleKernelBridge kernel_bridge;
     MemConsoleAppLoopContext loop_ctx;
     int kernel_bridge_requested;
+    int visual_review_requested;
+    int visual_review_mode;
+    int64_t visual_review_selected_id;
     int exit_code;
     int app_prefs_path_valid;
     int prefs_path_valid;
@@ -97,6 +103,44 @@ typedef struct MemConsoleAppMainContext {
     MemConsoleWrapperError wrapper_error;
     MemConsoleAppStage stage;
 } MemConsoleAppMainContext;
+
+static int mem_console_parse_visual_review_mode(const char *text, int *out_mode) {
+    if (!out_mode) {
+        return 0;
+    }
+    if (!text || !text[0] || strcmp(text, "focus") == 0 || strcmp(text, "FOCUS") == 0) {
+        *out_mode = MEM_CONSOLE_GRAPH_VIEW_FOCUS;
+        return 1;
+    }
+    if (strcmp(text, "pods") == 0 || strcmp(text, "PODS") == 0) {
+        *out_mode = MEM_CONSOLE_GRAPH_VIEW_PODS;
+        return 1;
+    }
+    if (strcmp(text, "web") == 0 || strcmp(text, "WEB") == 0) {
+        *out_mode = MEM_CONSOLE_GRAPH_VIEW_WEB;
+        return 1;
+    }
+    return 0;
+}
+
+static int mem_console_parse_visual_review_item_id(const char *text, int64_t *out_item_id) {
+    char *end = 0;
+    long long value = 0;
+
+    if (!out_item_id) {
+        return 0;
+    }
+    *out_item_id = 0;
+    if (!text || !text[0]) {
+        return 1;
+    }
+    value = strtoll(text, &end, 10);
+    if (!end || *end != '\0' || value <= 0) {
+        return 0;
+    }
+    *out_item_id = (int64_t)value;
+    return 1;
+}
 
 static void mem_console_log_wrapper_error(const char *fn_name,
                                           MemConsoleWrapperError wrapper_error,
@@ -179,6 +223,27 @@ static int mem_console_app_config_load(MemConsoleAppMainContext *ctx) {
 
     ctx->db_flag = find_flag_value(ctx->argc, ctx->argv, "--db");
     ctx->kernel_bridge_requested = has_flag(ctx->argc, ctx->argv, "--kernel-bridge");
+    ctx->visual_review_requested = has_flag(ctx->argc, ctx->argv, "--visual-review");
+    ctx->visual_review_mode_flag = find_flag_value(ctx->argc, ctx->argv, "--visual-review-mode");
+    ctx->visual_review_selected_id_flag = find_flag_value(ctx->argc, ctx->argv, "--visual-review-selected-id");
+    ctx->visual_review_mode = MEM_CONSOLE_GRAPH_VIEW_FOCUS;
+    ctx->visual_review_selected_id = 0;
+    if ((ctx->visual_review_mode_flag || ctx->visual_review_selected_id_flag) &&
+        !ctx->visual_review_requested) {
+        fprintf(stderr, "mem_console: --visual-review is required with visual review mode or selected id flags.\n");
+        return 0;
+    }
+    if (ctx->visual_review_requested &&
+        !mem_console_parse_visual_review_mode(ctx->visual_review_mode_flag, &ctx->visual_review_mode)) {
+        fprintf(stderr, "mem_console: invalid --visual-review-mode value.\n");
+        return 0;
+    }
+    if (ctx->visual_review_requested &&
+        !mem_console_parse_visual_review_item_id(ctx->visual_review_selected_id_flag,
+                                                 &ctx->visual_review_selected_id)) {
+        fprintf(stderr, "mem_console: invalid --visual-review-selected-id value.\n");
+        return 0;
+    }
     default_output_root[0] = '\0';
     if (mem_console_resolve_app_data_dir(default_output_root, sizeof(default_output_root)) &&
         mem_console_build_app_prefs_path_for_output_root(default_output_root,
@@ -272,14 +337,24 @@ static int mem_console_app_state_seed(MemConsoleAppMainContext *ctx) {
     if (ctx->prefs_path_valid) {
         ctx->result = mem_console_prefs_load(ctx->prefs_path, &ctx->state);
         if (ctx->result.code != CORE_OK) {
-            (void)snprintf(ctx->state.status_line,
-                           sizeof(ctx->state.status_line),
-                           "UI prefs load failed.");
+            mem_console_app_set_path_result_status(&ctx->state,
+                                                   "UI prefs load",
+                                                   ctx->prefs_path,
+                                                   ctx->result);
         } else if (ctx->result.message && strcmp(ctx->result.message, "prefs loaded") == 0) {
-            (void)snprintf(ctx->state.status_line,
-                           sizeof(ctx->state.status_line),
-                           "UI prefs restored.");
+            mem_console_app_set_statusf(&ctx->state, "UI prefs restored.");
         }
+    }
+    if (ctx->visual_review_requested) {
+        if (ctx->visual_review_selected_id > 0) {
+            mem_console_selection_center_on(&ctx->state, ctx->visual_review_selected_id);
+        }
+        (void)mem_console_graph_view_mode_set(&ctx->state, ctx->visual_review_mode);
+        mem_console_graph_view_mode_reset_viewport(&ctx->state);
+        ctx->state.graph_edge_labels_enabled = 1;
+        ctx->state.graph_edge_limit_cursor = 0;
+        mem_console_graph_edge_limit_set(&ctx->state, 1024);
+        mem_console_app_set_statusf(&ctx->state, "Visual review fixture mode active.");
     }
     ctx->state.kernel_bridge_enabled = ctx->kernel_bridge_requested ? 1 : 0;
 
@@ -300,7 +375,7 @@ static int mem_console_app_state_seed(MemConsoleAppMainContext *ctx) {
     if (ctx->prefs_path_valid) {
         ctx->prefs_last_saved_signature = mem_console_prefs_state_signature(&ctx->state);
         ctx->prefs_signature_valid = 1;
-        ctx->state.pane_prefs_dirty = 0;
+        mem_console_pane_prefs_mark_clean(&ctx->state);
     }
     if (ctx->app_prefs_path_valid) {
         ctx->result = mem_console_app_prefs_save(ctx->app_prefs_path,
@@ -309,9 +384,10 @@ static int mem_console_app_state_seed(MemConsoleAppMainContext *ctx) {
                                                  ctx->state.output_root,
                                                  ctx->state.active_db_path);
         if (ctx->result.code != CORE_OK) {
-            (void)snprintf(ctx->state.status_line,
-                           sizeof(ctx->state.status_line),
-                           "App prefs save failed.");
+            mem_console_app_set_path_result_status(&ctx->state,
+                                                   "App prefs save",
+                                                   ctx->app_prefs_path,
+                                                   ctx->result);
         }
     }
 
@@ -484,7 +560,7 @@ static int mem_console_app_run_loop_stage(MemConsoleAppMainContext *ctx) {
     if (ctx->prefs_path_valid && ctx->state.pane_prefs_dirty) {
         ctx->result = mem_console_prefs_save(ctx->prefs_path, &ctx->state);
         if (ctx->result.code == CORE_OK) {
-            ctx->state.pane_prefs_dirty = 0;
+            mem_console_pane_prefs_mark_clean(&ctx->state);
             ctx->prefs_last_saved_signature = mem_console_prefs_state_signature(&ctx->state);
             ctx->prefs_signature_valid = 1;
         }
@@ -541,6 +617,10 @@ static void mem_console_app_shutdown(MemConsoleAppMainContext *ctx) {
 
 int mem_console_app_main(int argc, char **argv) {
     MemConsoleAppMainContext ctx;
+
+    if (find_flag_value(argc, argv, "--visual-artifact")) {
+        return mem_console_visual_artifact_run_cli(argc, argv);
+    }
 
     if (!mem_console_app_bootstrap(&ctx, argc, argv)) {
         mem_console_log_wrapper_error(__func__,

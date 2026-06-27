@@ -116,7 +116,7 @@ static void mem_console_workspace_authoring_restore_baseline(MemConsoleWorkspace
     (void)state_set_theme_preset(state, (CoreThemePresetId)host->baseline_theme_preset_id);
     (void)state_set_font_preset(state, (CoreFontPresetId)host->baseline_font_preset_id);
     (void)state_set_text_zoom_step(state, host->baseline_text_zoom_step);
-    state->pane_prefs_dirty = 0;
+    mem_console_pane_prefs_mark_clean(state);
     mem_console_workspace_authoring_apply_render_state(state, render_ctx, ui_ctx);
     host->font_theme_pending_changes = 0u;
 }
@@ -181,8 +181,8 @@ static void mem_console_workspace_authoring_apply(MemConsoleWorkspaceAuthoringHo
         host->last_event_accepted = 1u;
         host->font_theme_baseline_valid = 0u;
         host->font_theme_pending_changes = 0u;
-        state->pane_prefs_dirty = 1;
-        (void)snprintf(state->status_line, sizeof(state->status_line), "Authoring applied.");
+        mem_console_pane_prefs_mark_dirty(state);
+        mem_console_app_set_statusf(state, "Authoring applied.");
     }
     host->key_c_down = 0u;
     host->key_v_down = 0u;
@@ -203,7 +203,7 @@ static void mem_console_workspace_authoring_cancel(MemConsoleWorkspaceAuthoringH
         mem_console_workspace_authoring_restore_baseline(host, state, render_ctx, ui_ctx);
         host->active = 0u;
         host->last_event_canceled = 1u;
-        (void)snprintf(state->status_line, sizeof(state->status_line), "Authoring canceled.");
+        mem_console_app_set_statusf(state, "Authoring canceled.");
     }
     host->key_c_down = 0u;
     host->key_v_down = 0u;

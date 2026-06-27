@@ -3,12 +3,11 @@
 #include "mem_console_ui_common.h"
 #include "mem_console_ui_left_browse_filters.h"
 #include "mem_console_ui_left_panel.h"
+#include "mem_console_state_roles.h"
 
 #include <SDL2/SDL.h>
 #include <limits.h>
 #include <math.h>
-#include <stdio.h>
-#include <time.h>
 
 static float left_panel_clampf(float value, float min_value, float max_value) {
     if (value < min_value) {
@@ -78,8 +77,8 @@ static void left_panel_compute_bounds(const MemConsoleState *state,
 
     bottom_min_h = layout_cfg->left_section_h +
                    layout_cfg->left_results_header_h +
-                   layout_cfg->left_status_h +
-                   (ui_gap * 2.0f) +
+                   (layout_cfg->left_status_h * 2.0f) +
+                   (ui_gap * 3.0f) +
                    52.0f;
 
     min_sum = top_min_h + bottom_min_h;
@@ -145,33 +144,6 @@ static void left_panel_compute_bounds(const MemConsoleState *state,
     if (out_max_ratio) {
         *out_max_ratio = max_ratio;
     }
-}
-
-static void left_panel_format_updated_ns(int64_t updated_ns, char *out_text, size_t out_cap) {
-    time_t seconds;
-    struct tm tm_value;
-
-    if (!out_text || out_cap == 0u) {
-        return;
-    }
-    out_text[0] = '\0';
-    if (updated_ns <= 0) {
-        (void)snprintf(out_text, out_cap, "time ?");
-        return;
-    }
-
-    seconds = (time_t)(updated_ns / 1000000000LL);
-    if (localtime_r(&seconds, &tm_value) == NULL) {
-        (void)snprintf(out_text, out_cap, "time ?");
-        return;
-    }
-    (void)snprintf(out_text,
-                   out_cap,
-                   "%02d/%02d %02d:%02d",
-                   tm_value.tm_mon + 1,
-                   tm_value.tm_mday,
-                   tm_value.tm_hour,
-                   tm_value.tm_min);
 }
 
 int mem_console_ui_left_begin_panel_drag(MemConsoleState *state,
@@ -270,7 +242,7 @@ int mem_console_ui_left_update_panel_drag(MemConsoleState *state,
     }
 
     state->left_panel_top_ratio = next_ratio;
-    state->pane_prefs_dirty = 1;
+    mem_console_pane_prefs_mark_dirty(state);
     return 1;
 }
 
@@ -314,9 +286,15 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
     float row_pitch;
     float content_height;
     float max_scroll;
+    MemConsoleLeftPanelRenderState render_state;
+    MemConsoleLeftPanelRenderStorage render_storage;
 
     if (!render_ctx || !ui_ctx || !frame || !state || !input || !layout_cfg || !io_action) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid left section draw request" };
+    }
+    if (!mem_console_left_panel_render_state_from_state(state, &render_state) ||
+        !mem_console_left_panel_render_storage_from_state(state, &render_storage)) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid left panel render state" };
     }
 
     left_panel_compute_bounds(state,
@@ -358,16 +336,13 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
     {
         CoreResult result = kit_ui_stack_next(&top_layout, layout_cfg->left_info_row_h, 0.0f, &row);
         if (result.code != CORE_OK) return result;
-        (void)snprintf(state->db_summary_line, sizeof(state->db_summary_line), "DB: %s", state->db_path);
-        format_text_for_width(state->db_summary_draw_line,
-                              sizeof(state->db_summary_draw_line),
-                              state->db_summary_line,
-                              row.width - (ui_ctx->style.padding * 2.0f),
-                              CORE_FONT_TEXT_SIZE_CAPTION);
+        mem_console_left_panel_derive_db_summary(&render_state,
+                                                 &render_storage,
+                                                 row.width - (ui_ctx->style.padding * 2.0f));
         result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                       frame,
                                                       row,
-                                                      state->db_summary_draw_line,
+                                                      render_storage.db_summary_draw_line,
                                                       CORE_THEME_COLOR_TEXT_MUTED,
                                                       CORE_FONT_ROLE_UI_REGULAR,
                                                       CORE_FONT_TEXT_SIZE_CAPTION);
@@ -377,19 +352,13 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
     {
         CoreResult result = kit_ui_stack_next(&top_layout, layout_cfg->left_info_row_h, 0.0f, &row);
         if (result.code != CORE_OK) return result;
-        (void)snprintf(state->schema_summary_line,
-                       sizeof(state->schema_summary_line),
-                       "Input Root: %s",
-                       state->input_root[0] ? state->input_root : "(unset)");
-        format_text_for_width(state->status_draw_line,
-                              sizeof(state->status_draw_line),
-                              state->schema_summary_line,
-                              row.width - (ui_ctx->style.padding * 2.0f),
-                              CORE_FONT_TEXT_SIZE_CAPTION);
+        mem_console_left_panel_derive_input_root_summary(&render_state,
+                                                         &render_storage,
+                                                         row.width - (ui_ctx->style.padding * 2.0f));
         result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                       frame,
                                                       row,
-                                                      state->status_draw_line,
+                                                      render_storage.input_root_summary_draw_line,
                                                       CORE_THEME_COLOR_TEXT_MUTED,
                                                       CORE_FONT_ROLE_UI_REGULAR,
                                                       CORE_FONT_TEXT_SIZE_CAPTION);
@@ -438,16 +407,11 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
     {
         CoreResult result = kit_ui_stack_next(&top_layout, layout_cfg->left_info_row_h, 0.0f, &row);
         if (result.code != CORE_OK) return result;
-        (void)snprintf(state->schema_summary_line,
-                       sizeof(state->schema_summary_line),
-                       "v%s | Active %lld | %s",
-                       state->schema_version[0] ? state->schema_version : "?",
-                       (long long)state->active_count,
-                       state->theme_name[0] ? state->theme_name : "theme");
+        mem_console_left_panel_derive_schema_summary(&render_state, &render_storage);
         result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                       frame,
                                                       row,
-                                                      state->schema_summary_line,
+                                                      render_storage.schema_summary_line,
                                                       CORE_THEME_COLOR_TEXT_MUTED,
                                                       CORE_FONT_ROLE_UI_REGULAR,
                                                       CORE_FONT_TEXT_SIZE_CAPTION);
@@ -560,7 +524,7 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
             !has_any_edit_mode &&
             kit_ui_point_in_rect(search_box, input->mouse_x, input->mouse_y)) {
             float text_origin_x = search_box.x + 6.0f + ui_ctx->style.padding;
-            state->input_target = MEM_CONSOLE_INPUT_SEARCH;
+            mem_console_input_target_set(state, MEM_CONSOLE_INPUT_SEARCH);
             state->search_cursor = mem_console_ui_cursor_index_for_click(state->search_text,
                                                                           render_ctx,
                                                                           input->mouse_x,
@@ -686,15 +650,11 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
     {
         CoreResult result = kit_ui_stack_next(&bottom_layout, layout_cfg->left_section_h, 0.0f, &row);
         if (result.code != CORE_OK) return result;
-        (void)snprintf(state->visible_summary_line,
-                       sizeof(state->visible_summary_line),
-                       "%d loaded | %lld matching",
-                       state->visible_count,
-                       (long long)state->matching_count);
+        mem_console_left_panel_derive_visible_summary(&render_state, &render_storage);
         result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                       frame,
                                                       row,
-                                                      state->visible_summary_line,
+                                                      render_storage.visible_summary_line,
                                                       CORE_THEME_COLOR_TEXT_MUTED,
                                                       CORE_FONT_ROLE_UI_REGULAR,
                                                       CORE_FONT_TEXT_SIZE_CAPTION);
@@ -718,7 +678,8 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
         bottom_layout.bounds.x,
         bottom_layout.bounds.y + bottom_layout.cursor,
         bottom_layout.bounds.width,
-        bottom_layout.bounds.y + bottom_layout.bounds.height - (bottom_layout.bounds.y + bottom_layout.cursor) - (layout_cfg->left_status_h + 6.0f)
+        bottom_layout.bounds.y + bottom_layout.bounds.height - (bottom_layout.bounds.y + bottom_layout.cursor) -
+            ((layout_cfg->left_status_h * 2.0f) + ui_ctx->style.gap + 6.0f)
     };
     if (list_viewport.height < 0.0f) {
         list_viewport.height = 0.0f;
@@ -842,28 +803,7 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
                     continue;
                 }
 
-                {
-                    char updated_text[32];
-                    const char *project_text = state->visible_items[i].project_key[0]
-                                             ? state->visible_items[i].project_key
-                                             : "no_project";
-                    const char *kind_text = state->visible_items[i].kind[0]
-                                          ? state->visible_items[i].kind
-                                          : "note";
-                    left_panel_format_updated_ns(state->visible_items[i].updated_ns,
-                                                 updated_text,
-                                                 sizeof(updated_text));
-                    (void)snprintf(state->list_item_labels[i],
-                                   sizeof(state->list_item_labels[i]),
-                                   "%lld %s%s[%s/%s] %s | %s",
-                                   (long long)state->visible_items[i].id,
-                                   state->visible_items[i].pinned ? "P " : "",
-                                   state->visible_items[i].canonical ? "C " : "",
-                                   project_text,
-                                   kind_text,
-                                   updated_text,
-                                   state->visible_items[i].title[0] ? state->visible_items[i].title : "UNTITLED");
-                }
+                (void)mem_console_left_panel_derive_item_label(&render_state, &render_storage, i);
 
                 button_result = kit_ui_eval_button(item_rect,
                                                    input,
@@ -883,11 +823,18 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
                     state->list_last_click_ms = now_ms;
                     state->graph_last_click_item_id = 0;
                     state->graph_last_click_ms = 0u;
-                    mem_console_select_item_for_navigation(state,
-                                                           clicked_item_id,
-                                                           is_double_click,
-                                                           is_double_click,
-                                                           io_action);
+                    if (is_double_click) {
+                        mem_console_select_item_for_navigation(state,
+                                                               clicked_item_id,
+                                                               1,
+                                                               1,
+                                                               io_action);
+                    } else {
+                        mem_console_select_item_for_inspection(state,
+                                                               clicked_item_id,
+                                                               0,
+                                                               io_action);
+                    }
                 }
                 if (state->visible_items[i].id == state->selected_item_id) {
                     button_result.state = KIT_UI_STATE_ACTIVE;
@@ -896,7 +843,7 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
                 result = mem_console_ui_draw_button_custom(ui_ctx,
                                                            frame,
                                                            item_rect,
-                                                           state->list_item_labels[i],
+                                                           render_storage.list_item_labels[i],
                                                            button_result.state,
                                                            CORE_FONT_ROLE_UI_REGULAR,
                                                            CORE_FONT_TEXT_SIZE_CAPTION);
@@ -941,11 +888,28 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
         if (result.code != CORE_OK) return result;
     }
 
-    format_text_for_width(state->status_draw_line,
-                          sizeof(state->status_draw_line),
-                          state->status_line,
-                          bottom_layout.bounds.width - (ui_ctx->style.padding * 2.0f),
-                          CORE_FONT_TEXT_SIZE_CAPTION);
+    mem_console_left_panel_derive_status_summary(&render_state,
+                                                 &render_storage,
+                                                 bottom_layout.bounds.width - (ui_ctx->style.padding * 2.0f));
+    mem_console_left_panel_derive_runtime_summary(&render_state,
+                                                  &render_storage,
+                                                  bottom_layout.bounds.width - (ui_ctx->style.padding * 2.0f));
+    {
+        CoreResult result = mem_console_ui_draw_info_line_custom(ui_ctx,
+                                                                  frame,
+                                                                  (KitRenderRect){
+                                                                      bottom_layout.bounds.x,
+                                                                      left_bottom_bounds.y + left_bottom_bounds.height -
+                                                                          ((layout_cfg->left_status_h * 2.0f) + ui_ctx->style.gap + 4.0f),
+                                                                      bottom_layout.bounds.width,
+                                                                      layout_cfg->left_status_h
+                                                                  },
+                                                                  render_storage.status_draw_line,
+                                                                  CORE_THEME_COLOR_TEXT_MUTED,
+                                                                  CORE_FONT_ROLE_UI_REGULAR,
+                                                                  CORE_FONT_TEXT_SIZE_CAPTION);
+        if (result.code != CORE_OK) return result;
+    }
     {
         CoreResult result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                                   frame,
@@ -955,7 +919,7 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
                                                                       bottom_layout.bounds.width,
                                                                       layout_cfg->left_status_h
                                                                   },
-                                                                  state->status_draw_line,
+                                                                  render_storage.runtime_summary_draw_line,
                                                                   CORE_THEME_COLOR_TEXT_MUTED,
                                                                   CORE_FONT_ROLE_UI_REGULAR,
                                                                   CORE_FONT_TEXT_SIZE_CAPTION);

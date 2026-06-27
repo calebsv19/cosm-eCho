@@ -144,7 +144,7 @@ CoreResult mem_console_prefs_load(const char *prefs_path, MemConsoleState *state
 
     if (loaded_any) {
         state->graph_mode_enabled = 1;
-        state->pane_prefs_dirty = 0;
+        mem_console_pane_prefs_mark_clean(state);
         return (CoreResult){ CORE_OK, "prefs loaded" };
     }
     return core_result_ok();

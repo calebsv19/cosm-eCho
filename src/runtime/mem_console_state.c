@@ -57,6 +57,59 @@ uint32_t mem_console_redraw_take_pending(MemConsoleState *state) {
     return reasons;
 }
 
+void mem_console_input_target_set(MemConsoleState *state, MemConsoleInputTarget input_target) {
+    if (!state) {
+        return;
+    }
+    state->input_target = input_target;
+}
+
+void mem_console_pane_prefs_mark_dirty(MemConsoleState *state) {
+    if (!state) {
+        return;
+    }
+    state->pane_prefs_dirty = 1;
+}
+
+void mem_console_pane_prefs_mark_clean(MemConsoleState *state) {
+    if (!state) {
+        return;
+    }
+    state->pane_prefs_dirty = 0;
+}
+
+void mem_console_selection_set(MemConsoleState *state, int64_t item_id) {
+    if (!state) {
+        return;
+    }
+    state->selected_item_id = item_id > 0 ? item_id : 0;
+}
+
+void mem_console_selection_clear(MemConsoleState *state) {
+    mem_console_selection_set(state, 0);
+    mem_console_graph_center_set(state, 0);
+}
+
+void mem_console_graph_center_set(MemConsoleState *state, int64_t item_id) {
+    if (!state) {
+        return;
+    }
+    state->graph_center_item_id = item_id > 0 ? item_id : 0;
+}
+
+void mem_console_selection_center_on(MemConsoleState *state, int64_t item_id) {
+    mem_console_selection_set(state, item_id);
+    mem_console_graph_center_set(state, item_id);
+}
+
+void mem_console_selection_apply_refreshed(MemConsoleState *state, const MemConsoleState *refreshed) {
+    if (!state || !refreshed) {
+        return;
+    }
+    mem_console_selection_set(state, refreshed->selected_item_id);
+    mem_console_graph_center_set(state, refreshed->graph_center_item_id);
+}
+
 void mem_console_redraw_note_frame(MemConsoleState *state, uint32_t reasons, uint64_t now_ms) {
     char reason_text[48];
     int any_reason = 0;
@@ -136,72 +189,38 @@ void compute_layout(MemConsoleState *state, int frame_width, int frame_height) {
     }
 }
 
-static int estimate_char_width_px(CoreFontTextSizeTier text_tier) {
-    switch (text_tier) {
-        case CORE_FONT_TEXT_SIZE_HEADER:
-            return 13;
-        case CORE_FONT_TEXT_SIZE_TITLE:
-            return 11;
-        case CORE_FONT_TEXT_SIZE_PARAGRAPH:
-            return 9;
-        case CORE_FONT_TEXT_SIZE_CAPTION:
-            return 8;
-        case CORE_FONT_TEXT_SIZE_BASIC:
-        default:
-            return 9;
+static void mem_console_apply_selection_detail_state(MemConsoleState *state,
+                                                     int64_t item_id,
+                                                     int enable_graph_mode) {
+    if (!state || item_id == 0) {
+        return;
+    }
+
+    mem_console_selection_set(state, item_id);
+    state->selected_created_ns = 0;
+    state->title_edit_mode = 0;
+    state->body_edit_mode = 0;
+    state->detail_connection_scroll = 0.0f;
+    state->relationship_action_link_id = 0;
+    mem_console_input_target_set(state, MEM_CONSOLE_INPUT_SEARCH);
+    if (enable_graph_mode) {
+        state->graph_mode_enabled = 1;
     }
 }
 
-void format_text_for_width(char *out_text,
-                           size_t out_cap,
-                           const char *source_text,
-                           float width_px,
-                           CoreFontTextSizeTier text_tier) {
-    size_t source_len;
-    int char_width;
-    int max_chars;
-    size_t keep_len;
-
-    if (!out_text || out_cap == 0u) {
-        return;
-    }
-    out_text[0] = '\0';
-
-    if (!source_text) {
+void mem_console_select_item_for_inspection(MemConsoleState *state,
+                                            int64_t item_id,
+                                            int enable_graph_mode,
+                                            MemConsoleAction *io_action) {
+    if (!state || item_id == 0) {
         return;
     }
 
-    char_width = estimate_char_width_px(text_tier);
-    if (char_width < 1) {
-        char_width = 8;
-    }
-    max_chars = (int)(width_px / (float)char_width);
-    if (max_chars < 4) {
-        max_chars = 4;
-    }
+    mem_console_apply_selection_detail_state(state, item_id, enable_graph_mode);
 
-    source_len = strlen(source_text);
-    if ((int)source_len <= max_chars) {
-        (void)snprintf(out_text, out_cap, "%s", source_text);
-        return;
+    if (io_action && *io_action == MEM_CONSOLE_ACTION_NONE) {
+        *io_action = MEM_CONSOLE_ACTION_REFRESH_DETAIL;
     }
-
-    keep_len = (size_t)(max_chars - 3);
-    if (keep_len >= out_cap) {
-        keep_len = out_cap - 1u;
-    }
-
-    if (keep_len > 0u) {
-        memcpy(out_text, source_text, keep_len);
-    }
-
-    if (keep_len + 3u < out_cap) {
-        memcpy(out_text + keep_len, "...", 3u);
-        out_text[keep_len + 3u] = '\0';
-        return;
-    }
-
-    out_text[out_cap - 1u] = '\0';
 }
 
 void mem_console_select_item_for_navigation(MemConsoleState *state,
@@ -213,17 +232,8 @@ void mem_console_select_item_for_navigation(MemConsoleState *state,
         return;
     }
 
-    state->selected_item_id = item_id;
-    state->graph_center_item_id = item_id;
-    state->selected_created_ns = 0;
-    state->title_edit_mode = 0;
-    state->body_edit_mode = 0;
-    state->detail_connection_scroll = 0.0f;
-    state->relationship_action_link_id = 0;
-    state->input_target = MEM_CONSOLE_INPUT_SEARCH;
-    if (enable_graph_mode) {
-        state->graph_mode_enabled = 1;
-    }
+    mem_console_apply_selection_detail_state(state, item_id, enable_graph_mode);
+    mem_console_graph_center_set(state, item_id);
     if (reset_graph_viewport) {
         mem_console_graph_view_mode_reset_viewport(state);
     }
@@ -240,7 +250,7 @@ void begin_title_edit_mode(MemConsoleState *state) {
     }
     state->body_edit_mode = 0;
     state->title_edit_mode = 1;
-    state->input_target = MEM_CONSOLE_INPUT_TITLE_EDIT;
+    mem_console_input_target_set(state, MEM_CONSOLE_INPUT_TITLE_EDIT);
     (void)snprintf(state->title_edit_text,
                    sizeof(state->title_edit_text),
                    "%s",
@@ -253,7 +263,7 @@ void cancel_title_edit_mode(MemConsoleState *state) {
         return;
     }
     state->title_edit_mode = 0;
-    state->input_target = MEM_CONSOLE_INPUT_SEARCH;
+    mem_console_input_target_set(state, MEM_CONSOLE_INPUT_SEARCH);
     (void)snprintf(state->title_edit_text,
                    sizeof(state->title_edit_text),
                    "%s",
@@ -267,7 +277,7 @@ void begin_body_edit_mode(MemConsoleState *state) {
     }
     state->title_edit_mode = 0;
     state->body_edit_mode = 1;
-    state->input_target = MEM_CONSOLE_INPUT_BODY_EDIT;
+    mem_console_input_target_set(state, MEM_CONSOLE_INPUT_BODY_EDIT);
     (void)snprintf(state->body_edit_text,
                    sizeof(state->body_edit_text),
                    "%s",
@@ -280,7 +290,7 @@ void cancel_body_edit_mode(MemConsoleState *state) {
         return;
     }
     state->body_edit_mode = 0;
-    state->input_target = MEM_CONSOLE_INPUT_SEARCH;
+    mem_console_input_target_set(state, MEM_CONSOLE_INPUT_SEARCH);
     (void)snprintf(state->body_edit_text,
                    sizeof(state->body_edit_text),
                    "%s",

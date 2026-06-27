@@ -219,12 +219,10 @@ static int mem_console_app_recreate_swapchain_and_mark(VkRenderer *renderer,
 
     vk_result = vk_renderer_recreate_swapchain(renderer, window);
     if (vk_result != VK_SUCCESS) {
-        (void)snprintf(state->status_line,
-                       sizeof(state->status_line),
-                       "%s (vk=%d).",
-                       reason ? reason : "Swapchain recreate failed",
-                       (int)vk_result);
-        mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        mem_console_app_set_statusf(state,
+                                    "%s (vk=%d).",
+                                    reason ? reason : "Swapchain recreate failed",
+                                    (int)vk_result);
         return 0;
     }
 
@@ -480,10 +478,6 @@ static void mem_console_loop_post_action_phase(const MemConsoleAppLoopContext *c
                                                   ctx->prefs_signature_valid,
                                                   ctx->prefs_last_saved_signature);
         if (result.code != CORE_OK) {
-            (void)snprintf(ctx->state->status_line,
-                           sizeof(ctx->state->status_line),
-                           "DB switch failed: %s",
-                           result.message ? result.message : "error");
             mem_console_redraw_mark(ctx->state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
         }
     }
@@ -495,7 +489,7 @@ static void mem_console_loop_post_action_phase(const MemConsoleAppLoopContext *c
             *ctx->prefs_last_saved_signature = current_signature;
             *ctx->prefs_signature_valid = 1;
         } else if (current_signature != *ctx->prefs_last_saved_signature) {
-            ctx->state->pane_prefs_dirty = 1;
+            mem_console_pane_prefs_mark_dirty(ctx->state);
         }
     }
 
@@ -507,14 +501,11 @@ static void mem_console_loop_post_action_phase(const MemConsoleAppLoopContext *c
         !ctx->state->search_refresh_pending) {
         CoreResult result = mem_console_prefs_save(ctx->prefs_path, ctx->state);
         if (result.code == CORE_OK) {
-            ctx->state->pane_prefs_dirty = 0;
+            mem_console_pane_prefs_mark_clean(ctx->state);
             *ctx->prefs_last_saved_signature = mem_console_prefs_state_signature(ctx->state);
             *ctx->prefs_signature_valid = 1;
         } else {
-            (void)snprintf(ctx->state->status_line,
-                           sizeof(ctx->state->status_line),
-                           "Pane prefs save failed.");
-            mem_console_redraw_mark(ctx->state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
+            mem_console_app_set_path_result_status(ctx->state, "Pane prefs save", ctx->prefs_path, result);
         }
     }
 }

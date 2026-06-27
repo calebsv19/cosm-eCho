@@ -63,6 +63,52 @@ if ! touch "$LOG_FILE" 2>/dev/null; then
     touch "$LOG_FILE" 2>/dev/null || true
 fi
 
+launcher_log() {
+    printf '%s launcher diagnostic %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >>"$LOG_FILE" 2>/dev/null || true
+}
+
+launcher_print_config() {
+    echo "SCRIPT_DIR=$SCRIPT_DIR"
+    echo "APP_CONTENTS_DIR=$APP_CONTENTS_DIR"
+    echo "RES_DIR=$RES_DIR"
+    echo "APP_BINARY=$SCRIPT_DIR/mem-console-bin"
+    echo "LOG_FILE=$LOG_FILE"
+    echo "MEM_CONSOLE_RUNTIME_DIR=$MEM_CONSOLE_RUNTIME_DIR"
+    echo "APP_BUNDLE_DB=$APP_BUNDLE_DB"
+    echo "APP_DB_PATH=$APP_DB_PATH"
+    echo "CODEWORK_MEMDB_PATH=$CODEWORK_MEMDB_PATH"
+    echo "VK_RENDERER_SHADER_ROOT=$VK_RENDERER_SHADER_ROOT"
+    echo "VK_ICD_FILENAMES=$VK_ICD_FILENAMES"
+    echo "VK_DRIVER_FILES=$VK_DRIVER_FILES"
+    echo "MOLTENVK_DYLIB=$MOLTENVK_DYLIB"
+}
+
+launcher_fail() {
+    message="$1"
+    path="${2:-}"
+    if [ -n "$path" ]; then
+        echo "self-test failed: $message path=$path" >&2
+        launcher_log "self-test failed: $message path=$path"
+    else
+        echo "self-test failed: $message" >&2
+        launcher_log "self-test failed: $message"
+    fi
+    echo "diagnostic: log_file=$LOG_FILE app_contents=$APP_CONTENTS_DIR resources=$RES_DIR runtime=$MEM_CONSOLE_RUNTIME_DIR db=$CODEWORK_MEMDB_PATH shader_root=$VK_RENDERER_SHADER_ROOT" >&2
+    exit 1
+}
+
+require_exec() {
+    [ -x "$1" ] || launcher_fail "missing executable" "$1"
+}
+
+require_file() {
+    [ -f "$1" ] || launcher_fail "missing file" "$1"
+}
+
+require_dir() {
+    [ -d "$1" ] || launcher_fail "missing directory" "$1"
+}
+
 if [ ! -f "$APP_DB_PATH" ] && [ -f "$APP_BUNDLE_DB" ]; then
     cp "$APP_BUNDLE_DB" "$APP_DB_PATH" 2>/dev/null || true
 fi
@@ -91,46 +137,30 @@ export VK_DRIVER_FILES="${VK_DRIVER_FILES:-$ICD_FILE}"
 export MOLTENVK_DYLIB
 
 if [ "${1:-}" = "--print-config" ]; then
-    echo "APP_CONTENTS_DIR=$APP_CONTENTS_DIR"
-    echo "RES_DIR=$RES_DIR"
-    echo "LOG_FILE=$LOG_FILE"
-    echo "MEM_CONSOLE_RUNTIME_DIR=$MEM_CONSOLE_RUNTIME_DIR"
-    echo "APP_BUNDLE_DB=$APP_BUNDLE_DB"
-    echo "APP_DB_PATH=$APP_DB_PATH"
-    echo "CODEWORK_MEMDB_PATH=$CODEWORK_MEMDB_PATH"
-    echo "VK_RENDERER_SHADER_ROOT=$VK_RENDERER_SHADER_ROOT"
-    echo "VK_ICD_FILENAMES=$VK_ICD_FILENAMES"
-    echo "VK_DRIVER_FILES=$VK_DRIVER_FILES"
-    echo "MOLTENVK_DYLIB=$MOLTENVK_DYLIB"
+    launcher_print_config
     exit 0
 fi
 
 if [ "${1:-}" = "--self-test" ]; then
-    [ -x "$SCRIPT_DIR/mem-console-bin" ] || { echo "missing: mem-console-bin" >&2; exit 1; }
-    [ -f "$APP_CONTENTS_DIR/Info.plist" ] || { echo "missing: Info.plist" >&2; exit 1; }
-    [ -f "$APP_BUNDLE_DB" ] || { echo "missing: bundled default sqlite" >&2; exit 1; }
-    [ -d "$RUNTIME_DIR" ] || { echo "missing: runtime directory" >&2; exit 1; }
-    [ -f "$ICD_FILE" ] || { echo "missing: runtime MoltenVK ICD file" >&2; exit 1; }
-    [ -f "$MOLTENVK_DYLIB" ] || { echo "missing: bundled MoltenVK dylib" >&2; exit 1; }
-    [ -f "$RES_DIR/shared/assets/fonts/Montserrat-Regular.ttf" ] || { echo "missing: shared font" >&2; exit 1; }
-    [ -f "$RUNTIME_DIR/vk_renderer/shaders/textured.vert.spv" ] || { echo "missing: runtime vk textured shader" >&2; exit 1; }
-    [ -f "$RUNTIME_DIR/vk_renderer/shaders/line.vert.spv" ] || { echo "missing: runtime vk line shader" >&2; exit 1; }
-    [ -f "$RUNTIME_DIR/vk_renderer/shaders/line.frag.spv" ] || { echo "missing: runtime vk line shader" >&2; exit 1; }
-    [ -f "$RUNTIME_DIR/vk_renderer/shaders/fill.vert.spv" ] || { echo "missing: runtime vk fill shader" >&2; exit 1; }
-    [ -f "$RUNTIME_DIR/vk_renderer/shaders/fill.frag.spv" ] || { echo "missing: runtime vk fill shader" >&2; exit 1; }
-    [ -f "$RUNTIME_DIR/shaders/textured.vert.spv" ] || { echo "missing: runtime textured shader" >&2; exit 1; }
-    [ -f "$RUNTIME_DIR/shaders/line.vert.spv" ] || { echo "missing: runtime line shader" >&2; exit 1; }
-    [ -f "$RUNTIME_DIR/shaders/line.frag.spv" ] || { echo "missing: runtime line shader" >&2; exit 1; }
-    [ -f "$RUNTIME_DIR/shaders/fill.vert.spv" ] || { echo "missing: runtime fill shader" >&2; exit 1; }
-    [ -f "$RUNTIME_DIR/shaders/fill.frag.spv" ] || { echo "missing: runtime fill shader" >&2; exit 1; }
+    require_exec "$SCRIPT_DIR/mem-console-bin"
+    require_file "$APP_CONTENTS_DIR/Info.plist"
+    require_file "$APP_BUNDLE_DB"
+    require_dir "$RUNTIME_DIR"
+    require_file "$ICD_FILE"
+    require_file "$MOLTENVK_DYLIB"
+    require_file "$RES_DIR/shared/assets/fonts/Montserrat-Regular.ttf"
+    require_file "$RUNTIME_DIR/vk_renderer/shaders/textured.vert.spv"
+    require_file "$RUNTIME_DIR/vk_renderer/shaders/line.vert.spv"
+    require_file "$RUNTIME_DIR/vk_renderer/shaders/line.frag.spv"
+    require_file "$RUNTIME_DIR/vk_renderer/shaders/fill.vert.spv"
+    require_file "$RUNTIME_DIR/vk_renderer/shaders/fill.frag.spv"
+    require_file "$RUNTIME_DIR/shaders/textured.vert.spv"
+    require_file "$RUNTIME_DIR/shaders/line.vert.spv"
+    require_file "$RUNTIME_DIR/shaders/line.frag.spv"
+    require_file "$RUNTIME_DIR/shaders/fill.vert.spv"
+    require_file "$RUNTIME_DIR/shaders/fill.frag.spv"
     echo "self-test: ok"
-    echo "LOG_FILE=$LOG_FILE"
-    echo "MEM_CONSOLE_RUNTIME_DIR=$MEM_CONSOLE_RUNTIME_DIR"
-    echo "CODEWORK_MEMDB_PATH=$CODEWORK_MEMDB_PATH"
-    echo "VK_RENDERER_SHADER_ROOT=$VK_RENDERER_SHADER_ROOT"
-    echo "VK_ICD_FILENAMES=$VK_ICD_FILENAMES"
-    echo "VK_DRIVER_FILES=$VK_DRIVER_FILES"
-    echo "MOLTENVK_DYLIB=$MOLTENVK_DYLIB"
+    launcher_print_config
     exit 0
 fi
 

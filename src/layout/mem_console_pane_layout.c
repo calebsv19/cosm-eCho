@@ -1,6 +1,7 @@
 #include "mem_console_pane_layout.h"
 
 #include "core_pane.h"
+#include "mem_console_state.h"
 
 enum {
     MEM_CONSOLE_PANE_TREE_NODE_ROOT = 0,
@@ -745,7 +746,7 @@ int mem_console_pane_layout_update_drag(MemConsoleState *state,
 
     (void)root_bounds;
     if (changed) {
-        state->pane_prefs_dirty = 1;
+        mem_console_pane_prefs_mark_dirty(state);
         (void)mem_console_pane_layout_compute(state, layout_cfg, frame_width, frame_height);
     }
     return changed;

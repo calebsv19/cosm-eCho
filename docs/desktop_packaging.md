@@ -13,6 +13,9 @@ Last updated: 2026-05-04
   - `Contents/Frameworks/libMoltenVK.dylib`
 - bundled resources:
   - `Contents/Resources/data/default.sqlite`
+  - package rules copy only `data/default.sqlite`, not the whole ignored local
+    `data/` directory, so app prefs sidecars or private DBs do not enter the
+    bundle
   - optional `Contents/Resources/AppIcon.icns` when `PACKAGE_APP_ICON_SRC` or `PACKAGE_APP_ICONSET_SRC` is provided
   - `Contents/Resources/shared/assets/fonts/*`
   - `Contents/Resources/vk_renderer/shaders/*`
@@ -51,8 +54,17 @@ Multi-arch release lane:
   - `HOME=/private/tmp/codex-mem-console-x86-home make -C mem_console release-artifact TARGET_ARCH=x86_64 BUILD_TOOLCHAIN=clang PACKAGE_TOOLCHAIN=clang`
 
 ## Launcher Runtime Contract
-- `--print-config` dumps active paths and env configuration.
-- `--self-test` verifies app binary, plist, DB seed, shared fonts, Vulkan shader bundles, runtime ICD, and bundled MoltenVK.
+- `--print-config` dumps active paths and env configuration, including the
+  launcher script directory, app binary, resource root, log file, runtime root,
+  DB paths, shader root, Vulkan ICD paths, and bundled MoltenVK dylib.
+- `--self-test` verifies app binary, plist, DB seed, shared fonts, Vulkan shader
+  bundles, runtime ICD, and bundled MoltenVK. Missing-resource failures include
+  the failed path plus log/runtime/DB/shader context.
+- packaged self-test failures print launcher config after the failure so the
+  active bundle and runtime roots are visible from the package command output.
+- release bundle audit writes `build/release/bundle_manifest.txt` and rejects
+  private/generated roots, packaged `.ui.pack` sidecars, and unexpected
+  `Contents/Resources/data` files before release artifact creation.
 - when icon inputs are provided, packaging bundles `AppIcon.icns` and declares `CFBundleIconFile=AppIcon`.
 - startup logs go to `~/Library/Logs/MemConsole/launcher.log` (tmp fallback).
 - launcher runtime root:
@@ -73,11 +85,12 @@ Multi-arch release lane:
 2. `make -C mem_console test`
 3. `make -C mem_console run-headless-smoke`
 4. `make -C mem_console visual-harness`
-5. `make -C mem_console release-bundle-audit`
-6. `make -C mem_console package-desktop-refresh`
-7. `/Users/<user>/Desktop/eCho.app/Contents/MacOS/mem-console-launcher --print-config`
-8. `open /Users/<user>/Desktop/eCho.app`
-9. `tail -n 120 ~/Library/Logs/MemConsole/launcher.log`
+5. `make -C mem_console run-package-diagnostic-contract-checks`
+6. `make -C mem_console release-bundle-audit`
+7. `make -C mem_console package-desktop-refresh`
+8. `/Users/<user>/Desktop/eCho.app/Contents/MacOS/mem-console-launcher --print-config`
+9. `open /Users/<user>/Desktop/eCho.app`
+10. `tail -n 120 ~/Library/Logs/MemConsole/launcher.log`
 
 Note:
 - a fresh clone will still need an `AppIcon.icns` copied into `tools/packaging/macos/local_app_icon/` before plain packaging picks it up, because that lane is intentionally ignored.

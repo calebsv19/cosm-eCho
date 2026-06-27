@@ -76,6 +76,8 @@ typedef struct MemConsoleRuntime {
     uint64_t stats_refresh_dropped_editing;
     uint64_t stats_refresh_errors;
     uint64_t stats_refresh_coalesced;
+    uint64_t latest_refresh_error_id;
+    char latest_refresh_error_message[160];
     int queue_initialized;
     int wake_initialized;
 } MemConsoleRuntime;

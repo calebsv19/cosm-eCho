@@ -7,7 +7,9 @@
 #include "mem_console_ui_graph_controls.h"
 #include "mem_console_ui_graph_panel.h"
 #include "mem_console_ui_left_section.h"
+#include "mem_console_visual_artifact.h"
 
+#include <SDL2/SDL.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -350,7 +352,7 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
 
     if (input->mouse_released &&
         kit_ui_point_in_rect(input_rect, input->mouse_x, input->mouse_y)) {
-        state->input_target = MEM_CONSOLE_INPUT_DB_PATH;
+        mem_console_input_target_set(state, MEM_CONSOLE_INPUT_DB_PATH);
     }
 
     if (input->mouse_pressed && kit_ui_point_in_rect(input_rect, input->mouse_x, input->mouse_y)) {
@@ -360,7 +362,7 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
                                                                  text_origin_x,
                                                                  CORE_FONT_ROLE_UI_REGULAR,
                                                                  CORE_FONT_TEXT_SIZE_PARAGRAPH);
-        state->input_target = MEM_CONSOLE_INPUT_DB_PATH;
+        mem_console_input_target_set(state, MEM_CONSOLE_INPUT_DB_PATH);
         mem_console_db_picker_begin_selection(state, visible_start + (local_cursor - visible_bias > 0 ? local_cursor - visible_bias : 0));
     } else if (state->db_modal_drag_select_active && input->mouse_down) {
         int local_cursor = mem_console_ui_cursor_index_for_click(state->db_modal_visible_text,
@@ -588,6 +590,7 @@ int run_frame(KitRenderContext *render_ctx,
     int authoring_active;
     KitUiInputState blocked_input;
     const MemConsoleLayoutConfig *layout_cfg;
+    int visual_artifact_result;
 
     if (!render_ctx || !ui_ctx || !state || !input || !out_action) {
         fprintf(stderr, "mem_console: run_frame invalid args\n");
@@ -859,6 +862,19 @@ int run_frame(KitRenderContext *render_ctx,
             return MEM_CONSOLE_FRAME_RECOVERABLE;
         }
         return MEM_CONSOLE_FRAME_FATAL;
+    }
+
+    visual_artifact_result = mem_console_visual_artifact_capture_if_requested(&command_buffer,
+                                                                              (uint32_t)draw_width,
+                                                                              (uint32_t)draw_height);
+    if (visual_artifact_result < 0) {
+        return MEM_CONSOLE_FRAME_FATAL;
+    }
+    if (visual_artifact_result > 0 && SDL_WasInit(SDL_INIT_VIDEO) != 0u) {
+        SDL_Event quit_event;
+        memset(&quit_event, 0, sizeof(quit_event));
+        quit_event.type = SDL_QUIT;
+        SDL_PushEvent(&quit_event);
     }
 
     return MEM_CONSOLE_FRAME_OK;

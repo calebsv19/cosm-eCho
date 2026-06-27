@@ -1,136 +1,11 @@
 #include "mem_console_ui_detail_section.h"
 
 #include "mem_console_ui_detail_section_internal.h"
+#include "mem_console_state_roles.h"
 #include "mem_console_ui_common.h"
 #include "mem_console_ui_detail_panel.h"
 
-#include <stdio.h>
 #include <string.h>
-#include <time.h>
-
-static int format_created_timestamp_compact(int64_t created_ns, char *out_text, size_t out_cap) {
-    time_t seconds;
-    struct tm local_tm;
-    size_t written = 0u;
-
-    if (!out_text || out_cap == 0u || created_ns <= 0) {
-        return 0;
-    }
-    out_text[0] = '\0';
-
-    seconds = (time_t)(created_ns / 1000000000LL);
-    if (seconds <= 0) {
-        return 0;
-    }
-
-#if defined(_POSIX_VERSION)
-    if (!localtime_r(&seconds, &local_tm)) {
-        return 0;
-    }
-    written = strftime(out_text, out_cap, "%b %d %H:%M", &local_tm);
-#else
-    {
-        struct tm *tmp = localtime(&seconds);
-        if (!tmp) {
-            return 0;
-        }
-        local_tm = *tmp;
-    }
-    written = strftime(out_text, out_cap, "%b %d %H:%M", &local_tm);
-#endif
-    return written > 0u ? 1 : 0;
-}
-
-static float detail_wrapped_text_line_step(CoreFontTextSizeTier text_tier) {
-    switch (text_tier) {
-        case CORE_FONT_TEXT_SIZE_CAPTION:
-            return 16.0f;
-        case CORE_FONT_TEXT_SIZE_BASIC:
-            return 20.0f;
-        case CORE_FONT_TEXT_SIZE_PARAGRAPH:
-        case CORE_FONT_TEXT_SIZE_TITLE:
-        case CORE_FONT_TEXT_SIZE_HEADER:
-        default:
-            return 24.0f;
-    }
-}
-
-static int detail_wrap_text_lines(const char *text,
-                                  char line_storage[][256],
-                                  int line_storage_count,
-                                  int max_chars) {
-    const char *cursor;
-    int line_count = 0;
-
-    if (!text || !line_storage || line_storage_count <= 0) {
-        return 0;
-    }
-
-    if (max_chars < 18) {
-        max_chars = 18;
-    }
-    if (max_chars > 120) {
-        max_chars = 120;
-    }
-
-    cursor = text;
-    while (*cursor != '\0' && line_count < line_storage_count) {
-        const char *line_start;
-        const char *break_at = 0;
-        int len = 0;
-        char *line = line_storage[line_count];
-
-        while (*cursor == ' ') {
-            cursor += 1;
-        }
-        if (*cursor == '\n') {
-            line[0] = '\0';
-            cursor += 1;
-            line_count += 1;
-            continue;
-        }
-
-        line_start = cursor;
-        while (*cursor != '\0' && *cursor != '\n' && len < max_chars) {
-            if (*cursor == ' ') {
-                break_at = cursor;
-            }
-            cursor += 1;
-            len += 1;
-        }
-
-        if (*cursor != '\0' && *cursor != '\n' && len >= max_chars && break_at && break_at > line_start) {
-            cursor = break_at;
-            len = (int)(break_at - line_start);
-        }
-
-        if (len <= 0) {
-            if (*cursor == '\n') {
-                cursor += 1;
-            } else if (*cursor != '\0') {
-                cursor += 1;
-            }
-            continue;
-        }
-
-        if ((size_t)len >= 256u) {
-            len = 255;
-        }
-        memcpy(line, line_start, (size_t)len);
-        line[len] = '\0';
-
-        while (*cursor == ' ') {
-            cursor += 1;
-        }
-        if (*cursor == '\n') {
-            cursor += 1;
-        }
-
-        line_count += 1;
-    }
-
-    return line_count;
-}
 
 static float detail_estimate_graph_controls_reserved_height(const MemConsoleLayoutConfig *layout_cfg,
                                                             float stack_gap,
@@ -160,7 +35,7 @@ static float detail_estimate_graph_controls_reserved_height(const MemConsoleLayo
 
 static CoreResult detail_draw_scrollable_wrapped_text(KitUiContext *ui_ctx,
                                                       KitRenderFrame *frame,
-                                                      char line_storage[][256],
+                                                      char line_storage[][MEM_CONSOLE_DETAIL_TEXT_LINE_CAP],
                                                       int line_storage_count,
                                                       KitRenderRect bounds,
                                                       const char *text,
@@ -190,18 +65,18 @@ static CoreResult detail_draw_scrollable_wrapped_text(KitUiContext *ui_ctx,
             *out_text_viewport = bounds;
         }
         if (out_line_step) {
-            *out_line_step = detail_wrapped_text_line_step(text_tier);
+            *out_line_step = mem_console_detail_wrapped_text_line_step(text_tier);
         }
         return core_result_ok();
     }
 
-    line_step = detail_wrapped_text_line_step(text_tier);
+    line_step = mem_console_detail_wrapped_text_line_step(text_tier);
     if (line_step < 14.0f) {
         line_step = 14.0f;
     }
 
     max_chars = (int)((bounds.width - 16.0f) / 8.0f);
-    line_count = detail_wrap_text_lines(text, line_storage, line_storage_count, max_chars);
+    line_count = mem_console_detail_wrap_text_lines(text, line_storage, line_storage_count, max_chars);
 
     content_height = 12.0f + ((float)line_count * line_step);
     if (content_height < bounds.height) {
@@ -237,7 +112,7 @@ static CoreResult detail_draw_scrollable_wrapped_text(KitUiContext *ui_ctx,
         }
 
         max_chars = (int)((text_viewport.width - 16.0f) / 8.0f);
-        line_count = detail_wrap_text_lines(text, line_storage, line_storage_count, max_chars);
+        line_count = mem_console_detail_wrap_text_lines(text, line_storage, line_storage_count, max_chars);
         content_height = 12.0f + ((float)line_count * line_step);
         if (content_height < bounds.height) {
             content_height = bounds.height;
@@ -323,6 +198,8 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                                               MemConsoleAction *io_action) {
     KitUiStackLayout meta_layout;
     KitUiStackLayout body_layout;
+    MemConsoleDetailRenderState detail_view;
+    MemConsoleDetailRenderStorage detail_storage;
     KitRenderRect row;
     KitRenderRect detail_meta_line_rect;
     KitRenderRect detail_title_row;
@@ -346,6 +223,10 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
     }
 
     mem_console_ui_detail_refresh_reference_path_cache(state);
+    if (!mem_console_detail_render_state_from_state(state, &detail_view) ||
+        !mem_console_detail_render_storage_from_state(state, &detail_storage)) {
+        return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid detail render state" };
+    }
 
     title_input_active = state->input_target == MEM_CONSOLE_INPUT_TITLE_EDIT;
 
@@ -379,7 +260,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
     };
 
     if (state->title_edit_mode) {
-        state->detail_title_line_count = 0;
+        mem_console_detail_clear_title_lines(&detail_storage);
         result = mem_console_ui_draw_editable_line(ui_ctx,
                                                    render_ctx,
                                                    frame,
@@ -396,7 +277,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         if (input->mouse_released &&
             kit_ui_point_in_rect(detail_title_row, input->mouse_x, input->mouse_y)) {
             float text_origin_x = detail_title_row.x + ui_ctx->style.padding;
-            state->input_target = MEM_CONSOLE_INPUT_TITLE_EDIT;
+            mem_console_input_target_set(state, MEM_CONSOLE_INPUT_TITLE_EDIT);
             state->title_edit_cursor = mem_console_ui_cursor_index_for_click(state->title_edit_text,
                                                                              render_ctx,
                                                                              input->mouse_x,
@@ -405,7 +286,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                                                                              CORE_FONT_TEXT_SIZE_TITLE);
         }
     } else {
-        title_line_step = detail_wrapped_text_line_step(CORE_FONT_TEXT_SIZE_TITLE);
+        title_line_step = mem_console_detail_wrapped_text_line_step(CORE_FONT_TEXT_SIZE_TITLE);
         if (title_line_step < 18.0f) {
             title_line_step = 18.0f;
         }
@@ -418,24 +299,16 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         if (title_line_limit < 1) {
             title_line_limit = 1;
         }
-        if (title_line_limit > (int)(sizeof(state->detail_title_lines) / sizeof(state->detail_title_lines[0]))) {
-            title_line_limit = (int)(sizeof(state->detail_title_lines) / sizeof(state->detail_title_lines[0]));
+        if (title_line_limit > detail_storage.title_line_capacity) {
+            title_line_limit = detail_storage.title_line_capacity;
         }
 
         title_max_chars = (int)(title_text_width /
                                 (float)mem_console_ui_estimate_char_width_px(CORE_FONT_TEXT_SIZE_TITLE));
-        title_line_count = detail_wrap_text_lines(state->selected_title,
-                                                  state->detail_title_lines,
-                                                  title_line_limit,
-                                                  title_max_chars);
-        if (title_line_count <= 0) {
-            title_line_count = 1;
-            (void)snprintf(state->detail_title_lines[0],
-                           sizeof(state->detail_title_lines[0]),
-                           "%s",
-                           state->selected_title);
-        }
-        state->detail_title_line_count = title_line_count;
+        title_line_count = mem_console_detail_derive_title_lines(&detail_view,
+                                                                 &detail_storage,
+                                                                 title_line_limit,
+                                                                 title_max_chars);
 
         for (i = 0; i < title_line_count; ++i) {
             KitRenderRect title_line_rect = {
@@ -447,7 +320,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
             result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                           frame,
                                                           title_line_rect,
-                                                          state->detail_title_lines[i],
+                                                          detail_storage.title_lines[i],
                                                           CORE_THEME_COLOR_TEXT_PRIMARY,
                                                           CORE_FONT_ROLE_UI_BOLD,
                                                           CORE_FONT_TEXT_SIZE_TITLE);
@@ -457,31 +330,11 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         }
     }
 
-    if (state->selected_item_id != 0) {
-        char created_label[32];
-        if (format_created_timestamp_compact(state->selected_created_ns,
-                                             created_label,
-                                             sizeof(created_label))) {
-            (void)snprintf(state->detail_meta_line,
-                           sizeof(state->detail_meta_line),
-                           "MEMORY ID %lld | %s",
-                           (long long)state->selected_item_id,
-                           created_label);
-        } else {
-            (void)snprintf(state->detail_meta_line,
-                           sizeof(state->detail_meta_line),
-                           "MEMORY ID %lld",
-                           (long long)state->selected_item_id);
-        }
-    } else {
-        (void)snprintf(state->detail_meta_line,
-                       sizeof(state->detail_meta_line),
-                       "SELECT A MEMORY TO EDIT");
-    }
+    mem_console_detail_derive_meta_line(&detail_view, &detail_storage);
     result = mem_console_ui_draw_info_line_custom(ui_ctx,
                                                   frame,
                                                   detail_meta_line_rect,
-                                                  state->detail_meta_line,
+                                                  detail_storage.meta_line,
                                                   CORE_THEME_COLOR_TEXT_MUTED,
                                                   CORE_FONT_ROLE_UI_REGULAR,
                                                   CORE_FONT_TEXT_SIZE_CAPTION);
@@ -690,7 +543,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
                 candidate_cursor = body_len;
             }
 
-            state->input_target = MEM_CONSOLE_INPUT_BODY_EDIT;
+            mem_console_input_target_set(state, MEM_CONSOLE_INPUT_BODY_EDIT);
             state->body_edit_cursor = candidate_cursor;
             cursor = candidate_cursor;
             line_index = cursor / line_capacity;

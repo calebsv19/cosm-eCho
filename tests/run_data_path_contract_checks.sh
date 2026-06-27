@@ -18,6 +18,10 @@ check_contains() {
 
 check_contains "int mem_console_path_contract_normalize(" \
     "${ROOT_DIR}/src/runtime/mem_console_state_paths.c"
+check_contains "int mem_console_path_has_sqlite_suffix(" \
+    "${ROOT_DIR}/src/runtime/mem_console_state_paths.c"
+check_contains "const char *mem_console_db_path_policy_error(" \
+    "${ROOT_DIR}/src/runtime/mem_console_state_paths.c"
 check_contains "int mem_console_build_app_prefs_path_for_output_root(" \
     "${ROOT_DIR}/src/runtime/mem_console_prefs.c"
 check_contains "mem_console_build_app_prefs_path_for_output_root(ctx->output_root" \
@@ -28,11 +32,15 @@ check_contains ".local/share/mem_console/mem_console.app.pack" \
 # S3 matrix lock: open/switch is reference mode and returns before suffix rewrite.
 check_contains "if (!state->db_modal_create_mode) {" \
     "${ROOT_DIR}/src/runtime/mem_console_state_db_picker.c"
-check_contains "Open/switch is explicit reference mode: use the selected path as typed." \
+check_contains "Open/switch is explicit reference mode: validate without suffix rewrite." \
     "${ROOT_DIR}/src/runtime/mem_console_state_db_picker.c"
+check_contains "return mem_console_db_path_is_safe(out_path);" \
+    "${ROOT_DIR}/src/runtime/mem_console_state_db_picker.c"
+check_contains "mem_console_db_path_policy_error(next_db_path)" \
+    "${ROOT_DIR}/src/app/mem_console_app_db_switch.c"
 
 # S3 create-name behavior: bare names route under input_root with sqlite suffix.
-check_contains "path_has_sqlite_suffix(out_path) ? \"%s/%s\" : \"%s/%s.sqlite\"" \
+check_contains "mem_console_path_has_sqlite_suffix(out_path) ? \"%s/%s\" : \"%s/%s.sqlite\"" \
     "${ROOT_DIR}/src/runtime/mem_console_state_db_picker.c"
 check_contains "const char *create_root = state->input_root[0] ? state->input_root : state->output_root;" \
     "${ROOT_DIR}/src/runtime/mem_console_state_db_picker.c"

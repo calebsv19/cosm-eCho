@@ -1,7 +1,5 @@
 #include "mem_console_app_internal.h"
 
-#include <stdio.h>
-
 void mem_console_app_apply_compact_ui_density(KitUiContext *ui_ctx,
                                               const KitRenderContext *render_ctx) {
     float zoom_scale = 1.0f;
@@ -56,26 +54,22 @@ int mem_console_app_handle_theme_shortcut(KitRenderContext *render_ctx,
     }
 
     if (!cycle_theme_preset(state, direction)) {
-        (void)snprintf(state->status_line,
-                       sizeof(state->status_line),
-                       "Theme switch failed.");
+        mem_console_app_set_statusf(state, "Theme switch failed.");
         return 1;
     }
 
     result = kit_render_set_theme_preset(render_ctx, state->theme_preset_id);
     if (result.code != CORE_OK) {
-        (void)snprintf(state->status_line,
-                       sizeof(state->status_line),
-                       "Theme switch failed.");
+        mem_console_app_set_statusf(state, "Theme switch failed.");
         return 1;
     }
 
     (void)kit_ui_style_apply_theme_scale(ui_ctx);
     mem_console_app_apply_compact_ui_density(ui_ctx, render_ctx);
     (void)prefs_path;
-    state->pane_prefs_dirty = 1;
+    mem_console_pane_prefs_mark_dirty(state);
 
-    (void)snprintf(state->status_line, sizeof(state->status_line), "Theme switched to %s.", state->theme_name);
+    mem_console_app_set_statusf(state, "Theme switched to %s.", state->theme_name);
     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_THEME | MEM_CONSOLE_REDRAW_REASON_CONTENT);
     return 1;
 }
@@ -101,26 +95,22 @@ int mem_console_app_handle_font_shortcut(KitRenderContext *render_ctx,
     }
 
     if (!cycle_font_preset(state, direction)) {
-        (void)snprintf(state->status_line,
-                       sizeof(state->status_line),
-                       "Font switch failed.");
+        mem_console_app_set_statusf(state, "Font switch failed.");
         return 1;
     }
 
     result = kit_render_set_font_preset(render_ctx, state->font_preset_id);
     if (result.code != CORE_OK) {
-        (void)snprintf(state->status_line,
-                       sizeof(state->status_line),
-                       "Font switch failed.");
+        mem_console_app_set_statusf(state, "Font switch failed.");
         return 1;
     }
 
     (void)kit_ui_style_apply_theme_scale(ui_ctx);
     mem_console_app_apply_compact_ui_density(ui_ctx, render_ctx);
     (void)prefs_path;
-    state->pane_prefs_dirty = 1;
+    mem_console_pane_prefs_mark_dirty(state);
 
-    (void)snprintf(state->status_line, sizeof(state->status_line), "Font switched to %s.", state->font_name);
+    mem_console_app_set_statusf(state, "Font switched to %s.", state->font_name);
     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_THEME | MEM_CONSOLE_REDRAW_REASON_CONTENT);
     return 1;
 }
@@ -151,9 +141,7 @@ int mem_console_app_handle_text_zoom_shortcut(KitRenderContext *render_ctx,
     }
 
     if (!handled || result.code != CORE_OK) {
-        (void)snprintf(state->status_line,
-                       sizeof(state->status_line),
-                       "Text zoom update failed.");
+        mem_console_app_set_statusf(state, "Text zoom update failed.");
         return 1;
     }
 
@@ -162,12 +150,11 @@ int mem_console_app_handle_text_zoom_shortcut(KitRenderContext *render_ctx,
     mem_console_app_apply_compact_ui_density(ui_ctx, render_ctx);
 
     (void)prefs_path;
-    state->pane_prefs_dirty = 1;
+    mem_console_pane_prefs_mark_dirty(state);
 
-    (void)snprintf(state->status_line,
-                   sizeof(state->status_line),
-                   "Text zoom set to %d%%.",
-                   kit_render_text_zoom_percent(render_ctx));
+    mem_console_app_set_statusf(state,
+                                "Text zoom set to %d%%.",
+                                kit_render_text_zoom_percent(render_ctx));
     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_LAYOUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
     return 1;
 }

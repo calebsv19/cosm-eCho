@@ -375,11 +375,11 @@ void mem_console_ui_graph_apply_focus_anchor_priority_layout(KitRenderRect bound
         int ring_capacity = i == 1 ? 10 : 8 + (i * 5);
         int ring_count = 1;
         float radius_x = i == 1
-                             ? 74.0f + (crowd * 8.0f)
-                             : 112.0f + ((float)(i - 2) * (40.0f + (crowd * 8.0f)));
+                             ? 96.0f + (crowd * 16.0f)
+                             : 142.0f + ((float)(i - 2) * (46.0f + (crowd * 10.0f)));
         float radius_y = i == 1
-                             ? 52.0f + (crowd * 6.0f)
-                             : 84.0f + ((float)(i - 2) * (32.0f + (crowd * 6.0f)));
+                             ? 70.0f + (crowd * 10.0f)
+                             : 106.0f + ((float)(i - 2) * (36.0f + (crowd * 8.0f)));
 
         if (level_count <= 0) {
             continue;
@@ -512,12 +512,12 @@ void mem_console_ui_graph_apply_focus_anchor_priority_layout(KitRenderRect bound
                 dx = center_x[a] - center_x[b];
                 dy = center_y[a] - center_y[b];
                 min_dx = (layouts[a].rect.width + layouts[b].rect.width) * 0.5f +
-                         12.0f + (crowd * 9.0f);
+                         16.0f + (crowd * 11.0f);
                 min_dy = (layouts[a].rect.height + layouts[b].rect.height) * 0.5f +
-                         10.0f + (crowd * 6.0f);
+                         12.0f + (crowd * 8.0f);
                 if (depth[a] == 1 || depth[b] == 1) {
-                    min_dx += 5.0f;
-                    min_dy += 3.0f;
+                    min_dx += 9.0f;
+                    min_dy += 5.0f;
                 }
                 if (fabsf(dx) >= min_dx || fabsf(dy) >= min_dy) {
                     continue;
@@ -555,7 +555,7 @@ void mem_console_ui_graph_apply_focus_anchor_priority_layout(KitRenderRect bound
             dx_root = center_x[a] - root_center_x;
             dy_root = center_y[a] - root_center_y;
             root_dist_sq = (dx_root * dx_root) + (dy_root * dy_root);
-            min_root_radius = 34.0f + (layouts[a].rect.width * 0.5f) + (crowd * 8.0f);
+            min_root_radius = 48.0f + (layouts[a].rect.width * 0.5f) + (crowd * 12.0f);
             if (root_dist_sq < (min_root_radius * min_root_radius)) {
                 float root_dist = sqrtf(root_dist_sq);
                 float nx = 0.0f;

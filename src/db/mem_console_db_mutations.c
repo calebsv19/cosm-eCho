@@ -230,6 +230,7 @@ CoreResult rename_selected_from_title_buffer(CoreMemDb *db, MemConsoleState *sta
     int has_row = 0;
     int tx_started = 0;
     int64_t now_ns;
+    int64_t updated_id = 0;
     char fingerprint[17];
 
     if (!db || !state) {
@@ -258,7 +259,8 @@ CoreResult rename_selected_from_title_buffer(CoreMemDb *db, MemConsoleState *sta
     result = core_memdb_prepare(db,
                                 "UPDATE mem_item "
                                 "SET title = ?1, fingerprint = ?2, updated_ns = ?3 "
-                                "WHERE id = ?4 AND archived_ns IS NULL;",
+                                "WHERE id = ?4 AND archived_ns IS NULL "
+                                "RETURNING id;",
                                 &stmt);
     if (result.code != CORE_OK) {
         goto cleanup;
@@ -283,8 +285,16 @@ CoreResult rename_selected_from_title_buffer(CoreMemDb *db, MemConsoleState *sta
     if (result.code != CORE_OK) {
         goto cleanup;
     }
-    if (has_row) {
-        result = (CoreResult){ CORE_ERR_FORMAT, "update returned unexpected row" };
+    if (!has_row) {
+        result = (CoreResult){ CORE_ERR_NOT_FOUND, "selected memory not found" };
+        goto cleanup;
+    }
+    result = core_memdb_stmt_column_i64(&stmt, 0, &updated_id);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
+    if (updated_id != state->selected_item_id) {
+        result = (CoreResult){ CORE_ERR_FORMAT, "title update returned unexpected id" };
         goto cleanup;
     }
 
@@ -319,6 +329,7 @@ CoreResult replace_selected_body_from_body_buffer(CoreMemDb *db, MemConsoleState
     int has_row = 0;
     int tx_started = 0;
     int64_t now_ns;
+    int64_t updated_id = 0;
     char fingerprint[17];
 
     if (!db || !state) {
@@ -347,7 +358,8 @@ CoreResult replace_selected_body_from_body_buffer(CoreMemDb *db, MemConsoleState
     result = core_memdb_prepare(db,
                                 "UPDATE mem_item "
                                 "SET body = ?1, fingerprint = ?2, updated_ns = ?3 "
-                                "WHERE id = ?4 AND archived_ns IS NULL;",
+                                "WHERE id = ?4 AND archived_ns IS NULL "
+                                "RETURNING id;",
                                 &stmt);
     if (result.code != CORE_OK) {
         goto cleanup;
@@ -372,8 +384,16 @@ CoreResult replace_selected_body_from_body_buffer(CoreMemDb *db, MemConsoleState
     if (result.code != CORE_OK) {
         goto cleanup;
     }
-    if (has_row) {
-        result = (CoreResult){ CORE_ERR_FORMAT, "update returned unexpected row" };
+    if (!has_row) {
+        result = (CoreResult){ CORE_ERR_NOT_FOUND, "selected memory not found" };
+        goto cleanup;
+    }
+    result = core_memdb_stmt_column_i64(&stmt, 0, &updated_id);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
+    if (updated_id != state->selected_item_id) {
+        result = (CoreResult){ CORE_ERR_FORMAT, "body update returned unexpected id" };
         goto cleanup;
     }
 
@@ -402,26 +422,34 @@ cleanup:
     return result;
 }
 
-CoreResult set_selected_flag(CoreMemDb *db,
-                             const MemConsoleState *state,
-                             const char *field_name,
-                             int field_value) {
+static const char *selected_item_flag_update_sql(MemConsoleItemFlag flag) {
+    switch (flag) {
+    case MEM_CONSOLE_ITEM_FLAG_PINNED:
+        return "UPDATE mem_item SET pinned = ?1 WHERE id = ?2 AND archived_ns IS NULL RETURNING id;";
+    case MEM_CONSOLE_ITEM_FLAG_CANONICAL:
+        return "UPDATE mem_item SET canonical = ?1 WHERE id = ?2 AND archived_ns IS NULL RETURNING id;";
+    default:
+        break;
+    }
+    return 0;
+}
+
+CoreResult set_selected_item_flag(CoreMemDb *db,
+                                  const MemConsoleState *state,
+                                  MemConsoleItemFlag flag,
+                                  int field_value) {
     CoreMemStmt stmt = {0};
     CoreResult result;
     int has_row = 0;
-    char sql[160];
+    const char *sql = selected_item_flag_update_sql(flag);
+    int64_t updated_id = 0;
 
-    if (!db || !state || !field_name) {
+    if (!db || !state || !sql) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid argument" };
     }
     if (state->selected_item_id == 0) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "no selected item" };
     }
-
-    (void)snprintf(sql,
-                   sizeof(sql),
-                   "UPDATE mem_item SET %s = ?1 WHERE id = ?2 AND archived_ns IS NULL;",
-                   field_name);
 
     result = core_memdb_prepare(db, sql, &stmt);
     if (result.code != CORE_OK) {
@@ -439,8 +467,16 @@ CoreResult set_selected_flag(CoreMemDb *db,
     if (result.code != CORE_OK) {
         goto cleanup;
     }
-    if (has_row) {
-        result = (CoreResult){ CORE_ERR_FORMAT, "update returned unexpected row" };
+    if (!has_row) {
+        result = (CoreResult){ CORE_ERR_NOT_FOUND, "selected memory not found" };
+        goto cleanup;
+    }
+    result = core_memdb_stmt_column_i64(&stmt, 0, &updated_id);
+    if (result.code != CORE_OK) {
+        goto cleanup;
+    }
+    if (updated_id != state->selected_item_id) {
+        result = (CoreResult){ CORE_ERR_FORMAT, "flag update returned unexpected id" };
         goto cleanup;
     }
 

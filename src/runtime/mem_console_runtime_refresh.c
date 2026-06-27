@@ -32,6 +32,47 @@ typedef struct MemConsoleRefreshTask {
     CoreWake *wake;
 } MemConsoleRefreshTask;
 
+static void mem_console_runtime_store_in_flight_intent(MemConsoleRuntime *runtime,
+                                                       const MemConsoleRefreshTask *task) {
+    if (!runtime || !task) {
+        return;
+    }
+
+    runtime->refresh_in_flight = 1;
+    runtime->stats_refresh_submitted += 1u;
+    runtime->in_flight_request_id = task->request_id;
+    (void)snprintf(runtime->in_flight_search_text,
+                   sizeof(runtime->in_flight_search_text),
+                   "%s",
+                   task->search_text);
+    runtime->in_flight_selected_item_id = task->selected_item_id;
+    runtime->in_flight_graph_center_item_id = task->graph_center_item_id;
+    runtime->in_flight_list_query_offset = task->list_query_offset;
+    runtime->in_flight_browse_pinned_only = task->browse_pinned_only ? 1 : 0;
+    runtime->in_flight_browse_canonical_only = task->browse_canonical_only ? 1 : 0;
+    runtime->in_flight_browse_kind_index =
+        mem_console_browse_kind_index_clamp(task->browse_kind_index);
+    mem_console_runtime_copy_selected_project_filters(runtime->in_flight_selected_project_keys,
+                                                      &runtime->in_flight_selected_project_count,
+                                                      task->selected_project_keys,
+                                                      task->selected_project_count);
+    (void)snprintf(runtime->in_flight_graph_kind_filter,
+                   sizeof(runtime->in_flight_graph_kind_filter),
+                   "%s",
+                   task->graph_kind_filter);
+    runtime->in_flight_graph_kind_filter_mask = task->graph_kind_filter_mask;
+    runtime->in_flight_graph_kind_filter_all_override =
+        task->graph_kind_filter_all_override ? 1 : 0;
+    runtime->in_flight_graph_edge_limit = task->graph_edge_limit;
+    runtime->in_flight_graph_hops = task->graph_hops;
+    runtime->in_flight_graph_layout_mode = task->graph_layout_mode;
+    runtime->in_flight_graph_sort_mode = task->graph_sort_mode;
+    runtime->in_flight_graph_scope_full_mode_enabled = task->graph_scope_full_mode_enabled ? 1 : 0;
+    runtime->in_flight_graph_node_kind_filter_mask = task->graph_node_kind_filter_mask;
+    runtime->in_flight_graph_node_kind_filter_all_override =
+        task->graph_node_kind_filter_all_override ? 1 : 0;
+}
+
 MemConsoleRuntimeMetricsSnapshot
 mem_console_runtime_metrics_snapshot_capture(const MemConsoleRuntime *runtime) {
     MemConsoleRuntimeMetricsSnapshot snapshot;
@@ -48,6 +89,7 @@ mem_console_runtime_metrics_snapshot_capture(const MemConsoleRuntime *runtime) {
     snapshot.refresh_dropped_editing = runtime->stats_refresh_dropped_editing;
     snapshot.refresh_errors = runtime->stats_refresh_errors;
     snapshot.refresh_coalesced = runtime->stats_refresh_coalesced;
+    snapshot.latest_refresh_error_id = runtime->latest_refresh_error_id;
     snapshot.refresh_in_flight = runtime->refresh_in_flight;
     snapshot.pending_intent_valid = runtime->pending_intent_valid;
     return snapshot;
@@ -66,6 +108,7 @@ int mem_console_runtime_metrics_snapshot_changed(
            before->refresh_dropped_editing != after->refresh_dropped_editing ||
            before->refresh_errors != after->refresh_errors ||
            before->refresh_coalesced != after->refresh_coalesced ||
+           before->latest_refresh_error_id != after->latest_refresh_error_id ||
            before->refresh_in_flight != after->refresh_in_flight ||
            before->pending_intent_valid != after->pending_intent_valid;
 }
@@ -221,8 +264,7 @@ void mem_console_runtime_apply_refreshed_state(MemConsoleState *state,
                    "%s",
                    refreshed->project_filter_summary_line);
 
-    state->selected_item_id = refreshed->selected_item_id;
-    state->graph_center_item_id = refreshed->graph_center_item_id;
+    mem_console_selection_apply_refreshed(state, refreshed);
     state->selected_created_ns = refreshed->selected_created_ns;
     state->selected_pinned = refreshed->selected_pinned;
     state->selected_canonical = refreshed->selected_canonical;
@@ -262,19 +304,39 @@ void mem_console_runtime_publish_metrics(const MemConsoleRuntime *runtime,
     state->runtime_refresh_dropped = dropped_total;
     state->runtime_refresh_errors = runtime->stats_refresh_errors;
     state->runtime_refresh_coalesced = runtime->stats_refresh_coalesced;
+    state->runtime_latest_refresh_error_id = runtime->latest_refresh_error_id;
+    (void)snprintf(state->runtime_latest_refresh_error_message,
+                   sizeof(state->runtime_latest_refresh_error_message),
+                   "%s",
+                   runtime->latest_refresh_error_message);
     state->runtime_refresh_in_flight = runtime->refresh_in_flight;
     state->runtime_pending_intent = runtime->pending_intent_valid;
 
-    (void)snprintf(state->runtime_summary_line,
-                   sizeof(state->runtime_summary_line),
-                   "Async s%llu a%llu d%llu e%llu c%llu | if=%d p=%d",
-                   (unsigned long long)state->runtime_refresh_submitted,
-                   (unsigned long long)state->runtime_refresh_applied,
-                   (unsigned long long)state->runtime_refresh_dropped,
-                   (unsigned long long)state->runtime_refresh_errors,
-                   (unsigned long long)state->runtime_refresh_coalesced,
-                   state->runtime_refresh_in_flight,
-                   state->runtime_pending_intent);
+    if (state->runtime_latest_refresh_error_id != 0u &&
+        state->runtime_latest_refresh_error_message[0] != '\0') {
+        (void)snprintf(state->runtime_summary_line,
+                       sizeof(state->runtime_summary_line),
+                       "Async s%llu a%llu d%llu e%llu c%llu | if=%d p=%d | last error: %s",
+                       (unsigned long long)state->runtime_refresh_submitted,
+                       (unsigned long long)state->runtime_refresh_applied,
+                       (unsigned long long)state->runtime_refresh_dropped,
+                       (unsigned long long)state->runtime_refresh_errors,
+                       (unsigned long long)state->runtime_refresh_coalesced,
+                       state->runtime_refresh_in_flight,
+                       state->runtime_pending_intent,
+                       state->runtime_latest_refresh_error_message);
+    } else {
+        (void)snprintf(state->runtime_summary_line,
+                       sizeof(state->runtime_summary_line),
+                       "Async s%llu a%llu d%llu e%llu c%llu | if=%d p=%d",
+                       (unsigned long long)state->runtime_refresh_submitted,
+                       (unsigned long long)state->runtime_refresh_applied,
+                       (unsigned long long)state->runtime_refresh_dropped,
+                       (unsigned long long)state->runtime_refresh_errors,
+                       (unsigned long long)state->runtime_refresh_coalesced,
+                       state->runtime_refresh_in_flight,
+                       state->runtime_pending_intent);
+    }
 }
 
 void mem_console_runtime_capture_intent_from_state(
@@ -464,8 +526,8 @@ static void *refresh_worker_task(void *task_ctx) {
         goto finalize;
     }
     seed_state(worker_state, task->db_path);
-    worker_state->selected_item_id = task->selected_item_id;
-    worker_state->graph_center_item_id = task->graph_center_item_id;
+    mem_console_selection_set(worker_state, task->selected_item_id);
+    mem_console_graph_center_set(worker_state, task->graph_center_item_id);
     worker_state->list_query_offset = task->list_query_offset;
     worker_state->browse_pinned_only = task->browse_pinned_only ? 1 : 0;
     worker_state->browse_canonical_only = task->browse_canonical_only ? 1 : 0;
@@ -576,38 +638,6 @@ CoreResult mem_console_runtime_schedule_refresh(MemConsoleRuntime *runtime,
         return (CoreResult){ CORE_ERR_IO, "failed to submit refresh task" };
     }
 
-    runtime->refresh_in_flight = 1;
-    runtime->stats_refresh_submitted += 1u;
-    runtime->in_flight_request_id = task->request_id;
-    (void)snprintf(runtime->in_flight_search_text,
-                   sizeof(runtime->in_flight_search_text),
-                   "%s",
-                   task->search_text);
-    runtime->in_flight_selected_item_id = task->selected_item_id;
-    runtime->in_flight_graph_center_item_id = task->graph_center_item_id;
-    runtime->in_flight_list_query_offset = task->list_query_offset;
-    runtime->in_flight_browse_pinned_only = task->browse_pinned_only ? 1 : 0;
-    runtime->in_flight_browse_canonical_only = task->browse_canonical_only ? 1 : 0;
-    runtime->in_flight_browse_kind_index =
-        mem_console_browse_kind_index_clamp(task->browse_kind_index);
-    mem_console_runtime_copy_selected_project_filters(runtime->in_flight_selected_project_keys,
-                                                      &runtime->in_flight_selected_project_count,
-                                                      task->selected_project_keys,
-                                                      task->selected_project_count);
-    (void)snprintf(runtime->in_flight_graph_kind_filter,
-                   sizeof(runtime->in_flight_graph_kind_filter),
-                   "%s",
-                   task->graph_kind_filter);
-    runtime->in_flight_graph_kind_filter_mask = task->graph_kind_filter_mask;
-    runtime->in_flight_graph_kind_filter_all_override =
-        task->graph_kind_filter_all_override ? 1 : 0;
-    runtime->in_flight_graph_edge_limit = task->graph_edge_limit;
-    runtime->in_flight_graph_hops = task->graph_hops;
-    runtime->in_flight_graph_layout_mode = task->graph_layout_mode;
-    runtime->in_flight_graph_sort_mode = task->graph_sort_mode;
-    runtime->in_flight_graph_scope_full_mode_enabled = task->graph_scope_full_mode_enabled ? 1 : 0;
-    runtime->in_flight_graph_node_kind_filter_mask = task->graph_node_kind_filter_mask;
-    runtime->in_flight_graph_node_kind_filter_all_override =
-        task->graph_node_kind_filter_all_override ? 1 : 0;
+    mem_console_runtime_store_in_flight_intent(runtime, task);
     return core_result_ok();
 }

@@ -36,6 +36,30 @@ float prefs_viewport_zoom_or_default(float zoom) {
     return next_zoom;
 }
 
+static void prefs_store_graph_viewport_from_state(const MemConsoleState *state,
+                                                  MemConsoleUiPrefsV5 *out_prefs) {
+    if (!state || !out_prefs) {
+        return;
+    }
+
+    out_prefs->graph_pan_x = prefs_viewport_component_or_default(state->graph_viewport.pan_x, 0.0f);
+    out_prefs->graph_pan_y = prefs_viewport_component_or_default(state->graph_viewport.pan_y, 0.0f);
+    out_prefs->graph_zoom = prefs_viewport_zoom_or_default(state->graph_viewport.zoom);
+}
+
+static void prefs_apply_graph_viewport_to_state(MemConsoleState *state,
+                                                float graph_pan_x,
+                                                float graph_pan_y,
+                                                float graph_zoom) {
+    if (!state) {
+        return;
+    }
+
+    state->graph_viewport.pan_x = prefs_viewport_component_or_default(graph_pan_x, 0.0f);
+    state->graph_viewport.pan_y = prefs_viewport_component_or_default(graph_pan_y, 0.0f);
+    state->graph_viewport.zoom = prefs_viewport_zoom_or_default(graph_zoom);
+}
+
 static void prefs_copy_project_filters_from_state(MemConsoleUiPrefsV5 *prefs,
                                                   const MemConsoleState *state) {
     int i;
@@ -197,9 +221,7 @@ static void prefs_build_v5_from_state(const MemConsoleState *state, MemConsoleUi
     out_prefs->graph_edge_limit = mem_console_graph_edge_limit_clamp(state->graph_query_edge_limit);
     out_prefs->graph_hops = mem_console_graph_hops_clamp(state->graph_query_hops);
     out_prefs->graph_mode_enabled = state->graph_mode_enabled ? 1 : 0;
-    out_prefs->graph_pan_x = prefs_viewport_component_or_default(state->graph_viewport.pan_x, 0.0f);
-    out_prefs->graph_pan_y = prefs_viewport_component_or_default(state->graph_viewport.pan_y, 0.0f);
-    out_prefs->graph_zoom = prefs_viewport_zoom_or_default(state->graph_viewport.zoom);
+    prefs_store_graph_viewport_from_state(state, out_prefs);
     out_prefs->graph_kind_filter_all_override = state->graph_kind_filter_all_override ? 1 : 0;
     (void)snprintf(out_prefs->search_text,
                    sizeof(out_prefs->search_text),
@@ -322,7 +344,7 @@ int prefs_apply_v5_to_state(const MemConsoleUiPrefsV5 *prefs, MemConsoleState *s
     state->pane_left_collapsed = prefs->pane_left_collapsed ? 1 : 0;
     state->pane_right_detail_collapsed = prefs->pane_right_detail_collapsed ? 1 : 0;
 
-    state->selected_item_id = prefs->selected_item_id > 0 ? prefs->selected_item_id : 0;
+    mem_console_selection_set(state, prefs->selected_item_id);
     state->list_query_offset = prefs->list_query_offset > 0 ? prefs->list_query_offset : 0;
     prefs_copy_project_filters_to_state(prefs, state);
 
@@ -338,9 +360,10 @@ int prefs_apply_v5_to_state(const MemConsoleUiPrefsV5 *prefs, MemConsoleState *s
     state->graph_query_hops = mem_console_graph_hops_clamp((int)prefs->graph_hops);
     state->graph_mode_enabled = 1;
 
-    state->graph_viewport.pan_x = prefs_viewport_component_or_default(prefs->graph_pan_x, 0.0f);
-    state->graph_viewport.pan_y = prefs_viewport_component_or_default(prefs->graph_pan_y, 0.0f);
-    state->graph_viewport.zoom = prefs_viewport_zoom_or_default(prefs->graph_zoom);
+    prefs_apply_graph_viewport_to_state(state,
+                                        prefs->graph_pan_x,
+                                        prefs->graph_pan_y,
+                                        prefs->graph_zoom);
     (void)snprintf(state->search_text, sizeof(state->search_text), "%s", prefs->search_text);
     state->graph_layout_mode = MEM_CONSOLE_GRAPH_LAYOUT_DAG;
     state->graph_sort_mode = MEM_CONSOLE_GRAPH_SORT_RECENT_FIRST;
@@ -458,7 +481,7 @@ int prefs_apply_v3_to_state(const MemConsoleUiPrefsV3 *prefs, MemConsoleState *s
     state->pane_left_collapsed = prefs->pane_left_collapsed ? 1 : 0;
     state->pane_right_detail_collapsed = prefs->pane_right_detail_collapsed ? 1 : 0;
 
-    state->selected_item_id = prefs->selected_item_id > 0 ? prefs->selected_item_id : 0;
+    mem_console_selection_set(state, prefs->selected_item_id);
     state->list_query_offset = prefs->list_query_offset > 0 ? prefs->list_query_offset : 0;
     state->selected_project_count = 0;
     {
@@ -499,9 +522,10 @@ int prefs_apply_v3_to_state(const MemConsoleUiPrefsV3 *prefs, MemConsoleState *s
                                      mem_console_graph_edge_limit_clamp((int)prefs->graph_edge_limit));
     state->graph_query_hops = mem_console_graph_hops_clamp((int)prefs->graph_hops);
     state->graph_mode_enabled = 1;
-    state->graph_viewport.pan_x = prefs_viewport_component_or_default(prefs->graph_pan_x, 0.0f);
-    state->graph_viewport.pan_y = prefs_viewport_component_or_default(prefs->graph_pan_y, 0.0f);
-    state->graph_viewport.zoom = prefs_viewport_zoom_or_default(prefs->graph_zoom);
+    prefs_apply_graph_viewport_to_state(state,
+                                        prefs->graph_pan_x,
+                                        prefs->graph_pan_y,
+                                        prefs->graph_zoom);
     (void)snprintf(state->search_text, sizeof(state->search_text), "%s", prefs->search_text);
     return 1;
 }

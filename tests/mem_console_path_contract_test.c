@@ -114,10 +114,28 @@ static void test_normalize_preserves_explicit_input_root_hint(void) {
     assert(strcmp(active_db_out, active_db) == 0);
 }
 
+static void test_db_path_policy_rejects_unsafe_paths(void) {
+    assert(mem_console_path_has_sqlite_suffix("/tmp/mem_console/safe.sqlite"));
+    assert(!mem_console_path_has_sqlite_suffix("/tmp/mem_console/safe.sqlite3"));
+    assert(mem_console_db_path_is_safe("/tmp/mem_console/safe.sqlite"));
+    assert(mem_console_db_path_is_safe("mem_console/data/default.sqlite"));
+    assert(!mem_console_db_path_is_safe(""));
+    assert(!mem_console_db_path_is_safe("/tmp/mem_console/safe.db"));
+    assert(!mem_console_db_path_is_safe("../mem_console/escape.sqlite"));
+    assert(!mem_console_db_path_is_safe("mem_console/../escape.sqlite"));
+    assert(!mem_console_db_path_is_safe("/tmp/mem_console/../escape.sqlite"));
+    assert(!mem_console_db_path_is_safe("/tmp/mem_console/bad\nname.sqlite"));
+    assert(strcmp(mem_console_db_path_policy_error("/tmp/mem_console/../escape.sqlite"),
+                  "DB path cannot contain parent-directory segments") == 0);
+    assert(strcmp(mem_console_db_path_policy_error("/tmp/mem_console/safe.db"),
+                  "DB path must end in .sqlite") == 0);
+}
+
 int main(void) {
     test_env_db_override_wins();
     test_normalize_derives_input_root_from_active_db_parent();
     test_normalize_preserves_explicit_input_root_hint();
+    test_db_path_policy_rejects_unsafe_paths();
     puts("mem_console_path_contract_test: success");
     return 0;
 }

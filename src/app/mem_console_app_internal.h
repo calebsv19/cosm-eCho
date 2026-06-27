@@ -15,9 +15,16 @@
 #include "mem_console_state.h"
 #include "vk_renderer.h"
 
+void mem_console_app_set_statusf(MemConsoleState *state, const char *fmt, ...);
+
 void mem_console_app_set_action_error_status(MemConsoleState *state,
                                              const char *prefix,
                                              CoreResult result);
+
+void mem_console_app_set_path_result_status(MemConsoleState *state,
+                                            const char *operation,
+                                            const char *path,
+                                            CoreResult result);
 
 void mem_console_app_refresh_and_report(CoreMemDb *db,
                                         MemConsoleState *state,

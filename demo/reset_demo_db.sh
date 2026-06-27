@@ -3,14 +3,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MEM_CLI="${ROOT_DIR}/shared/core/core_memdb/build/mem_cli"
+source "${ROOT_DIR}/mem_console/demo/demo_db_safety.sh"
 
-if [[ -n "${CODEWORK_MEMDB_PATH:-}" ]]; then
-    DEFAULT_DB_PATH="${CODEWORK_MEMDB_PATH}"
-else
-    DEFAULT_DB_PATH="${ROOT_DIR}/mem_console/demo/demo_mem_console.sqlite"
-fi
-
+DEFAULT_DB_PATH="${ROOT_DIR}/mem_console/demo/demo_mem_console.sqlite"
 DB_PATH="${1:-${DEFAULT_DB_PATH}}"
+DB_PATH="$(mem_console_demo_assert_safe_db_path "${ROOT_DIR}" "${DB_PATH}")"
 DB_DIR="$(dirname "${DB_PATH}")"
 
 mkdir -p "${DB_DIR}"

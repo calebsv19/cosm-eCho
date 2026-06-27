@@ -56,6 +56,128 @@ static void runtime_backoff_poll_interval(MemConsoleRuntime *runtime) {
     runtime->poll_interval_ms = runtime_next_backoff_interval_ms(runtime->poll_interval_ms);
 }
 
+static void mem_console_runtime_store_latest_refresh_error(MemConsoleRuntime *runtime,
+                                                           const char *error_text) {
+    if (!runtime) {
+        return;
+    }
+
+    runtime->stats_refresh_errors += 1u;
+    runtime->latest_refresh_error_id = runtime->stats_refresh_errors;
+    (void)snprintf(runtime->latest_refresh_error_message,
+                   sizeof(runtime->latest_refresh_error_message),
+                   "%s",
+                   error_text && error_text[0] ? error_text : "background refresh failed");
+}
+
+static void mem_console_runtime_store_pending_intent(
+    MemConsoleRuntime *runtime,
+    const char *search_text,
+    int64_t selected_item_id,
+    int64_t graph_center_item_id,
+    int list_query_offset,
+    int browse_pinned_only,
+    int browse_canonical_only,
+    int browse_kind_index,
+    char selected_project_keys[MEM_CONSOLE_SCOPE_FILTER_LIMIT][64],
+    int selected_project_count,
+    const char *graph_kind_filter,
+    uint32_t graph_kind_filter_mask,
+    int graph_kind_filter_all_override,
+    int graph_edge_limit,
+    int graph_hops,
+    int graph_layout_mode,
+    int graph_sort_mode,
+    int graph_scope_full_mode_enabled,
+    uint32_t graph_node_kind_filter_mask,
+    int graph_node_kind_filter_all_override) {
+    if (!runtime || !search_text || !selected_project_keys || !graph_kind_filter) {
+        return;
+    }
+
+    runtime->pending_intent_valid = 1;
+    (void)snprintf(runtime->pending_search_text,
+                   sizeof(runtime->pending_search_text),
+                   "%s",
+                   search_text);
+    runtime->pending_selected_item_id = selected_item_id;
+    runtime->pending_graph_center_item_id = graph_center_item_id;
+    runtime->pending_list_query_offset = list_query_offset;
+    runtime->pending_browse_pinned_only = browse_pinned_only ? 1 : 0;
+    runtime->pending_browse_canonical_only = browse_canonical_only ? 1 : 0;
+    runtime->pending_browse_kind_index = mem_console_browse_kind_index_clamp(browse_kind_index);
+    mem_console_runtime_copy_selected_project_filters(runtime->pending_selected_project_keys,
+                                                      &runtime->pending_selected_project_count,
+                                                      selected_project_keys,
+                                                      selected_project_count);
+    (void)snprintf(runtime->pending_graph_kind_filter,
+                   sizeof(runtime->pending_graph_kind_filter),
+                   "%s",
+                   graph_kind_filter);
+    runtime->pending_graph_kind_filter_mask = graph_kind_filter_mask;
+    runtime->pending_graph_kind_filter_all_override = graph_kind_filter_all_override ? 1 : 0;
+    runtime->pending_graph_edge_limit = graph_edge_limit;
+    runtime->pending_graph_hops = graph_hops;
+    runtime->pending_graph_layout_mode = graph_layout_mode;
+    runtime->pending_graph_sort_mode = graph_sort_mode;
+    runtime->pending_graph_scope_full_mode_enabled = graph_scope_full_mode_enabled ? 1 : 0;
+    runtime->pending_graph_node_kind_filter_mask = graph_node_kind_filter_mask;
+    runtime->pending_graph_node_kind_filter_all_override =
+        graph_node_kind_filter_all_override ? 1 : 0;
+}
+
+static void mem_console_runtime_clear_pending_intent(MemConsoleRuntime *runtime) {
+    if (!runtime) {
+        return;
+    }
+    runtime->pending_intent_valid = 0;
+}
+
+static void mem_console_runtime_apply_pending_intent_to_state(const MemConsoleRuntime *runtime,
+                                                             MemConsoleState *pending_state) {
+    if (!runtime || !pending_state || !runtime->pending_intent_valid) {
+        return;
+    }
+
+    (void)snprintf(pending_state->search_text,
+                   sizeof(pending_state->search_text),
+                   "%s",
+                   runtime->pending_search_text);
+    mem_console_selection_set(pending_state, runtime->pending_selected_item_id);
+    mem_console_graph_center_set(pending_state, runtime->pending_graph_center_item_id);
+    pending_state->list_query_offset = runtime->pending_list_query_offset;
+    pending_state->browse_pinned_only = runtime->pending_browse_pinned_only ? 1 : 0;
+    pending_state->browse_canonical_only = runtime->pending_browse_canonical_only ? 1 : 0;
+    pending_state->browse_kind_index =
+        mem_console_browse_kind_index_clamp(runtime->pending_browse_kind_index);
+    mem_console_runtime_copy_selected_project_filters(pending_state->selected_project_keys,
+                                                      &pending_state->selected_project_count,
+                                                      runtime->pending_selected_project_keys,
+                                                      runtime->pending_selected_project_count);
+    pending_state->graph_kind_filter_all_override =
+        runtime->pending_graph_kind_filter_all_override ? 1 : 0;
+    pending_state->graph_kind_filter_mask =
+        runtime->pending_graph_kind_filter_mask & mem_console_graph_kind_filter_all_mask();
+    if (pending_state->graph_kind_filter_all_override) {
+        pending_state->graph_kind_filter_mask = mem_console_graph_kind_filter_all_mask();
+    }
+    mem_console_graph_kind_sync_text_filter(pending_state);
+    mem_console_graph_edge_limit_set(pending_state, runtime->pending_graph_edge_limit);
+    pending_state->graph_query_hops = mem_console_graph_hops_clamp(runtime->pending_graph_hops);
+    pending_state->graph_layout_mode =
+        mem_console_graph_layout_mode_clamp(runtime->pending_graph_layout_mode);
+    pending_state->graph_sort_mode = mem_console_graph_sort_mode_clamp(runtime->pending_graph_sort_mode);
+    pending_state->graph_scope_full_mode_enabled =
+        runtime->pending_graph_scope_full_mode_enabled ? 1 : 0;
+    pending_state->graph_node_kind_filter_all_override =
+        runtime->pending_graph_node_kind_filter_all_override ? 1 : 0;
+    pending_state->graph_node_kind_filter_mask =
+        runtime->pending_graph_node_kind_filter_mask & mem_console_graph_node_kind_filter_all_mask();
+    if (pending_state->graph_node_kind_filter_all_override) {
+        pending_state->graph_node_kind_filter_mask = mem_console_graph_node_kind_filter_all_mask();
+    }
+}
+
 CoreResult mem_console_runtime_init(MemConsoleRuntime *runtime, uint64_t now_ms) {
     if (!runtime) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid runtime init" };
@@ -278,37 +400,26 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
                                                 runtime->pending_graph_node_kind_filter_mask,
                                                 runtime->pending_graph_node_kind_filter_all_override)) {
             runtime->stats_refresh_coalesced += 1u;
-            runtime->pending_intent_valid = 1;
-            (void)snprintf(runtime->pending_search_text,
-                           sizeof(runtime->pending_search_text),
-                           "%s",
-                           current_search_text);
-            runtime->pending_selected_item_id = current_selected_item_id;
-            runtime->pending_graph_center_item_id = current_graph_center_item_id;
-            runtime->pending_list_query_offset = current_list_query_offset;
-            runtime->pending_browse_pinned_only = current_browse_pinned_only ? 1 : 0;
-            runtime->pending_browse_canonical_only = current_browse_canonical_only ? 1 : 0;
-            runtime->pending_browse_kind_index =
-                mem_console_browse_kind_index_clamp(current_browse_kind_index);
-            mem_console_runtime_copy_selected_project_filters(runtime->pending_selected_project_keys,
-                                                              &runtime->pending_selected_project_count,
-                                                              current_selected_project_keys,
-                                                              current_selected_project_count);
-            (void)snprintf(runtime->pending_graph_kind_filter,
-                           sizeof(runtime->pending_graph_kind_filter),
-                           "%s",
-                           current_graph_kind_filter);
-            runtime->pending_graph_kind_filter_mask = current_graph_kind_filter_mask;
-            runtime->pending_graph_kind_filter_all_override =
-                current_graph_kind_filter_all_override ? 1 : 0;
-            runtime->pending_graph_edge_limit = current_graph_edge_limit;
-            runtime->pending_graph_hops = current_graph_hops;
-            runtime->pending_graph_layout_mode = current_graph_layout_mode;
-            runtime->pending_graph_sort_mode = current_graph_sort_mode;
-            runtime->pending_graph_scope_full_mode_enabled = current_graph_scope_full_mode_enabled;
-            runtime->pending_graph_node_kind_filter_mask = current_graph_node_kind_filter_mask;
-            runtime->pending_graph_node_kind_filter_all_override =
-                current_graph_node_kind_filter_all_override ? 1 : 0;
+            mem_console_runtime_store_pending_intent(runtime,
+                                                     current_search_text,
+                                                     current_selected_item_id,
+                                                     current_graph_center_item_id,
+                                                     current_list_query_offset,
+                                                     current_browse_pinned_only,
+                                                     current_browse_canonical_only,
+                                                     current_browse_kind_index,
+                                                     current_selected_project_keys,
+                                                     current_selected_project_count,
+                                                     current_graph_kind_filter,
+                                                     current_graph_kind_filter_mask,
+                                                     current_graph_kind_filter_all_override,
+                                                     current_graph_edge_limit,
+                                                     current_graph_hops,
+                                                     current_graph_layout_mode,
+                                                     current_graph_sort_mode,
+                                                     current_graph_scope_full_mode_enabled,
+                                                     current_graph_node_kind_filter_mask,
+                                                     current_graph_node_kind_filter_all_override);
         }
     }
 
@@ -391,11 +502,11 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
         runtime->last_applied_request_id = completion->request_id;
         if (completion->result.code != CORE_OK) {
             const char *error_text = completion->result.message ? completion->result.message : "background refresh failed";
+            mem_console_runtime_store_latest_refresh_error(runtime, error_text);
             (void)snprintf(state->status_line,
                            sizeof(state->status_line),
                            "Async refresh failed: %s",
-                           error_text);
-            runtime->stats_refresh_errors += 1u;
+                           runtime->latest_refresh_error_message);
             runtime->next_poll_due_ms = now_ms + runtime->poll_interval_ms;
             core_free(completion);
             continue;
@@ -431,43 +542,7 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
         runtime->pending_intent_valid &&
         can_schedule) {
         MemConsoleState pending_state = *state;
-        (void)snprintf(pending_state.search_text,
-                       sizeof(pending_state.search_text),
-                       "%s",
-                       runtime->pending_search_text);
-        pending_state.selected_item_id = runtime->pending_selected_item_id;
-        pending_state.graph_center_item_id = runtime->pending_graph_center_item_id;
-        pending_state.list_query_offset = runtime->pending_list_query_offset;
-        pending_state.browse_pinned_only = runtime->pending_browse_pinned_only ? 1 : 0;
-        pending_state.browse_canonical_only = runtime->pending_browse_canonical_only ? 1 : 0;
-        pending_state.browse_kind_index =
-            mem_console_browse_kind_index_clamp(runtime->pending_browse_kind_index);
-        mem_console_runtime_copy_selected_project_filters(pending_state.selected_project_keys,
-                                                          &pending_state.selected_project_count,
-                                                          runtime->pending_selected_project_keys,
-                                                          runtime->pending_selected_project_count);
-        pending_state.graph_kind_filter_all_override =
-            runtime->pending_graph_kind_filter_all_override ? 1 : 0;
-        pending_state.graph_kind_filter_mask =
-            runtime->pending_graph_kind_filter_mask & mem_console_graph_kind_filter_all_mask();
-        if (pending_state.graph_kind_filter_all_override) {
-            pending_state.graph_kind_filter_mask = mem_console_graph_kind_filter_all_mask();
-        }
-        mem_console_graph_kind_sync_text_filter(&pending_state);
-        mem_console_graph_edge_limit_set(&pending_state, runtime->pending_graph_edge_limit);
-        pending_state.graph_query_hops = mem_console_graph_hops_clamp(runtime->pending_graph_hops);
-        pending_state.graph_layout_mode =
-            mem_console_graph_layout_mode_clamp(runtime->pending_graph_layout_mode);
-        pending_state.graph_sort_mode = mem_console_graph_sort_mode_clamp(runtime->pending_graph_sort_mode);
-        pending_state.graph_scope_full_mode_enabled =
-            runtime->pending_graph_scope_full_mode_enabled ? 1 : 0;
-        pending_state.graph_node_kind_filter_all_override =
-            runtime->pending_graph_node_kind_filter_all_override ? 1 : 0;
-        pending_state.graph_node_kind_filter_mask =
-            runtime->pending_graph_node_kind_filter_mask & mem_console_graph_node_kind_filter_all_mask();
-        if (pending_state.graph_node_kind_filter_all_override) {
-            pending_state.graph_node_kind_filter_mask = mem_console_graph_node_kind_filter_all_mask();
-        }
+        mem_console_runtime_apply_pending_intent_to_state(runtime, &pending_state);
 
         if (mem_console_runtime_intent_matches(pending_state.search_text,
                                                pending_state.selected_item_id,
@@ -512,11 +587,11 @@ void mem_console_runtime_tick(MemConsoleRuntime *runtime,
             runtime_reset_poll_interval(runtime);
             CoreResult result = mem_console_runtime_schedule_refresh(runtime, &pending_state);
             if (result.code == CORE_OK) {
-                runtime->pending_intent_valid = 0;
+                mem_console_runtime_clear_pending_intent(runtime);
                 runtime->next_poll_due_ms = now_ms + runtime->poll_interval_ms;
             }
         } else {
-            runtime->pending_intent_valid = 0;
+            mem_console_runtime_clear_pending_intent(runtime);
         }
     }
 

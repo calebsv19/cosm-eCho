@@ -309,7 +309,7 @@ void seed_state(MemConsoleState *state, const char *db_path) {
     state->db_modal_open = 0;
     state->db_modal_create_mode = 0;
     state->db_modal_input_root_mode = 0;
-    state->input_target = MEM_CONSOLE_INPUT_SEARCH;
+    mem_console_input_target_set(state, MEM_CONSOLE_INPUT_SEARCH);
     state->search_cursor = 0;
     state->title_edit_cursor = 0;
     state->body_edit_cursor = 0;
@@ -394,6 +394,6 @@ void seed_state(MemConsoleState *state, const char *db_path) {
     state->left_panel_drag_start_ratio = 0.0f;
     state->pane_left_collapsed = 0;
     state->pane_right_detail_collapsed = 0;
-    state->pane_prefs_dirty = 0;
+    mem_console_pane_prefs_mark_clean(state);
     kit_graph_struct_viewport_default(&state->graph_viewport);
 }

@@ -232,10 +232,10 @@ static int64_t graph_priority_root_item_id(const MemConsoleState *state) {
     if (!state) {
         return 0;
     }
-    if (state->selected_item_id != 0) {
-        return state->selected_item_id;
+    if (state->graph_center_item_id != 0) {
+        return state->graph_center_item_id;
     }
-    return state->graph_center_item_id;
+    return state->selected_item_id;
 }
 
 static CoreResult load_priority_graph_nodes(CoreMemDb *db,
@@ -685,16 +685,16 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
         mem_console_db_apply_graph_node_sort(state);
         mem_console_db_apply_graph_edge_priority(state, edge_limit);
 
-        if (state->selected_item_id != 0 &&
-            find_graph_node_index(state, state->selected_item_id) >= 0) {
-            state->graph_center_item_id = state->selected_item_id;
-        } else if (state->graph_center_item_id != 0 &&
-                   find_graph_node_index(state, state->graph_center_item_id) >= 0) {
+        if (state->graph_center_item_id != 0 &&
+            find_graph_node_index(state, state->graph_center_item_id) >= 0) {
             /* keep existing center */
+        } else if (state->selected_item_id != 0 &&
+                   find_graph_node_index(state, state->selected_item_id) >= 0) {
+            mem_console_graph_center_set(state, state->selected_item_id);
         } else if (state->graph_node_count > 0) {
-            state->graph_center_item_id = state->graph_nodes[0].item_id;
+            mem_console_graph_center_set(state, state->graph_nodes[0].item_id);
         } else {
-            state->graph_center_item_id = 0;
+            mem_console_graph_center_set(state, 0);
         }
 
         return core_result_ok();
@@ -718,10 +718,10 @@ CoreResult load_graph_neighborhood(CoreMemDb *db, MemConsoleState *state) {
             result = ensure_graph_node(db, state, center_item_id, &selected_index);
         }
         if (result.code != CORE_OK) {
-            state->graph_center_item_id = 0;
+            mem_console_graph_center_set(state, 0);
             return core_result_ok();
         }
-        state->graph_center_item_id = center_item_id;
+        mem_console_graph_center_set(state, center_item_id);
     }
 
     if (sort_oldest_first) {

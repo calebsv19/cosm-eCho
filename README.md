@@ -82,6 +82,7 @@ Right now it proves:
 It does not yet provide a full multiline editor widget, richer styling controls, or real authoring module insertion beyond the shared add-module stub.
 
 Current source layout:
+- Source-lane ownership notes live in `mem_console/src/README.md`.
 - `src/app/`:
   - lifecycle/bootstrap/loop, event/action dispatch, and Workspace Authoring host integration (`mem_console.c`, `mem_console_app_main.c`, `mem_console_app_loop.c`, `mem_console_workspace_authoring_host.c`)
 - `src/runtime/`:
@@ -156,6 +157,20 @@ make -C mem_console run-headless-smoke
 make -C mem_console visual-harness
 ```
 
+R6 demo-proof status:
+- `visual-harness` is the current build/readiness and manual validation target.
+- `visual-fixture-capture` is GUI/operator evidence for deterministic graph
+  fixture modes and uses `desktop_capture` for real screenshots.
+- `demo/capture_visual_graph_fixture.sh --plan-only --out-root <path>` proves
+  the expected visual capture artifact plan without launching the app.
+- `make -C mem_console visual-artifact` is the source-run first-frame baseline:
+  it seeds the deterministic graph fixture, runs the app-owned first frame
+  headlessly through the null render backend, writes
+  `visual_artifacts/mem_console_first_frame_web.svg`, and reports the final
+  artifact path.
+- `make -C mem_console run-visual-artifact-contract-checks` verifies the
+  `visual-artifact` success lines and SVG metadata without desktop capture.
+
 ## Run
 
 ```sh
@@ -212,5 +227,9 @@ Demo reset helper:
 ## Near-Term Target
 
 The next implementation steps are:
-- add richer link editing affordances on top of the current graph mode controls
-- finish graph-mode audit closure and Codex skill packaging validation
+- plan the commit grouping for the completed private R0-R6 scaffold refinement
+  pass, including the new source-run `visual-artifact` demo proof
+- keep graph HUD/status render-boundary hardening and broader SDL input-router
+  cleanup as the next scoped technical follow-through
+- start any future graph/product polish as a new active plan instead of
+  extending archived graph/visualizer lanes

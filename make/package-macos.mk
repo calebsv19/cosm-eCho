@@ -11,8 +11,8 @@ package-desktop: package-build-lane
 	@cp "$(PACKAGE_LAUNCHER_SRC)" "$(PACKAGE_MACOS_DIR)/mem-console-launcher"
 	@chmod +x "$(PACKAGE_MACOS_DIR)/mem-console-bin" "$(PACKAGE_MACOS_DIR)/mem-console-launcher"
 	@PACKAGE_DEP_SEARCH_ROOTS="$(TARGET_DEP_SEARCH_ROOTS)" "$(PACKAGE_DYLIB_BUNDLER)" "$(PACKAGE_MACOS_DIR)/mem-console-bin" "$(PACKAGE_FRAMEWORKS_DIR)"
-	@if [ -d "data" ]; then cp -R data "$(PACKAGE_RESOURCES_DIR)/"; else mkdir -p "$(PACKAGE_RESOURCES_DIR)/data"; fi
 	@mkdir -p "$(PACKAGE_RESOURCES_DIR)/data"
+	@if [ -f "data/default.sqlite" ]; then cp "data/default.sqlite" "$(PACKAGE_RESOURCES_DIR)/data/default.sqlite"; fi
 	@mkdir -p "$(PACKAGE_RESOURCES_DIR)/shared/assets/fonts"
 	@cp -R "$(SHARED_ROOT)/assets/fonts/." "$(PACKAGE_RESOURCES_DIR)/shared/assets/fonts/"
 	@if [ -f "$(PACKAGE_APP_ICON_SRC)" ]; then \
@@ -46,6 +46,8 @@ package-desktop-smoke: package-desktop
 		test -f "$(PACKAGE_BUNDLED_ICON_PATH)" || (echo "Missing bundled AppIcon.icns"; exit 1); \
 	fi
 	@test -f "$(PACKAGE_RESOURCES_DIR)/data/default.sqlite" || (echo "Missing default sqlite"; exit 1)
+	@extra_data="$$(find "$(PACKAGE_RESOURCES_DIR)/data" -type f ! -name default.sqlite -print -quit)"; \
+	[ -z "$$extra_data" ] || (echo "Unexpected packaged data sidecar: $$extra_data"; exit 1)
 	@test -f "$(PACKAGE_RESOURCES_DIR)/shared/assets/fonts/Montserrat-Regular.ttf" || (echo "Missing shared font"; exit 1)
 	@test -f "$(PACKAGE_RESOURCES_DIR)/vk_renderer/shaders/textured.vert.spv" || (echo "Missing bundled vk shader"; exit 1)
 	@test -f "$(PACKAGE_RESOURCES_DIR)/shaders/textured.vert.spv" || (echo "Missing bundled runtime shader"; exit 1)
@@ -59,7 +61,7 @@ package-desktop-smoke: package-desktop
 	@echo "package-desktop-smoke passed."
 
 package-desktop-self-test: package-desktop-smoke
-	@"$(PACKAGE_MACOS_DIR)/mem-console-launcher" --self-test || (echo "package-desktop self-test failed."; exit 1)
+	@"$(PACKAGE_MACOS_DIR)/mem-console-launcher" --self-test || (echo "package-desktop self-test failed; launcher config follows."; "$(PACKAGE_MACOS_DIR)/mem-console-launcher" --print-config; exit 1)
 	@echo "package-desktop-self-test passed."
 
 package-desktop-copy-desktop: package-desktop

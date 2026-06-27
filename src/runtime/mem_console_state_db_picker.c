@@ -6,16 +6,6 @@
 #include <stdio.h>
 #include <string.h>
 
-static int path_has_sqlite_suffix(const char *path) {
-    size_t len;
-
-    if (!path) {
-        return 0;
-    }
-    len = strlen(path);
-    return len >= 7u && strcmp(path + len - 7u, ".sqlite") == 0;
-}
-
 static int path_has_directory_separator(const char *path) {
     if (!path || !path[0]) {
         return 0;
@@ -59,7 +49,7 @@ static void db_picker_set_text_from_path(MemConsoleState *state,
     }
 
     len = strlen(path);
-    if (strip_sqlite_suffix && path_has_sqlite_suffix(path)) {
+    if (strip_sqlite_suffix && mem_console_path_has_sqlite_suffix(path)) {
         len -= 7u;
     }
     if (len >= sizeof(state->db_modal_text)) {
@@ -226,7 +216,7 @@ void begin_db_picker_mode(MemConsoleState *state, int create_mode) {
     state->db_modal_input_root_mode = 0;
     state->pending_db_path[0] = '\0';
     state->db_modal_resolved_path[0] = '\0';
-    state->input_target = MEM_CONSOLE_INPUT_DB_PATH;
+    mem_console_input_target_set(state, MEM_CONSOLE_INPUT_DB_PATH);
 
     mem_console_db_picker_rescan_entries(state);
     if (!state->db_modal_create_mode && state->db_picker_entry_count > 0) {
@@ -263,7 +253,7 @@ void begin_input_root_picker_mode(MemConsoleState *state) {
     state->db_modal_input_root_mode = 1;
     state->pending_db_path[0] = '\0';
     state->db_modal_resolved_path[0] = '\0';
-    state->input_target = MEM_CONSOLE_INPUT_DB_PATH;
+    mem_console_input_target_set(state, MEM_CONSOLE_INPUT_DB_PATH);
     db_picker_set_text_from_path(state, state->input_root[0] ? state->input_root : state->output_root, 0);
     state->db_modal_cursor = (int)strlen(state->db_modal_text);
     state->db_modal_selection_anchor = 0;
@@ -291,7 +281,7 @@ void cancel_db_picker_mode(MemConsoleState *state) {
     state->db_modal_selection_start = 0;
     state->db_modal_selection_end = 0;
     state->db_modal_drag_select_active = 0;
-    state->input_target = MEM_CONSOLE_INPUT_SEARCH;
+    mem_console_input_target_set(state, MEM_CONSOLE_INPUT_SEARCH);
 }
 
 int mem_console_db_picker_build_path(const MemConsoleState *state,
@@ -346,8 +336,8 @@ int mem_console_db_picker_build_path(const MemConsoleState *state,
     }
 
     if (!state->db_modal_create_mode) {
-        /* Open/switch is explicit reference mode: use the selected path as typed. */
-        return 1;
+        /* Open/switch is explicit reference mode: validate without suffix rewrite. */
+        return mem_console_db_path_is_safe(out_path);
     }
 
     if (!path_has_directory_separator(out_path)) {
@@ -361,7 +351,7 @@ int mem_console_db_picker_build_path(const MemConsoleState *state,
         }
         written = snprintf(resolved_create_path,
                            sizeof(resolved_create_path),
-                           path_has_sqlite_suffix(out_path) ? "%s/%s" : "%s/%s.sqlite",
+                           mem_console_path_has_sqlite_suffix(out_path) ? "%s/%s" : "%s/%s.sqlite",
                            create_root,
                            out_path);
         if (written <= 0 || (size_t)written >= sizeof(resolved_create_path) ||
@@ -370,10 +360,10 @@ int mem_console_db_picker_build_path(const MemConsoleState *state,
             return 0;
         }
         (void)snprintf(out_path, out_cap, "%s", resolved_create_path);
-        return 1;
+        return mem_console_db_path_is_safe(out_path);
     }
 
-    if (!path_has_sqlite_suffix(out_path)) {
+    if (!mem_console_path_has_sqlite_suffix(out_path)) {
         size_t len = strlen(out_path);
         if (len + 7u >= out_cap) {
             out_path[0] = '\0';
@@ -382,7 +372,7 @@ int mem_console_db_picker_build_path(const MemConsoleState *state,
         memcpy(out_path + len, ".sqlite", 8u);
     }
 
-    return 1;
+    return mem_console_db_path_is_safe(out_path);
 }
 
 void mem_console_db_picker_rescan_entries(MemConsoleState *state) {
