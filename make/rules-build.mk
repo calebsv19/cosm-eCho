@@ -22,7 +22,7 @@ $($(1)_LIB): FORCE $(3) | $(SHARED_BUILD_DIR)
 	cp "$$($(1)_LIB_SRC)" "$$@"
 endef
 
-$(eval $(call build_copy_static_lib,KIT_RENDER,KIT_RENDER_ENABLE_VK=1,))
+$(eval $(call build_copy_static_lib,KIT_RENDER,KIT_RENDER_ENABLE_VK=1 CFLAGS="-std=c11 -Wall -Wextra -Werror -O2 -I$(abspath $(VK_RUNTIME_DIR)/include)",))
 $(eval $(call build_copy_static_lib,KIT_UI,KIT_RENDER_ENABLE_VK=1,$(KIT_RENDER_LIB)))
 $(eval $(call build_copy_static_lib,KIT_GRAPH_STRUCT,KIT_RENDER_ENABLE_VK=1,$(KIT_UI_LIB)))
 $(eval $(call build_copy_static_lib,KIT_WORKSPACE_AUTHORING,,$(CORE_BASE_LIB) $(CORE_THEME_LIB) $(CORE_FONT_LIB) $(CORE_PANE_LIB) $(KIT_RENDER_LIB)))
@@ -39,7 +39,8 @@ $(eval $(call build_copy_static_lib,CORE_KERNEL,,$(CORE_TIME_LIB) $(CORE_SCHED_L
 $(eval $(call build_copy_static_lib,CORE_MEMDB,,$(CORE_BASE_LIB)))
 $(eval $(call build_copy_static_lib,CORE_PANE,,))
 $(eval $(call build_copy_static_lib,CORE_PACK,,$(CORE_BASE_LIB)))
-$(eval $(call build_copy_static_lib,VK_RENDERER,,))
+$(eval $(call build_copy_static_lib,VK_RUNTIME,,))
+$(eval $(call build_copy_static_lib,VK_RENDERER,VK_RUNTIME_ROOT="$(abspath $(VK_RUNTIME_DIR))",$(VK_RUNTIME_LIB)))
 
 $(BIN): $(APP_OBJS) $(APP_SHARED_LIBS) | $(BIN_DIR)
 	$(HOST_CC) $(ARCH_FLAGS) $(CFLAGS) $(INC) $(APP_OBJS) $(APP_SHARED_LIBS) $(VULKAN_LIBS) $(SDL_LIBS) $(SDL_TTF_LIBS) $(APPLE_FW) -lm $(FISICS_MEMCHECK_LINK_LIBS) -o $@

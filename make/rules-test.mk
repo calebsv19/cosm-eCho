@@ -88,6 +88,7 @@ run-package-diagnostic-contract-checks:
 	./tests/run_package_diagnostic_contract_checks.sh
 
 run-demo-helper-safety-contract-checks:
+	@$(MAKE) -C $(CORE_MEMDB_DIR) tools
 	./tests/run_demo_helper_safety_contract_checks.sh
 
 run-item-mutation-test:

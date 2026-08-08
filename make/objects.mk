@@ -18,6 +18,7 @@ KIT_UI_LIB_SRC := $(KIT_UI_DIR)/build/libkit_ui.a
 KIT_GRAPH_STRUCT_LIB_SRC := $(KIT_GRAPH_STRUCT_DIR)/build/libkit_graph_struct.a
 KIT_WORKSPACE_AUTHORING_LIB_SRC := $(KIT_WORKSPACE_AUTHORING_DIR)/build/libkit_workspace_authoring.a
 VK_RENDERER_LIB_SRC := $(VK_RENDERER_DIR)/build/lib/libvkrenderer.a
+VK_RUNTIME_LIB_SRC := $(VK_RUNTIME_DIR)/build/lib/libvkruntime.a
 
 CORE_BASE_LIB := $(SHARED_BUILD_DIR)/libcore_base.a
 CORE_THEME_LIB := $(SHARED_BUILD_DIR)/libcore_theme.a
@@ -37,6 +38,7 @@ KIT_UI_LIB := $(SHARED_BUILD_DIR)/libkit_ui.a
 KIT_GRAPH_STRUCT_LIB := $(SHARED_BUILD_DIR)/libkit_graph_struct.a
 KIT_WORKSPACE_AUTHORING_LIB := $(SHARED_BUILD_DIR)/libkit_workspace_authoring.a
 VK_RENDERER_LIB := $(SHARED_BUILD_DIR)/libvkrenderer.a
+VK_RUNTIME_LIB := $(SHARED_BUILD_DIR)/libvkruntime.a
 
 APP_SHARED_LIBS := \
 	$(KIT_GRAPH_STRUCT_LIB) \
@@ -44,6 +46,7 @@ APP_SHARED_LIBS := \
 	$(KIT_UI_LIB) \
 	$(KIT_RENDER_LIB) \
 	$(VK_RENDERER_LIB) \
+	$(VK_RUNTIME_LIB) \
 	$(CORE_MEMDB_LIB) \
 	$(CORE_PACK_LIB) \
 	$(CORE_PANE_LIB) \

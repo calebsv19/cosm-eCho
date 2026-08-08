@@ -8,6 +8,7 @@ APP_SRCS := src/app/mem_console.c \
 	src/app/mem_console_app_loop_input.c \
 	src/app/mem_console_app_status.c \
 	src/app/mem_console_app_theme.c \
+	src/app/mem_console_vulkan_rollout.c \
 	src/app/mem_console_workspace_authoring_host.c \
 	src/app/mem_console_kernel_bridge.c \
 	src/db/mem_console_db.c \

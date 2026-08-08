@@ -1,6 +1,6 @@
 # eCho Current Truth
 
-Last updated: 2026-06-27
+Last updated: 2026-08-07
 
 ## Program Identity
 - Product name: `eCho`
@@ -86,6 +86,21 @@ Last updated: 2026-06-27
   - Font/Theme/text-size previews are live
   - `Enter` applies; `Esc` or toggle-out cancels and restores the entry baseline
   - accepted changes persist through the existing per-DB `.ui.pack`
+- Managed Vulkan adoption is source- and package-proven against canonical
+  shared commit `60084f90564105983c7c74e862a299d8b6775347`:
+  - the default vendored build now carries `vk_runtime 0.6.0` beneath
+    `vk_renderer 1.3.1`; `SHARED_ROOT=../shared` remains a bounded development
+    override rather than the normal build path
+  - the renderer compatibility handles mirror the runtime-owned Vulkan
+    instance, device, graphics queue, and present queue
+  - `make -C mem_console vulkan-rollout-self-test` requires Khronos validation,
+    draws nontrivial frames, reads back captures, performs a real drawable
+    resize, and proves shutdown/restart lifecycle reuse
+  - the Apple M2 proof recorded zero validation warnings/errors at startup,
+    resize, and restart, with drawable extents changing from `1440x900` to
+    `1800x1120` and a measured `2.000` render scale before and after resize
+  - this is presentation/runtime lifecycle adoption only; eCho does not call
+    the shared compute, residency, or timing workload APIs
 
 ## Runtime and Data Path Contract
 - Active DB startup resolution is explicit:
@@ -141,6 +156,8 @@ Last updated: 2026-06-27
   - `make -C mem_console run-relationship-mutation-test`
   - `make -C mem_console run-browse-filter-contract-checks`
   - `make -C mem_console run-visual-fixture-contract-checks`
+  - `make -C mem_console vulkan-rollout-contract`
+  - `make -C mem_console vulkan-rollout-self-test`
   - `make -C mem_console visual-harness` builds the visual runtime target and
     prints readiness output, but does not execute the interactive shell
   - `make -C mem_console visual-fixture-capture` builds a deterministic graph

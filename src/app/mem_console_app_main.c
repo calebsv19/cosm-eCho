@@ -14,6 +14,7 @@
 
 #include "mem_console_app_internal.h"
 #include "mem_console_prefs.h"
+#include "mem_console_vulkan_rollout.h"
 #include "ui/mem_console_visual_artifact.h"
 
 static int mem_console_build_legacy_app_prefs_path(char *out_path, size_t out_cap) {
@@ -620,6 +621,9 @@ int mem_console_app_main(int argc, char **argv) {
 
     if (find_flag_value(argc, argv, "--visual-artifact")) {
         return mem_console_visual_artifact_run_cli(argc, argv);
+    }
+    if (has_flag(argc, argv, "--vulkan-rollout-self-test")) {
+        return mem_console_vulkan_rollout_self_test();
     }
 
     if (!mem_console_app_bootstrap(&ctx, argc, argv)) {
