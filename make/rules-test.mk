@@ -136,9 +136,11 @@ run-browse-filter-contract-checks:
 	./tests/run_browse_filter_contract_checks.sh
 
 run-visual-fixture-contract-checks:
+	@$(MAKE) -C $(CORE_MEMDB_DIR) tools
 	./tests/run_visual_fixture_contract_checks.sh
 
 run-visual-artifact-contract-checks: $(BIN)
+	@$(MAKE) -C $(CORE_MEMDB_DIR) tools
 	./tests/run_visual_artifact_contract_checks.sh
 
 visual-harness: $(BIN)
@@ -146,6 +148,7 @@ visual-harness: $(BIN)
 	@echo "launch manual UI validation with: make -C mem_console run-demo"
 
 visual-artifact: $(BIN)
+	@$(MAKE) -C $(CORE_MEMDB_DIR) tools
 	./demo/render_visual_artifact.sh
 
 visual-fixture-capture: $(BIN)

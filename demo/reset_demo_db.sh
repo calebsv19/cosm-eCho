@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-MEM_CLI="${ROOT_DIR}/shared/core/core_memdb/build/mem_cli"
-source "${ROOT_DIR}/mem_console/demo/demo_db_safety.sh"
+PROGRAM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+MEM_CLI="${PROGRAM_ROOT}/third_party/codework_shared/core/core_memdb/build/mem_cli"
+source "${PROGRAM_ROOT}/demo/demo_db_safety.sh"
 
-DEFAULT_DB_PATH="${ROOT_DIR}/mem_console/demo/demo_mem_console.sqlite"
+DEFAULT_DB_PATH="${PROGRAM_ROOT}/demo/demo_mem_console.sqlite"
 DB_PATH="${1:-${DEFAULT_DB_PATH}}"
-DB_PATH="$(mem_console_demo_assert_safe_db_path "${ROOT_DIR}" "${DB_PATH}")"
+DB_PATH="$(mem_console_demo_assert_safe_db_path "${PROGRAM_ROOT}" "${DB_PATH}")"
 DB_DIR="$(dirname "${DB_PATH}")"
 
 mkdir -p "${DB_DIR}"

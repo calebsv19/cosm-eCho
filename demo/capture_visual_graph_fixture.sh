@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WORK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-MEM_CONSOLE_DIR="${WORK_ROOT}/mem_console"
+MEM_CONSOLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+GIT_COMMON_DIR="$(git -C "${MEM_CONSOLE_DIR}" rev-parse --path-format=absolute --git-common-dir)"
+WORK_ROOT="$(cd "${GIT_COMMON_DIR}/../.." && pwd)"
 CAPTURE_BIN="${WORK_ROOT}/desktop_capture/build/bin/desktop_capture"
 MEM_CONSOLE_BIN="${MEM_CONSOLE_DIR}/build/targets/macOS-arm64/toolchains/clang/bin/mem_console"
 STAMP="$(date +%Y%m%d_%H%M%S)"

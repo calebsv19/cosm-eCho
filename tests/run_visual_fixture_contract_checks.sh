@@ -2,11 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORK_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
 FIXTURE_DB="${ROOT_DIR}/build/test_visual_graph_fixture.sqlite"
 FIXTURE_MANIFEST="${ROOT_DIR}/build/test_visual_graph_fixture.env"
 CAPTURE_PLAN_ROOT="${ROOT_DIR}/build/test_visual_capture_plan"
-MEM_CLI="${WORK_ROOT}/shared/core/core_memdb/build/mem_cli"
+MEM_CLI="${ROOT_DIR}/third_party/codework_shared/core/core_memdb/build/mem_cli"
 
 fail() {
     echo "visual fixture contract failed: $1" >&2

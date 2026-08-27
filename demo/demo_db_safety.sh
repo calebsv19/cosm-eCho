@@ -13,15 +13,15 @@ mem_console_demo_resolve_path() {
 }
 
 mem_console_demo_assert_safe_db_path() {
-    local root_dir="$1"
+    local program_root="$1"
     local db_path="$2"
     local resolved_db_path
     local demo_root
     local build_root
 
     resolved_db_path="$(mem_console_demo_resolve_path "${db_path}")"
-    demo_root="$(cd "${root_dir}/mem_console/demo" && pwd -P)"
-    build_root="$(cd "${root_dir}/mem_console/build" && pwd -P)"
+    demo_root="$(cd "${program_root}/demo" && pwd -P)"
+    build_root="$(cd "${program_root}/build" && pwd -P)"
 
     case "${resolved_db_path}" in
         "${demo_root}"/*.sqlite|"${build_root}"/*.sqlite)

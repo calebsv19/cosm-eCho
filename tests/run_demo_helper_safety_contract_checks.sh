@@ -2,8 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORK_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
-LIVE_DB="${WORK_ROOT}/data/codework_mem_console.sqlite"
+LIVE_DB="${ROOT_DIR}/data/live_workspace.sqlite"
 BUILD_DB="${ROOT_DIR}/build/test_demo_helper_safety.sqlite"
 BUILD_MANIFEST="${BUILD_DB}.manifest"
 
@@ -33,7 +32,8 @@ check_contains "MEM_CONSOLE_ALLOW_NON_DEMO_DB=1" "${ROOT_DIR}/demo/demo_db_safet
 check_contains "Refusing to write non-demo DB" "${ROOT_DIR}/demo/demo_db_safety.sh"
 
 for helper in reset_demo_db.sh reset_visual_graph_fixture.sh seed_large_list.sh; do
-    check_contains "source \"\${ROOT_DIR}/mem_console/demo/demo_db_safety.sh\"" "${ROOT_DIR}/demo/${helper}"
+    check_contains "source \"\${PROGRAM_ROOT}/demo/demo_db_safety.sh\"" "${ROOT_DIR}/demo/${helper}"
+    check_contains "third_party/codework_shared/core/core_memdb/build/mem_cli" "${ROOT_DIR}/demo/${helper}"
     check_contains "mem_console_demo_assert_safe_db_path" "${ROOT_DIR}/demo/${helper}"
     check_absent 'DEFAULT_DB_PATH="${CODEWORK_MEMDB_PATH}"' "${ROOT_DIR}/demo/${helper}"
 done

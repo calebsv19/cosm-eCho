@@ -1,6 +1,6 @@
 # mem_console Desktop Packaging
 
-Last updated: 2026-05-04
+Last updated: 2026-08-27
 
 ## Bundle Contract
 - output app:
@@ -16,6 +16,9 @@ Last updated: 2026-05-04
   - package rules copy only `data/default.sqlite`, not the whole ignored local
     `data/` directory, so app prefs sidecars or private DBs do not enter the
     bundle
+  - when that ignored local seed is absent in a fresh clone or worktree,
+    packaging creates a blank schema-correct seed under the target build root;
+    it does not read or mutate a workspace Memory DB
   - optional `Contents/Resources/AppIcon.icns` when `PACKAGE_APP_ICON_SRC` or `PACKAGE_APP_ICONSET_SRC` is provided
   - `Contents/Resources/shared/assets/fonts/*`
   - `Contents/Resources/vk_renderer/shaders/*`
@@ -33,6 +36,17 @@ Default local icon store:
   - `make -C mem_console package-desktop-refresh`
   - `make -C mem_console package-desktop-refresh PACKAGE_APP_ICON_SRC="/absolute/path/to/echo.icns"`
   - `make -C mem_console package-desktop-refresh PACKAGE_APP_ICONSET_SRC="/absolute/path/to/echo.iconset"`
+- persistent Main Edit packaging:
+  - `make -C <CodeWork>/_worktrees/mem_console_main_edit package-desktop-main-edit`
+  - `make -C <CodeWork>/_worktrees/mem_console_main_edit package-desktop-main-edit-self-test`
+  - `make -C <CodeWork>/_worktrees/mem_console_main_edit package-desktop-main-edit-refresh`
+
+The Main Edit package is emitted at
+`build/targets/<target-triple>/dist/dev/main-edit/eCho Main Edit.app`. It uses
+bundle identifier `com.cosm.echo.main-edit`, runtime/log namespace
+`MemConsole-Main-Edit`, and an embedded source/binary identity. The build and
+self-test targets never refresh or open a Desktop app. Refresh is a separate
+target that process-audits and replaces only `~/Desktop/eCho Main Edit.app`.
 
 Plain `make -C mem_console package-desktop-refresh` and `package-desktop-self-test` now look in that local store first. The local icon store is gitignored so refreshed icon copies do not dirty the normal repo worktree.
 - release readiness:
@@ -67,6 +81,9 @@ Multi-arch release lane:
   `Contents/Resources/data` files before release artifact creation.
 - when icon inputs are provided, packaging bundles `AppIcon.icns` and declares `CFBundleIconFile=AppIcon`.
 - startup logs go to `~/Library/Logs/MemConsole/launcher.log` (tmp fallback).
+- package plist metadata selects the package profile, runtime namespace, log
+  namespace, and build label; the launcher exports these values in
+  `--print-config`. Main Edit self-test supplies isolated runtime and log roots.
 - launcher runtime root:
   - `MEM_CONSOLE_RUNTIME_DIR=~/Library/Application Support/MemConsole/runtime` (tmp fallback)
 - seeded runtime DB path:

@@ -4,8 +4,23 @@ set -eu
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
 APP_CONTENTS_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
 RES_DIR="$APP_CONTENTS_DIR/Resources"
+INFO_PLIST="$APP_CONTENTS_DIR/Info.plist"
+read_plist_string() {
+    key="$1"
+    fallback="$2"
+    value="$(/usr/libexec/PlistBuddy -c "Print :$key" "$INFO_PLIST" 2>/dev/null || true)"
+    if [ -n "$value" ]; then
+        printf '%s' "$value"
+    else
+        printf '%s' "$fallback"
+    fi
+}
+PACKAGE_PROFILE="$(read_plist_string MemConsolePackageProfile standard)"
+RUNTIME_NAMESPACE="$(read_plist_string MemConsoleRuntimeNamespace MemConsole)"
+LOG_NAMESPACE="$(read_plist_string MemConsoleLogNamespace MemConsole)"
+BUILD_LABEL="$(read_plist_string MemConsoleBuildLabel eCho)"
 APP_BUNDLE_DB="$RES_DIR/data/default.sqlite"
-RUNTIME_DIR_DEFAULT="${HOME}/Library/Application Support/MemConsole/runtime"
+RUNTIME_DIR_DEFAULT="${HOME}/Library/Application Support/${RUNTIME_NAMESPACE}/runtime"
 RUNTIME_DIR="${MEM_CONSOLE_RUNTIME_DIR:-$RUNTIME_DIR_DEFAULT}"
 
 ensure_bundle_copy() {
@@ -54,7 +69,7 @@ if ! mkdir -p "$RUNTIME_DIR" 2>/dev/null; then
 fi
 mkdir -p "$RUNTIME_DIR/data" "$RUNTIME_DIR/vk" "$RUNTIME_DIR/config/shared/shaders" 2>/dev/null || true
 APP_DB_PATH="$RUNTIME_DIR/data/default.sqlite"
-LOG_DIR="${HOME}/Library/Logs/MemConsole"
+LOG_DIR="${MEM_CONSOLE_LOG_DIR:-${HOME}/Library/Logs/${LOG_NAMESPACE}}"
 LOG_FILE="$LOG_DIR/launcher.log"
 
 mkdir -p "$LOG_DIR" 2>/dev/null || true
@@ -73,6 +88,11 @@ launcher_print_config() {
     echo "RES_DIR=$RES_DIR"
     echo "APP_BINARY=$SCRIPT_DIR/mem-console-bin"
     echo "LOG_FILE=$LOG_FILE"
+    echo "MEM_CONSOLE_PACKAGE_PROFILE=$MEM_CONSOLE_PACKAGE_PROFILE"
+    echo "MEM_CONSOLE_RUNTIME_NAMESPACE=$MEM_CONSOLE_RUNTIME_NAMESPACE"
+    echo "MEM_CONSOLE_LOG_NAMESPACE=$MEM_CONSOLE_LOG_NAMESPACE"
+    echo "MEM_CONSOLE_BUILD_LABEL=$MEM_CONSOLE_BUILD_LABEL"
+    echo "MEM_CONSOLE_LOG_DIR=$MEM_CONSOLE_LOG_DIR"
     echo "MEM_CONSOLE_RUNTIME_DIR=$MEM_CONSOLE_RUNTIME_DIR"
     echo "APP_BUNDLE_DB=$APP_BUNDLE_DB"
     echo "APP_DB_PATH=$APP_DB_PATH"
@@ -131,6 +151,11 @@ EOF
 
 export CODEWORK_MEMDB_PATH="${CODEWORK_MEMDB_PATH:-$APP_DB_PATH}"
 export MEM_CONSOLE_RUNTIME_DIR="$RUNTIME_DIR"
+export MEM_CONSOLE_PACKAGE_PROFILE="$PACKAGE_PROFILE"
+export MEM_CONSOLE_RUNTIME_NAMESPACE="$RUNTIME_NAMESPACE"
+export MEM_CONSOLE_LOG_NAMESPACE="$LOG_NAMESPACE"
+export MEM_CONSOLE_BUILD_LABEL="$BUILD_LABEL"
+export MEM_CONSOLE_LOG_DIR="$LOG_DIR"
 export VK_RENDERER_SHADER_ROOT="${VK_RENDERER_SHADER_ROOT:-$RUNTIME_DIR}"
 export VK_ICD_FILENAMES="${VK_ICD_FILENAMES:-$ICD_FILE}"
 export VK_DRIVER_FILES="${VK_DRIVER_FILES:-$ICD_FILE}"
@@ -144,6 +169,9 @@ fi
 if [ "${1:-}" = "--self-test" ]; then
     require_exec "$SCRIPT_DIR/mem-console-bin"
     require_file "$APP_CONTENTS_DIR/Info.plist"
+    if [ "$PACKAGE_PROFILE" = "main-edit" ]; then
+        require_file "$RES_DIR/build_identity.json"
+    fi
     require_file "$APP_BUNDLE_DB"
     require_dir "$RUNTIME_DIR"
     require_file "$ICD_FILE"

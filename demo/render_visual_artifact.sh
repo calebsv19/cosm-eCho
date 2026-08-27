@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-MEM_CONSOLE_DIR="${ROOT_DIR}/mem_console"
+MEM_CONSOLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET_TRIPLE="${TARGET_TRIPLE:-macOS-arm64}"
 TOOLCHAIN="${BUILD_TOOLCHAIN:-clang}"
 BIN_PATH="${MEM_CONSOLE_DIR}/build/targets/${TARGET_TRIPLE}/toolchains/${TOOLCHAIN}/bin/mem_console"
@@ -63,7 +62,7 @@ ARTIFACT_PATH="${OUT_ROOT}/mem_console_first_frame_${MODE}.svg"
 rm -f "${ARTIFACT_PATH}"
 
 (
-    cd "${ROOT_DIR}"
+    cd "${MEM_CONSOLE_DIR}"
     HOME="${HOME_ROOT}" "${BIN_PATH}" \
         --db "${DB_PATH}" \
         --visual-artifact "${ARTIFACT_PATH}" \

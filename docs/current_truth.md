@@ -1,6 +1,6 @@
 # eCho Current Truth
 
-Last updated: 2026-08-07
+Last updated: 2026-08-27
 
 ## Program Identity
 - Product name: `eCho`
@@ -10,6 +10,12 @@ Last updated: 2026-08-07
   - `/Users/calebsv/Desktop/CodeWork/docs/private_program_docs/memory_console/`
 
 ## Current Shipped State
+- The persistent implementation lane is
+  `<CodeWork>/_worktrees/mem_console_main_edit` on
+  `codex/mem-console-main-edit`. Its `eCho Main Edit.app` package is isolated by
+  bundle identifier, runtime/log namespace, target-specific artifact root, and
+  an embedded source/binary identity. Canonical adoption remains a separate
+  clean fast-forward gate.
 - Lifecycle-wrapper app entry is active with explicit stage handlers and stage-order guardrails.
 - Wrapper diagnostics normalization lane is complete and stable.
 - Runtime DB/UI/graph/layout lanes are structurally separated and stable.

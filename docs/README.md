@@ -10,6 +10,7 @@ Repository and source-level identifiers still use `mem_console`.
 - `architecture.md`: subsystem ownership and lifecycle shape.
 - `migration.md`: scaffold standardization phase tracker and verification contract.
 - `desktop_packaging.md`: `.app` packaging contract, launcher behavior, and validation workflow.
+- `main_edit_worktree.md`: persistent implementation worktree, isolated package identity, and adoption gates.
 - `memory_check_audit.md`: opt-in fisiCs memory-check audit command and latest clean graph allocation result.
 
 ## Current Emphasis

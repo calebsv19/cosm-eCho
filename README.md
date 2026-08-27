@@ -100,6 +100,12 @@ Current source layout:
 
 ## Build
 
+Persistent implementation work normally uses the Main Edit lane at
+`<CodeWork>/_worktrees/mem_console_main_edit` on
+`codex/mem-console-main-edit`. Its isolated `eCho Main Edit.app` package has a
+separate bundle, runtime, log, and build-identity contract. See
+[`docs/main_edit_worktree.md`](docs/main_edit_worktree.md).
+
 Shared runtime/modules are vendored in-repo at:
 
 - `third_party/codework_shared/`
