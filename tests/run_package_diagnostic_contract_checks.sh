@@ -42,7 +42,10 @@ check_contains 'require_file "$RUNTIME_DIR/shaders/fill.frag.spv"' "${LAUNCHER}"
 
 check_contains "package-desktop self-test failed; launcher config follows." "${PACKAGE_MK}"
 check_contains '"$(PACKAGE_MACOS_DIR)/mem-console-launcher" --print-config' "${PACKAGE_MK}"
-check_contains 'cp "data/default.sqlite" "$(PACKAGE_RESOURCES_DIR)/data/default.sqlite"' "${PACKAGE_MK}"
+check_contains 'if [ -f "$(PACKAGE_DEFAULT_DB_SRC)" ]; then' "${PACKAGE_MK}"
+check_contains 'cp "$(PACKAGE_DEFAULT_DB_SRC)" "$(PACKAGE_RESOURCES_DIR)/data/default.sqlite"' "${PACKAGE_MK}"
+check_contains '"$(CORE_MEMDB_DIR)/build/mem_cli" list --db "$(PACKAGE_GENERATED_DEFAULT_DB)"' "${PACKAGE_MK}"
+check_contains 'cp "$(PACKAGE_GENERATED_DEFAULT_DB)" "$(PACKAGE_RESOURCES_DIR)/data/default.sqlite"' "${PACKAGE_MK}"
 check_contains 'Unexpected packaged data sidecar' "${PACKAGE_MK}"
 
 check_contains '"$(PACKAGE_MACOS_DIR)/mem-console-launcher" --print-config > "$(RELEASE_DIR)/print_config.txt"' "${RELEASE_MK}"
