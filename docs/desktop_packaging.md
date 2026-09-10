@@ -111,3 +111,7 @@ Multi-arch release lane:
 
 Note:
 - a fresh clone will still need an `AppIcon.icns` copied into `tools/packaging/macos/local_app_icon/` before plain packaging picks it up, because that lane is intentionally ignored.
+
+## Isolated release packaging
+
+`make release-artifact-disposable RELEASE_ROOT=build/release-authenticated/<job-id>` produces a create-only eCho.app, ZIP, checksum and source-bound manifest. Existing roots, traversal and symlink ancestors are rejected. `release-package-self-test` uses temporary runtime and log directories and removes those on success or failure. The existing installed app and runtime are not replaced. Developer ID authentication and publication remain separate Decision 1 and Decision 2 stages.
