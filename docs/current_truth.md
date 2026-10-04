@@ -15,7 +15,8 @@ The retained Main Edit lane adopts shared commit
 `e5887348657f782e6094cdeeb095259dedb32bf8` through a managed subtree update.
 The common DB/browser/graph inspector buttons use `kit_ui`'s compact rounded appearance
 and state/style resolver instead of local square border strips. App-owned
-hit bounds, action dispatch, caption roles/anchors, and persistence stay local.
+hit bounds, action dispatch, caption roles/vertical anchors, and persistence stay local.
+Button labels use measured horizontal centering in the common adapter.
 
 Minimums for this slice are `kit_ui 0.11.3`, `kit_render 0.14.5`,
 `vk_renderer 1.4.0`, and `vk_runtime 0.6.0`. Positive rectangle radii now reach

@@ -163,8 +163,11 @@ CoreResult mem_console_ui_draw_button_custom(KitUiContext *ui_ctx,
     spec.state.disabled = state == KIT_UI_STATE_DISABLED;
     (void)kit_ui_button_appearance_preset(KIT_UI_BUTTON_APPEARANCE_COMPACT_ROUNDED,
                                          &appearance);
-    /* Preserve the existing caption anchor and app-owned interaction bounds. */
-    kit_ui_button_layout_init(&text_layout, ui_ctx->style.padding, rect.height * 0.5f);
+    float text_width = mem_console_ui_measure_text_width_px(ui_ctx->render_ctx,
+                                                            font_role, text_tier, text);
+    float text_offset_x = (rect.width - text_width) * 0.5f;
+    if (text_offset_x < 3.0f) text_offset_x = 3.0f;
+    kit_ui_button_layout_init(&text_layout, text_offset_x, rect.height * 0.5f);
     return kit_ui_draw_button_spec_appearance_custom(ui_ctx, frame, rect, &spec,
                                                      &text_layout, &appearance,
                                                      font_role, text_tier);

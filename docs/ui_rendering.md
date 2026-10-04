@@ -10,6 +10,8 @@ rounded solid geometry and keeps replaced vertex storage until frame completion.
 
 The migrated surface is the common DB/browser/graph inspector buttons. This is a contained rendering adoption,
 with application actions and interaction bounds still owned by the host.
+Button labels are horizontally centered using the shared text measurement path;
+font role/tier and the existing vertical anchor remain unchanged.
 
 ## Verification
 
