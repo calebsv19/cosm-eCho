@@ -1,6 +1,6 @@
 # eCho Current Truth
 
-Last updated: 2026-08-27
+Last updated: 2026-10-04
 
 ## Program Identity
 - Product name: `eCho`
@@ -8,6 +8,25 @@ Last updated: 2026-08-27
 - Canonical symbol/file prefix: `mem_console`
 - Primary private planning bucket:
   - `/Users/calebsv/Desktop/CodeWork/docs/private_program_docs/memory_console/`
+
+## Main Edit Rounded UI Slice (2026-10-04)
+
+The retained Main Edit lane adopts shared commit
+`e5887348657f782e6094cdeeb095259dedb32bf8` through a managed subtree update.
+The common DB/browser/graph inspector buttons use `kit_ui`'s compact rounded appearance
+and state/style resolver instead of local square border strips. App-owned
+hit bounds, action dispatch, caption roles/anchors, and persistence stay local.
+
+Minimums for this slice are `kit_ui 0.11.3`, `kit_render 0.14.5`,
+`vk_renderer 1.4.0`, and `vk_runtime 0.6.0`. Positive rectangle radii now reach
+native solid Vulkan geometry with drawable-scale edge coverage; previously the
+Vulkan adapter discarded them. Frame-buffer growth also retains recorded draw
+storage until its frame fence completes. Other control groups and native draw
+calls have not been migrated by this slice.
+
+This describes the Main Edit development package. Canonical adoption, release
+version changes, and publication are separate steps. See [shared UI rendering](ui_rendering.md)
+for checks and a visual review route.
 
 ## Current Shipped State
 - The persistent implementation lane is

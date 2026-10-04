@@ -7,7 +7,7 @@ import struct
 import subprocess
 from pathlib import Path
 
-EXPECTED_SHARED_COMMIT = "ddc0c2b1420d95132ef089e68e2ce7728fbc53a4"
+EXPECTED_SHARED_COMMIT = "e5887348657f782e6094cdeeb095259dedb32bf8"
 
 
 def command_output(command: list[str], cwd: Path) -> str:
@@ -30,9 +30,12 @@ def digest(path: Path) -> str:
 
 def verify_shared_source(root: Path, canonical: Path) -> None:
     commit = command_output(["git", "rev-parse", "HEAD"], canonical)
-    if commit != EXPECTED_SHARED_COMMIT:
-        raise SystemExit("canonical shared commit mismatch: "
-                         f"expected {EXPECTED_SHARED_COMMIT}, found {commit}")
+    ancestry = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", EXPECTED_SHARED_COMMIT, commit],
+        cwd=canonical, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if ancestry.returncode != 0:
+        raise SystemExit("canonical shared does not contain accepted source commit: "
+                         f"{EXPECTED_SHARED_COMMIT}, found {commit}")
     status = command_output(
         ["git", "status", "--porcelain", "--untracked-files=all", "--",
          "vk_runtime", "vk_renderer"], canonical)
@@ -40,7 +43,8 @@ def verify_shared_source(root: Path, canonical: Path) -> None:
         raise SystemExit("canonical shared Vulkan source is not exact/clean:\n" + status)
 
     tracked = command_output(
-        ["git", "ls-files", "--", "vk_runtime", "vk_renderer"], canonical
+        ["git", "ls-tree", "-r", "--name-only", EXPECTED_SHARED_COMMIT, "--",
+         "vk_runtime", "vk_renderer"], canonical
     ).splitlines()
     if not tracked:
         raise SystemExit("canonical shared Vulkan source has no tracked files")
@@ -48,9 +52,14 @@ def verify_shared_source(root: Path, canonical: Path) -> None:
     for relative in tracked:
         canonical_path = canonical / relative
         adopted_path = root / relative
+        accepted_bytes = subprocess.check_output(
+            ["git", "show", f"{EXPECTED_SHARED_COMMIT}:{relative}"], cwd=canonical)
+        accepted_digest = hashlib.sha256(accepted_bytes).hexdigest()
         if not adopted_path.is_file():
             mismatches.append(f"missing {relative}")
-        elif digest(canonical_path) != digest(adopted_path):
+        elif (not canonical_path.is_file() or
+              digest(canonical_path) != accepted_digest or
+              digest(adopted_path) != accepted_digest):
             mismatches.append(f"digest {relative}")
     if mismatches:
         raise SystemExit("adopted Vulkan source differs from canonical: " +
@@ -147,8 +156,8 @@ def main() -> int:
     renderer = read_version(root / "vk_renderer/VERSION")
     if runtime != (0, 6, 0):
         raise SystemExit(f"vk_runtime 0.6.0 required, found {runtime}")
-    if renderer != (1, 3, 2):
-        raise SystemExit(f"vk_renderer 1.3.2 required, found {renderer}")
+    if renderer != (1, 4, 0):
+        raise SystemExit(f"vk_renderer 1.4.0 required, found {renderer}")
 
     if args.app:
         if not args.initial_capture or not args.resized_capture or not args.log:
