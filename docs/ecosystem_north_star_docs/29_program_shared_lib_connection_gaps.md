@@ -543,6 +543,14 @@ Gaps:
   persistence expands beyond the current plain-text authoring seam.
 
 ### `growth_sim`
+GrowthSim Main Edit MCP closure (2026-10-04): installed headless and explicit
+desktop control directly use vendored `core_jobs 1.0.1` for cooperative owner-queue
+execution, `core_time 1.0.1` for monotonic deadlines and `core_headless_job 0.2.0`
+envelope/report validation. Both-toolchain native/wire, packaged/installed desktop
+and actual Codex four-mode/timeout acceptance pass. GrowthSim owns domain policy,
+quotas, provenance and terminal artifacts. Canonical adoption remains separate;
+no shared API/version change or distributed worker claim follows.
+
 Current shared profile:
 - `core_sim` is adopted through the vendored subtree host for Mold and Fire
   pass execution.

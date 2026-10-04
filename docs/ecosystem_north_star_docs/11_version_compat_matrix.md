@@ -181,3 +181,11 @@ residency, or timing workload APIs.
 - Update minimum versions whenever an app relies on newly added module behavior.
 - Keep `N/A` for modules not yet linked by that app.
 - For shared patch bumps in active deps (for example `core_wake` `1.0.1`), update dependent app minimums only when they require that patch behavior.
+
+### GrowthSim Main Edit installed MCP helper minimums (2026-10-04)
+
+Installed headless and explicit desktop control directly use selected vendored
+`core_jobs 1.0.1`, `core_time 1.0.1` and `core_headless_job 0.2.0` for cooperative
+bounded runs, monotonic deadlines and envelope/report validation. Source, package,
+installed desktop and actual Codex acceptance pass. This Main Edit delivery does
+not change the canonical app matrix or shared API/version contracts.
