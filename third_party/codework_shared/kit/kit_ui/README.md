@@ -224,3 +224,21 @@ Expected behavior:
 6. dragging the slider changes the visualization intensity and the status percentage text
 
 Press `Esc` or close the window to exit.
+
+## Rounded Vulkan Image Gate (0.11.3)
+
+```sh
+make -C shared/kit/kit_ui KIT_RENDER_ENABLE_VK=1 test-rounded-vk
+```
+
+This bounded host-side test renders actual Vulkan images and compares pixels
+against an independent rounded-shape oracle at 1x and 2x. It covers square and
+rounded bounds, radius clamping/pills, clipping, alpha, nested borders, the
+existing compact shared button appearance, forced vertex-buffer growth, frame
+fence reuse, and resize recovery. Captures are written under `build/`. A Vulkan
+surface and the Khronos validation layer must be available; this gate is
+separate from the display-free `make test` contract tests.
+
+The 0.11.3 harness build also includes and links sibling `vk_runtime`. The shared
+button API and default appearance remain unchanged. The rounded Vulkan path
+requires `kit_render` 0.14.5 and `vk_renderer` 1.4.0; the SDL adapter is unchanged.

@@ -465,9 +465,9 @@ worker-capability semantic contract for cross-program compute.
 
 ---
 
-### core_memdb (BOOTSTRAP)
+### core_memdb (ACTIVE)
 **Role:** Shared durable memory database contract.
-**Responsibilities (initial target):**
+**Responsibilities:**
 - SQLite-backed connection lifecycle
 - Query/statement execution helpers
 - Schema version tracking and migration entrypoints
@@ -479,9 +479,9 @@ worker-capability semantic contract for cross-program compute.
 - Higher-level console behavior stays in kits/apps layered above this core
 
 **Current status note:**
-- The scaffolded module now exists at `shared/core/core_memdb/`
-- The design and rollout docs live under `shared/docs/memory_db_system/`
-- The current implementation is intentionally a placeholder until the SQLite backend is wired
+- The active SQLite/event implementation lives at `shared/core/core_memdb/`; current module version is `0.31.1`. Budget-rejected link mutations preserve readable source-item audit metadata without emitting mutation events or changing the link projection.
+- The CLI and agent wrapper provide bounded scoped retrieval, event-first mutation/replay, graph links, stable-id-only maintained projections, and atomic Lane Head V1 handoffs.
+- Design, operating, and rollout docs live under `shared/docs/memory_db_system/`.
 
 ---
 
