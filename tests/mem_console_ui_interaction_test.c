@@ -153,6 +153,9 @@ int main(void) {
     pointer(&state,&render,&ui,root,SDL_MOUSEBUTTONDOWN);
     pointer(&state,&render,&ui,(KitRenderRect){0,0,1,1},SDL_MOUSEBUTTONUP);
     assert(frame(&state,&render,&ui)==MEM_CONSOLE_ACTION_NONE);
+    strcpy(state.search_text,"fixture");state.search_cursor=7;
+    state.button_keyboard_text=0;e=(SDL_Event){0};e.type=SDL_KEYDOWN;e.key.keysym.sym=SDLK_BACKSPACE;
+    route(&state,&render,&ui,&e);assert(strcmp(state.search_text,"fixture")==0);
     /* Text focus passes plain activation keys to the existing editor owner. */
     mem_console_ui_surface_text_focus(&state);
     e.type=SDL_KEYDOWN; e.key.keysym.sym=SDLK_SPACE;

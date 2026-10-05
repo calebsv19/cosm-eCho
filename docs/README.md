@@ -27,9 +27,7 @@ Repository and source-level identifiers still use `mem_console`.
 
 See [Shared button interaction](ui_interaction.md) for the optional focus,
 keyboard and press-origin capture contract, host ownership, current shared pin,
-and `make ui-interaction-self-test`. This is the retained Main Edit Font/Theme
-surface only; ordinary runtime controls, text entry and panes retain their own
-input paths.
+and `make ui-interaction-self-test`. The retained Main Edit inventory now includes runtime/authoring/modal buttons and bounded text fields; pane gestures and text presentation retain explicit host owners.
 
 
 ## 2026-10-05 bounded text editing and modal focus

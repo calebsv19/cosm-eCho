@@ -32,7 +32,7 @@ int mem_console_ui_text_event(MemConsoleState *s,const SDL_Event *event,MemConso
         s->button_keyboard_text=0;kit_ui_text_cancel_composition(&s->text_edit);return 0;
     }
     if(!s->button_keyboard_text && s->button_surface.interaction.focused_id)
-        return event->type==SDL_TEXTINPUT || event->type==SDL_TEXTEDITING;
+        return event->type==SDL_TEXTINPUT || event->type==SDL_TEXTEDITING || (event->type==SDL_KEYDOWN && (event->key.keysym.sym==SDLK_BACKSPACE || event->key.keysym.sym==SDLK_DELETE || event->key.keysym.sym==SDLK_LEFT || event->key.keysym.sym==SDLK_RIGHT || event->key.keysym.sym==SDLK_HOME || event->key.keysym.sym==SDLK_END || ((event->key.keysym.mod&(KMOD_CTRL|KMOD_GUI)) && (event->key.keysym.sym==SDLK_a || event->key.keysym.sym==SDLK_c || event->key.keysym.sym==SDLK_x || event->key.keysym.sym==SDLK_v))));
     if(event->type!=SDL_TEXTINPUT && event->type!=SDL_TEXTEDITING && event->type!=SDL_KEYDOWN)return 0;
     char *text=NULL;size_t cap=0;int *cursor=NULL;buffer(s,&text,&cap,&cursor);
     int changed_owner=s->text_edit.text!=text;
