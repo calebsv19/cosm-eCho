@@ -171,7 +171,8 @@ int kit_ui_interaction_focus_marker(const KitUiInteractionContext *ctx,
     KitRenderRect r = controls[index].bounds;
     float inset = fminf(6.0f, r.width * 0.2f);
     float thickness = fminf(2.0f, r.height * 0.1f);
-    *out_marker = (KitRenderRect){r.x + inset, r.y + r.height - thickness - 2.0f,
+    float bottom_padding = fminf(2.0f, r.height * 0.2f);
+    *out_marker = (KitRenderRect){r.x + inset, r.y + r.height - thickness - bottom_padding,
                                  r.width - inset * 2.0f, thickness};
     return 1;
 }

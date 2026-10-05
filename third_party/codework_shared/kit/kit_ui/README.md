@@ -268,3 +268,5 @@ for registered buttons, with normalized events, ordered Tab traversal and
 release activation. Hosts own coordinates, scope changes, text entry and actions.
 The generic archive has no SDL dependency; `kit_ui_interaction_sdl.h` is an
 optional adapter. See [the interaction contract](../../docs/UI_INTERACTION_CONTRACT.md).
+
+Patch 0.13.1: Clamp the focus marker inside positive-size controls, including tiny control bounds; optional SDL declarations preserve C linkage in C++ hosts.
