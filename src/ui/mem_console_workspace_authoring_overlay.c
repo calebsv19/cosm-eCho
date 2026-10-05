@@ -263,7 +263,7 @@ static CoreResult mem_console_authoring_render_font_theme(KitRenderContext *rend
 
     (void)snprintf(host->text_size_line,
                    sizeof(host->text_size_line),
-                   "Text Size step:%+d (%d%%)",
+                   "step %d (%d%%)",
                    state->text_zoom_step,
                    kit_render_text_zoom_percent(render_ctx));
     section = layout.text_size_section;
@@ -279,8 +279,20 @@ static CoreResult mem_console_authoring_render_font_theme(KitRenderContext *rend
     if (result.code != CORE_OK) return result;
     result = mem_console_authoring_draw_button(render_ctx, ui_ctx, frame, state, KIT_WORKSPACE_AUTHORING_FONT_THEME_BUTTON_TEXT_SIZE_RESET, layout.text_size_reset_button, NULL);
     if (result.code != CORE_OK) return result;
-    result = mem_console_authoring_draw_button(render_ctx, ui_ctx, frame, state, KIT_WORKSPACE_AUTHORING_FONT_THEME_BUTTON_TEXT_SIZE_INC, layout.text_size_value_chip, host->text_size_line);
+    result = kit_ui_clip_push(ui_ctx, frame, layout.text_size_value_chip);
     if (result.code != CORE_OK) return result;
+    result = mem_console_ui_draw_info_line_custom(ui_ctx,
+                                                 frame,
+                                                 layout.text_size_value_chip,
+                                                 host->text_size_line,
+                                                 CORE_THEME_COLOR_TEXT_PRIMARY,
+                                                 CORE_FONT_ROLE_UI_REGULAR,
+                                                 CORE_FONT_TEXT_SIZE_CAPTION);
+    {
+        CoreResult pop_result = kit_ui_clip_pop(ui_ctx, frame);
+        if (result.code != CORE_OK) return result;
+        if (pop_result.code != CORE_OK) return pop_result;
+    }
 
     (void)snprintf(host->theme_preset_line,
                    sizeof(host->theme_preset_line),

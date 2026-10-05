@@ -23,6 +23,9 @@ inactive or blocked. The existing UI derives visual button state and draws the
 shared marker without changing input ownership. Quit remains with the app
 lifecycle owner even while authoring is active.
 
+The text-size value chip is a clipped readout with no button identity. It cannot
+mirror the increment control's focused/pressed state or overlap Reset.
+
 Validation:
 
 ```sh
