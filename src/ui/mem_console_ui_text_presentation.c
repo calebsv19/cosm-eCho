@@ -1,5 +1,6 @@
 #include "mem_console_ui_common.h"
 #include <math.h>
+#include "kit_ui_native_text_sdl.h"
 #include <string.h>
 /* One slot per field: multiple queued rows never alias another field's storage. */
 typedef struct TextSlot {
@@ -53,6 +54,7 @@ static CoreResult present(KitUiContext *ui,const KitRenderContext *render,KitRen
     if(wrap && wheel) {scroll=fmaxf(0,scroll-wheel*line*3);reveal=0;}
     KitUiTextPresentationOptions options={viewport,line,1,scroll,wrap,active,reveal};
     r=kit_ui_text_presentation_build(&slot->view,&edit,&options,measure,slot);if(r.code!=CORE_OK)return r;
+    r=kit_ui_native_text_rect_sdl(NULL,&slot->view,frame->width_px,frame->height_px,NULL);if(r.code!=CORE_OK)return r;
     slot->source=text;slot->capacity=cap;slot->cursor=edit.cursor;slot->anchor=edit.anchor;strcpy(slot->composition,edit.composition);
     if(wrap)s->detail_body_scroll=slot->view.scroll_y;
     KitRenderColor accent;r=mem_console_ui_resolve_theme_color(render,CORE_THEME_COLOR_ACCENT_PRIMARY,&accent);if(r.code!=CORE_OK)return r;

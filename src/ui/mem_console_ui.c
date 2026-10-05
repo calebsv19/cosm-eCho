@@ -1,6 +1,7 @@
 #include "mem_console_ui.h"
 #include "mem_console_layout_config.h"
 #include "mem_console_pane_layout.h"
+#include "mem_console_ui_pane_composition.h"
 #include "mem_console_ui_common.h"
 #include "mem_console_ui_chrome.h"
 #include "mem_console_ui_detail_section.h"
@@ -520,6 +521,15 @@ int run_frame(KitRenderContext *render_ctx,
     }
 
     compute_layout(state, draw_width, draw_height);
+    KitPaneComposition panes;
+    result=mem_console_ui_panes_build(state,draw_width,draw_height,&panes);
+    if(result.code!=CORE_OK)return MEM_CONSOLE_FRAME_FATAL;
+    CorePaneId pane_owner=kit_pane_pointer_route(&state->pane_pointer_owner,&panes,
+        input->mouse_x,input->mouse_y,input->mouse_pressed,input->mouse_released,
+        state->db_modal_open||authoring_active||state->pane_drag_active||state->left_panel_drag_active);
+    KitUiInputState pane_inputs[3];
+    for(unsigned i=0;i<3;++i)pane_inputs[i]=mem_console_ui_pane_input(&blocked_input,pane_owner,i+1);
+
 
     command_buffer.commands = commands;
     command_buffer.capacity = 4096u;
@@ -567,7 +577,8 @@ int run_frame(KitRenderContext *render_ctx,
 
     has_any_edit_mode = state->title_edit_mode || state->body_edit_mode || state->db_modal_open;
 
-    result = kit_ui_clip_push(ui_ctx, &frame, state->left_pane);
+    CorePaneRect pane_clip_0=panes.entries[0].visible_content;
+    result = kit_ui_clip_push(ui_ctx, &frame, (KitRenderRect){pane_clip_0.x,pane_clip_0.y,pane_clip_0.width,pane_clip_0.height});
     if (result.code != CORE_OK) {
         fprintf(stderr,
                 "mem_console: kit_ui_clip_push(left_pane) failed: %d (%s)\n",
@@ -579,7 +590,7 @@ int run_frame(KitRenderContext *render_ctx,
                                               ui_ctx,
                                               &frame,
                                               state,
-                                              &blocked_input,
+                                              &pane_inputs[0],
                                               layout_cfg,
                                               wheel_y,
                                               has_any_edit_mode,
@@ -601,7 +612,8 @@ int run_frame(KitRenderContext *render_ctx,
         return 1;
     }
 
-    result = kit_ui_clip_push(ui_ctx, &frame, state->pane_right_detail);
+    CorePaneRect pane_clip_1=panes.entries[1].visible_content;
+    result = kit_ui_clip_push(ui_ctx, &frame, (KitRenderRect){pane_clip_1.x,pane_clip_1.y,pane_clip_1.width,pane_clip_1.height});
     if (result.code != CORE_OK) {
         fprintf(stderr,
                 "mem_console: kit_ui_clip_push(pane_right_detail) failed: %d (%s)\n",
@@ -613,7 +625,7 @@ int run_frame(KitRenderContext *render_ctx,
                                                 ui_ctx,
                                                 &frame,
                                                 state,
-                                                &blocked_input,
+                                                &pane_inputs[1],
                                                 wheel_y,
                                                 layout_cfg,
                                                 &right_layout,
@@ -630,7 +642,7 @@ int run_frame(KitRenderContext *render_ctx,
                                                 ui_ctx,
                                                 &frame,
                                                 state,
-                                                &blocked_input,
+                                                &pane_inputs[1],
                                                 layout_cfg,
                                                 has_any_edit_mode,
                                                 &right_layout,
@@ -652,7 +664,8 @@ int run_frame(KitRenderContext *render_ctx,
         return 1;
     }
 
-    result = kit_ui_clip_push(ui_ctx, &frame, state->pane_right_graph);
+    CorePaneRect pane_clip_2=panes.entries[2].visible_content;
+    result = kit_ui_clip_push(ui_ctx, &frame, (KitRenderRect){pane_clip_2.x,pane_clip_2.y,pane_clip_2.width,pane_clip_2.height});
     if (result.code != CORE_OK) {
         fprintf(stderr,
                 "mem_console: kit_ui_clip_push(pane_right_graph) failed: %d (%s)\n",
@@ -664,7 +677,7 @@ int run_frame(KitRenderContext *render_ctx,
                                              ui_ctx,
                                              &frame,
                                              state,
-                                             &blocked_input,
+                                             &pane_inputs[2],
                                              layout_cfg,
                                              &right_layout,
                                              wheel_y,

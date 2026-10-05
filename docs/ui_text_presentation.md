@@ -15,3 +15,12 @@ This bounded presentation is not a general document editor. Unicode scalar safet
 `make ui-text-presentation-self-test` runs the actual production-linked field adapters and retained button/text/modal replay. Unicode replacement preedit, selection, measured hit and queued storage lifetime are checked; Echo covers all six slots and explicit multiline rows. DataLab's real SDL painter is exercised at 1x/2x, including caret pixels and clip/blend restoration. Native Vulkan captures use actual Orchestra/Echo host frames at 1x/2x with validation enabled; this is separate from OS-native IME acceptance and human workflow review. Run product/headless, Vulkan lifecycle and isolated Main Edit packaging gates before refreshing the separate comparison bundle.
 
 See the imported shared `docs/UI_TEXT_PRESENTATION_CONTRACT.md` and [Text editing and modal focus](ui_text_focus.md). Next qualify mixed field/button focus traversal, then native text-input sessions/candidate placement/clipboard across the trio. Pane composition follows; wider programs adopt one surface at a time with an immutable shared pin and their own output/product gates.
+
+## 2026-10-05 pane composition follow-on
+
+Echo navigation/detail/graph use a shared composition snapshot after existing CorePane layout solve. Nested pane clips also constrain button registration. A caller-owned pane pointer owner prevents a press in one section from becoming a release gesture in another and cancels on modal/authoring/splitter takeover. Existing product headers stay inside content, with no extra title row.
+
+See [pane composition adoption](ui_pane_composition.md). Pane composition now has
+a shared foundation; the next boundary is pane-host lifecycle/dispatch and
+transactional splitter/focus takeover. Mixed traversal is kit-only preparation;
+native caret anchoring is integrated, with OS IME acceptance still pending.

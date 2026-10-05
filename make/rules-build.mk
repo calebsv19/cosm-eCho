@@ -55,3 +55,10 @@ $(UI_INTERACTION_SDL_OBJ): $(KIT_UI_DIR)/src/kit_ui_interaction_sdl.c $(KIT_UI_D
 $(UI_TEXT_SDL_OBJ): $(KIT_UI_DIR)/src/kit_ui_text_edit_sdl.c $(KIT_UI_DIR)/include/kit_ui_text_edit_sdl.h
 	mkdir -p $(dir $@)
 	$(APP_CC) $(ARCH_FLAGS) $(CFLAGS) $(INC) -c $< -o $@
+
+$(UI_PANE_COMPOSITION_OBJ): $(KIT_PANE_DIR)/src/kit_pane_composition.c $(KIT_PANE_DIR)/include/kit_pane_composition.h
+	mkdir -p $(dir $@)
+	$(APP_CC) $(ARCH_FLAGS) $(CFLAGS) $(INC) -c $< -o $@
+$(UI_NATIVE_TEXT_OBJ): $(KIT_UI_DIR)/src/kit_ui_native_text_sdl.c $(KIT_UI_DIR)/include/kit_ui_native_text_sdl.h
+	mkdir -p $(dir $@)
+	$(APP_CC) $(ARCH_FLAGS) $(CFLAGS) $(INC) -c $< -o $@

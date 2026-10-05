@@ -324,3 +324,12 @@ See [Text editing and modal focus](ui_text_focus.md) for exact ownership, tests 
 Search, title, body, DB/input-root path, graph edge limit and relationship target now adopt `kit_ui 0.16.0` measured text presentation in Main Edit. Six distinct UI-owned slots prevent queued text aliasing. Body editing uses measured scalar hard wrapping and explicit newlines; read-only bodies retain their existing layout. DB editing uses the full draft with horizontal caret-follow instead of an ellipsis string and duplicate byte-selection offsets. Numeric validation and database/session actions retain their owners.
 
 See [Shared text presentation](ui_text_presentation.md) for storage ownership, output gates and residual limits. The next behavioral slice is mixed field/button traversal; native IME/session/clipboard qualification and pane composition follow before wider adoption. Earlier dated milestones remain historical.
+
+## 2026-10-05 pane composition follow-on
+
+Echo navigation/detail/graph use a shared composition snapshot after existing CorePane layout solve. Nested pane clips also constrain button registration. A caller-owned pane pointer owner prevents a press in one section from becoming a release gesture in another and cancels on modal/authoring/splitter takeover. Existing product headers stay inside content, with no extra title row.
+
+See [pane composition adoption](ui_pane_composition.md). Pane composition now has
+a shared foundation; the next boundary is pane-host lifecycle/dispatch and
+transactional splitter/focus takeover. Mixed traversal is kit-only preparation;
+native caret anchoring is integrated, with OS IME acceptance still pending.

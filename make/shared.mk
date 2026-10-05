@@ -19,3 +19,5 @@ KIT_GRAPH_STRUCT_DIR ?= $(SHARED_ROOT)/kit/kit_graph_struct
 KIT_WORKSPACE_AUTHORING_DIR ?= $(SHARED_ROOT)/kit/kit_workspace_authoring
 VK_RENDERER_DIR ?= $(SHARED_ROOT)/vk_renderer
 VK_RUNTIME_DIR ?= $(SHARED_ROOT)/vk_runtime
+
+KIT_PANE_DIR ?= $(SHARED_ROOT)/kit/kit_pane

@@ -19,3 +19,12 @@ The editor model is now accompanied by [shared text presentation](ui_text_presen
 `make ui-text-focus-self-test` runs the production-linked interaction replay, including UTF-8 edits, preedit isolation, host submit/cancel and actual modal semantic restoration. Shared `test` and `test-text-edit-sdl` cover generic bounds, selection, clipboard failure and lifecycle mechanics. Run the program's product/headless gates, native Vulkan lifecycle gate and isolated Main Edit package tests before refreshing the separate development bundle. These are separate from human workflow review and native platform acceptance.
 
 Read the shared `docs/UI_TEXT_FOCUS_CONTRACT.md` in the accepted subtree for the reusable API contract. Next implement mixed traversal/native IME qualification; pane composition and wider adoption follow those bounded slices. Each future host inventories its own fields and modal policy before managed subtree adoption.
+
+## 2026-10-05 pane composition follow-on
+
+Echo navigation/detail/graph use a shared composition snapshot after existing CorePane layout solve. Nested pane clips also constrain button registration. A caller-owned pane pointer owner prevents a press in one section from becoming a release gesture in another and cancels on modal/authoring/splitter takeover. Existing product headers stay inside content, with no extra title row.
+
+See [pane composition adoption](ui_pane_composition.md). Pane composition now has
+a shared foundation; the next boundary is pane-host lifecycle/dispatch and
+transactional splitter/focus takeover. Mixed traversal is kit-only preparation;
+native caret anchoring is integrated, with OS IME acceptance still pending.

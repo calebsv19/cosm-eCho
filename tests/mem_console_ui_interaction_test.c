@@ -3,6 +3,7 @@
 #include "mem_console_ui.h"
 #include "mem_console_ui_common.h"
 #include "app/mem_console_app_internal.h"
+#include "mem_console_ui_pane_composition.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -216,5 +217,12 @@ int main(void) {
     assert(kit_render_end_frame(&render,&presented).code==CORE_OK);
     puts("Echo presentation: field click cancels preedit/collapses selection; body caret reveal, wheel scroll and scrollbar pass");
     puts("Echo six field presentation slots: Unicode preedit, measured hit, queued lifetime and explicit multiline rows pass");
+    KitPaneComposition panes;assert(mem_console_ui_panes_build(&state,1440,1000,&panes).code==CORE_OK);
+    assert(panes.count==3&&panes.entries[0].id==1&&panes.entries[2].id==3);
+    KitUiInputState press={state.left_pane.x+10,state.left_pane.y+10,1,1,0};
+    KitPanePointerOwner owner={0};CorePaneId pane=kit_pane_pointer_route(&owner,&panes,press.mouse_x,press.mouse_y,1,0,0);
+    assert(pane==1&&mem_console_ui_pane_input(&press,pane,1).mouse_pressed&&!mem_console_ui_pane_input(&press,pane,3).mouse_pressed);
+    assert(kit_pane_pointer_route(&owner,&panes,state.pane_right_graph.x+10,state.pane_right_graph.y+10,0,1,0)==1);
+    puts("Echo production pane adapter: navigation/detail/graph identity and cross-pane release ownership pass");
     return 0;
 }
