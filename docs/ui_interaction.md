@@ -1,0 +1,44 @@
+# Font/Theme button interaction
+
+The Main Edit Font/Theme surface adopts `kit_ui 0.13.0` and
+`kit_workspace_authoring 0.6.0`. Shared source is pinned to
+`0d2c72ddca5c981042afa5a8f844ae93591b55c5`; the earlier Vulkan geometry/texture
+contract remains in force.
+
+A press owns its button until release or cancellation. Release inside that same
+enabled control activates the existing host action; release-only and cross-button
+releases do nothing. Tab/Shift-Tab navigate visible enabled Font/Theme controls.
+Enter/Space activate the focused control on release, with repeat suppressed.
+A blue underline identifies keyboard/pointer focus. Ctrl-Tab retains the existing
+surface-cycle shortcut, Ctrl-Enter retains Apply, and Escape retains Cancel unless
+it is first cancelling an armed button press. Enter with no button focus still
+uses the existing Apply behavior.
+
+The host owns modal/text-entry scope, coordinate space, preview action dispatch
+and accepted-only persistence. The shared interaction context cannot edit the
+DB or text-entry targets. Apply/Cancel retain the existing baseline semantics. Pane-mode
+input and the normal runtime HUD remain on their existing input paths. Focus and
+capture reset on focus loss/resize/hide/minimize and when the Font/Theme scope is
+inactive or blocked. The existing UI derives visual button state and draws the
+shared marker without changing input ownership. Quit remains with the app
+lifecycle owner even while authoring is active.
+
+Validation:
+
+```sh
+make clean
+make ui-interaction-self-test
+make test
+make vulkan-rollout-self-test
+make package-desktop-main-edit-self-test
+```
+
+The replay uses production adapters and archives, applies real text-size previews,
+checks press origin, keyboard release/repeat, disabled focus order, quit passthrough
+and the marker in the actual Font/Theme panel command stream. The panel buttons
+now draw shared rounded appearance and full hover/press/selection/focus state. Runtime tests use a disposable private directory. Native
+lifecycle and package gates are separate from replay and human visual acceptance.
+
+The shared [interaction contract](../third_party/codework_shared/docs/UI_INTERACTION_CONTRACT.md)
+defines exact semantics and later rollout boundaries. Broader runtime controls,
+text entry/IME, pane composition and native Linux qualification remain later work.

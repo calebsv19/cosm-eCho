@@ -153,3 +153,8 @@ visual-artifact: $(BIN)
 
 visual-fixture-capture: $(BIN)
 	./demo/capture_visual_graph_fixture.sh
+
+.PHONY: ui-interaction-self-test
+ui-interaction-self-test: $(BIN)
+	$(HOST_CC) $(ARCH_FLAGS) $(CFLAGS) $(INC) tests/mem_console_ui_interaction_test.c $(filter-out $(OBJ_DIR)/src/app/mem_console.o,$(APP_OBJS)) $(APP_SHARED_LIBS) $(VULKAN_LIBS) $(SDL_LIBS) $(SDL_TTF_LIBS) $(APPLE_FW) -lm -o $(BIN_DIR)/mem_console_ui_interaction_test
+	@task_runtime=$$(mktemp -d /private/tmp/echo-ui-interaction.XXXXXX); cd "$$task_runtime" && DYLD_LIBRARY_PATH=/opt/homebrew/lib "$(abspath $(BIN_DIR))/mem_console_ui_interaction_test"; task_status=$$?; rm -rf "$$task_runtime"; exit $$task_status

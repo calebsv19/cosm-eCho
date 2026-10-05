@@ -47,3 +47,7 @@ $(BIN): $(APP_OBJS) $(APP_SHARED_LIBS) | $(BIN_DIR)
 
 clean:
 	rm -rf $(BUILD_ROOT)
+
+$(UI_INTERACTION_SDL_OBJ): $(KIT_UI_DIR)/src/kit_ui_interaction_sdl.c $(KIT_UI_DIR)/include/kit_ui_interaction_sdl.h $(KIT_UI_DIR)/include/kit_ui_interaction.h
+	@mkdir -p "$(dir $@)"
+	$(HOST_CC) $(ARCH_FLAGS) $(CFLAGS) $(INC) -c "$<" -o "$@"

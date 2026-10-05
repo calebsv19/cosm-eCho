@@ -1,6 +1,7 @@
 #include "mem_console_workspace_authoring.h"
 
 #include <stdio.h>
+#include "kit_workspace_authoring_interaction.h"
 
 #include "mem_console_ui_common.h"
 
@@ -111,46 +112,24 @@ static CoreResult mem_console_authoring_draw_button(KitRenderContext *render_ctx
                                                     KitWorkspaceAuthoringFontThemeButtonId button_id,
                                                     KitRenderRect rect,
                                                     const char *override_label) {
-    CoreResult result;
-    KitRenderColor fill;
-    KitRenderColor border;
-    const char *label;
-    int selected;
-
-    if (!render_ctx || !ui_ctx || !frame || button_id == KIT_WORKSPACE_AUTHORING_FONT_THEME_BUTTON_NONE) {
-        return core_result_ok();
-    }
-
-    result = mem_console_authoring_resolve(render_ctx, CORE_THEME_COLOR_SURFACE_2, &fill);
-    if (result.code != CORE_OK) return result;
-    result = mem_console_authoring_resolve(render_ctx, CORE_THEME_COLOR_TEXT_MUTED, &border);
-    if (result.code != CORE_OK) return result;
-
-    selected = mem_console_authoring_font_theme_button_selected(state, button_id);
-    if (selected) {
-        result = mem_console_authoring_resolve(render_ctx, CORE_THEME_COLOR_ACCENT_PRIMARY, &fill);
-        if (result.code != CORE_OK) return result;
-    }
-    if (!kit_workspace_authoring_ui_font_theme_button_enabled(button_id)) {
-        fill = mem_console_authoring_alpha(fill, 120u);
-        border = mem_console_authoring_alpha(border, 120u);
-    }
-
-    result = mem_console_authoring_push_rect(frame, rect, fill);
-    if (result.code != CORE_OK) return result;
-    result = mem_console_authoring_push_outline(frame, rect, border, 1.0f);
-    if (result.code != CORE_OK) return result;
-
-    label = override_label ? override_label : kit_workspace_authoring_ui_font_theme_button_label(button_id);
-    return mem_console_ui_draw_info_line_custom(ui_ctx,
-                                                frame,
-                                                rect,
-                                                label,
-                                                kit_workspace_authoring_ui_font_theme_button_enabled(button_id)
-                                                    ? CORE_THEME_COLOR_TEXT_PRIMARY
-                                                    : CORE_THEME_COLOR_TEXT_MUTED,
-                                                CORE_FONT_ROLE_UI_REGULAR,
-                                                CORE_FONT_TEXT_SIZE_PARAGRAPH);
+    if (!render_ctx || !ui_ctx || !frame || !state || !button_id) return core_result_ok();
+    const char *label = override_label ? override_label : kit_workspace_authoring_ui_font_theme_button_label(button_id);
+    KitUiInteractionControl control = {(uint32_t)button_id, rect,
+        kit_workspace_authoring_ui_font_theme_button_enabled(button_id)};
+    KitUiButtonSpec spec;
+    kit_ui_button_spec_init(&spec, label);
+    spec.state = kit_ui_interaction_button_state(&state->workspace_authoring.font_theme_interaction,
+        &control, mem_console_authoring_font_theme_button_selected(state, button_id));
+    KitUiButtonAppearance appearance;
+    kit_ui_button_appearance_preset(KIT_UI_BUTTON_APPEARANCE_COMPACT_ROUNDED, &appearance);
+    float width = mem_console_ui_measure_text_width_px(render_ctx,CORE_FONT_ROLE_UI_REGULAR,
+                                                        CORE_FONT_TEXT_SIZE_PARAGRAPH,label);
+    float offset = (rect.width - width) * 0.5f;
+    if (offset < 3.0f) offset = 3.0f;
+    KitUiButtonLayout text_layout;
+    kit_ui_button_layout_init(&text_layout,offset,rect.height*0.5f);
+    return kit_ui_draw_button_spec_appearance_custom(ui_ctx,frame,rect,&spec,&text_layout,&appearance,
+                                                      CORE_FONT_ROLE_UI_REGULAR,CORE_FONT_TEXT_SIZE_PARAGRAPH);
 }
 
 static CoreResult mem_console_authoring_render_overlay_buttons(KitRenderContext *render_ctx,
@@ -368,5 +347,16 @@ CoreResult mem_console_workspace_authoring_overlay_render(KitRenderContext *rend
         if (result.code != CORE_OK) return result;
     }
 
-    return mem_console_authoring_render_overlay_buttons(render_ctx, frame, &state->workspace_authoring);
+    result = mem_console_authoring_render_overlay_buttons(render_ctx, frame, &state->workspace_authoring);
+    if (result.code != CORE_OK) return result;
+    if (mem_console_workspace_authoring_host_font_theme_overlay_active(&state->workspace_authoring)) {
+        KitWorkspaceAuthoringFontThemeLayout layout;
+        KitUiInteractionControl controls[13];
+        if (kit_workspace_authoring_ui_font_theme_build_layout(render_ctx,frame_width,frame_height,&layout)) {
+            uint32_t count=kit_workspace_authoring_font_theme_controls(&layout,controls,13u);
+            return kit_ui_interaction_draw_focus(frame,&state->workspace_authoring.font_theme_interaction,
+                                                  controls,count,(KitRenderColor){80,180,255,255});
+        }
+    }
+    return core_result_ok();
 }

@@ -7,6 +7,7 @@
 
 #include "kit_render.h"
 #include "kit_ui.h"
+#include "kit_ui_interaction.h"
 #include "kit_workspace_authoring.h"
 #include "kit_workspace_authoring_ui.h"
 
@@ -18,6 +19,7 @@ typedef enum MemConsoleWorkspaceAuthoringOverlayMode {
 } MemConsoleWorkspaceAuthoringOverlayMode;
 
 typedef struct MemConsoleWorkspaceAuthoringHost {
+    KitUiInteractionContext font_theme_interaction;
     uint8_t active;
     uint8_t key_c_down;
     uint8_t key_v_down;
@@ -49,6 +51,13 @@ typedef struct MemConsoleWorkspaceAuthoringHost {
     char theme_preset_line[96];
     char custom_preset_line[160];
 } MemConsoleWorkspaceAuthoringHost;
+
+int mem_console_workspace_authoring_apply_font_theme_button(MemConsoleWorkspaceAuthoringHost *host,
+    struct MemConsoleState *state, KitRenderContext *render_ctx, KitUiContext *ui_ctx,
+    KitWorkspaceAuthoringFontThemeButtonId button_id);
+int mem_console_workspace_authoring_interaction_event(MemConsoleWorkspaceAuthoringHost *host,
+    struct MemConsoleState *state, KitRenderContext *render_ctx, KitUiContext *ui_ctx,
+    const SDL_Event *event, int blocked);
 
 void mem_console_workspace_authoring_host_reset(MemConsoleWorkspaceAuthoringHost *host);
 void mem_console_workspace_authoring_host_set_viewport(MemConsoleWorkspaceAuthoringHost *host,

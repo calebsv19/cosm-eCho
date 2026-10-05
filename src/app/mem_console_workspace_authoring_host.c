@@ -126,6 +126,7 @@ void mem_console_workspace_authoring_host_reset(MemConsoleWorkspaceAuthoringHost
         return;
     }
     memset(host, 0, sizeof(*host));
+    kit_ui_interaction_reset(&host->font_theme_interaction);
     host->overlay_mode = MEM_CONSOLE_WORKSPACE_AUTHORING_OVERLAY_PANES;
     host->entry_chord_armed_key = KIT_WORKSPACE_AUTHORING_KEY_UNKNOWN;
 }
@@ -136,6 +137,8 @@ void mem_console_workspace_authoring_host_set_viewport(MemConsoleWorkspaceAuthor
     if (!host) {
         return;
     }
+    if (host->viewport_width != width || host->viewport_height != height)
+        kit_ui_interaction_reset(&host->font_theme_interaction);
     host->viewport_width = width;
     host->viewport_height = height;
 }
@@ -163,7 +166,8 @@ static void mem_console_workspace_authoring_enter(MemConsoleWorkspaceAuthoringHo
     if (!host->active) {
         mem_console_workspace_authoring_capture_baseline(host, state);
         host->active = 1u;
-        host->overlay_mode = MEM_CONSOLE_WORKSPACE_AUTHORING_OVERLAY_PANES;
+        kit_ui_interaction_reset(&host->font_theme_interaction);
+    host->overlay_mode = MEM_CONSOLE_WORKSPACE_AUTHORING_OVERLAY_PANES;
         host->font_theme_pending_changes = 0u;
         mem_console_workspace_authoring_set_status(host, "Authoring active.");
     }
@@ -187,6 +191,7 @@ static void mem_console_workspace_authoring_apply(MemConsoleWorkspaceAuthoringHo
     host->key_c_down = 0u;
     host->key_v_down = 0u;
     host->entry_chord_armed_key = KIT_WORKSPACE_AUTHORING_KEY_UNKNOWN;
+    kit_ui_interaction_reset(&host->font_theme_interaction);
     host->overlay_mode = MEM_CONSOLE_WORKSPACE_AUTHORING_OVERLAY_PANES;
     host->last_event_exited = 1u;
     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_LAYOUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
@@ -208,6 +213,7 @@ static void mem_console_workspace_authoring_cancel(MemConsoleWorkspaceAuthoringH
     host->key_c_down = 0u;
     host->key_v_down = 0u;
     host->entry_chord_armed_key = KIT_WORKSPACE_AUTHORING_KEY_UNKNOWN;
+    kit_ui_interaction_reset(&host->font_theme_interaction);
     host->overlay_mode = MEM_CONSOLE_WORKSPACE_AUTHORING_OVERLAY_PANES;
     host->last_event_exited = 1u;
     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_LAYOUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
@@ -231,6 +237,7 @@ static void mem_console_workspace_authoring_cycle_overlay(MemConsoleWorkspaceAut
     host->overlay_mode = host->overlay_mode == MEM_CONSOLE_WORKSPACE_AUTHORING_OVERLAY_PANES
                              ? MEM_CONSOLE_WORKSPACE_AUTHORING_OVERLAY_FONT_THEME
                              : MEM_CONSOLE_WORKSPACE_AUTHORING_OVERLAY_PANES;
+    kit_ui_interaction_reset(&host->font_theme_interaction);
     host->overlay_cycle_count += 1u;
     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_LAYOUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
 }
@@ -270,7 +277,7 @@ static int mem_console_workspace_authoring_apply_overlay_button(MemConsoleWorksp
     return 0;
 }
 
-static int mem_console_workspace_authoring_apply_font_theme_button(MemConsoleWorkspaceAuthoringHost *host,
+int mem_console_workspace_authoring_apply_font_theme_button(MemConsoleWorkspaceAuthoringHost *host,
                                                                    MemConsoleState *state,
                                                                    KitRenderContext *render_ctx,
                                                                    KitUiContext *ui_ctx,
@@ -351,29 +358,6 @@ static int mem_console_workspace_authoring_handle_overlay_click(MemConsoleWorksp
     return mem_console_workspace_authoring_apply_overlay_button(host, state, render_ctx, ui_ctx, hit);
 }
 
-static int mem_console_workspace_authoring_handle_font_theme_click(MemConsoleWorkspaceAuthoringHost *host,
-                                                                   MemConsoleState *state,
-                                                                   KitRenderContext *render_ctx,
-                                                                   KitUiContext *ui_ctx,
-                                                                   int x,
-                                                                   int y) {
-    KitWorkspaceAuthoringFontThemeLayout layout;
-    KitWorkspaceAuthoringFontThemeButtonId hit;
-
-    if (!host || !host->active || host->viewport_width == 0u || host->viewport_height == 0u ||
-        !mem_console_workspace_authoring_host_font_theme_overlay_active(host)) {
-        return 0;
-    }
-    if (!kit_workspace_authoring_ui_font_theme_build_layout(render_ctx,
-                                                            (int)host->viewport_width,
-                                                            (int)host->viewport_height,
-                                                            &layout)) {
-        return 0;
-    }
-    hit = kit_workspace_authoring_ui_font_theme_hit_button(&layout, (float)x, (float)y);
-    return mem_console_workspace_authoring_apply_font_theme_button(host, state, render_ctx, ui_ctx, hit);
-}
-
 int mem_console_workspace_authoring_host_handle_sdl_event(MemConsoleWorkspaceAuthoringHost *host,
                                                           MemConsoleState *state,
                                                           KitRenderContext *render_ctx,
@@ -388,6 +372,13 @@ int mem_console_workspace_authoring_host_handle_sdl_event(MemConsoleWorkspaceAut
     }
 
     mem_console_workspace_authoring_clear_event_flags(host);
+    if (mem_console_workspace_authoring_interaction_event(host, state, render_ctx, ui_ctx,
+                                                          event, text_entry_active)) {
+        mem_console_workspace_authoring_note_consumed(host, 0);
+        return 1;
+    }
+    if (event->type == SDL_QUIT) return 0;
+
 
     if (event->type == SDL_KEYUP) {
         key = mem_console_workspace_authoring_key_from_sdl_keysym(&event->key.keysym);
@@ -411,16 +402,7 @@ int mem_console_workspace_authoring_host_handle_sdl_event(MemConsoleWorkspaceAut
                                                                                ui_ctx,
                                                                                event->button.x,
                                                                                event->button.y);
-        int font_theme_hit = 0;
-        if (!overlay_hit) {
-            font_theme_hit = mem_console_workspace_authoring_handle_font_theme_click(host,
-                                                                                    state,
-                                                                                    render_ctx,
-                                                                                    ui_ctx,
-                                                                                    event->button.x,
-                                                                                    event->button.y);
-        }
-        mem_console_workspace_authoring_note_consumed(host, (overlay_hit || font_theme_hit) ? 0 : 1);
+        mem_console_workspace_authoring_note_consumed(host, overlay_hit ? 0 : 1);
         return 1;
     }
 

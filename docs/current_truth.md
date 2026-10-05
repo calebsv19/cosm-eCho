@@ -297,3 +297,9 @@ The retained development lane adopts shared `f80f91d`, with `kit_render 0.14.6`,
 Vulkan conformance coverage through the application's copied shared archives.
 See [Native render command fidelity](render_fidelity.md) for repeatable gates
 and the source/package/interactive-review boundaries.
+
+## Font/Theme interaction follow-up
+
+Main Edit now adopts optional shared button focus/capture and rounded Font/Theme control state.
+See [Font/Theme interaction](ui_interaction.md) for scope, shortcuts and proof gates.
+The composite source pin advances to the interaction snapshot; Vulkan transforms, UVs and tint remain unchanged.

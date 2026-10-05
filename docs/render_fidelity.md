@@ -33,3 +33,9 @@ captures. The common fidelity harness checked 301,545 pixels and 2,106 text
 samples at 1x, and 465,019 pixels and 8,424 text samples at 2x, with zero Vulkan
 validation warnings or errors. The host's DB/path/mutation/state/graph/package
 and visual-artifact regression checks remain part of its separate product proof.
+
+## Font/Theme interaction follow-up
+
+Main Edit now adopts optional shared button focus/capture and rounded Font/Theme control state.
+See [Font/Theme interaction](ui_interaction.md) for scope, shortcuts and proof gates.
+The composite source pin advances to the interaction snapshot; Vulkan transforms, UVs and tint remain unchanged.
