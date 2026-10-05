@@ -109,6 +109,7 @@ int mem_console_ui_surface_event(MemConsoleState *state, KitRenderContext *rende
         input->mouse_down=0; input->mouse_pressed=0; input->mouse_released=0;
     }
     if (e.type==KIT_UI_INTERACTION_CANCEL) {
+        state->pane_pointer_owner=(KitPanePointerOwner){0};
         if (input) { input->mouse_down=0; input->mouse_pressed=0; input->mouse_released=0; }
         return 0;
     }

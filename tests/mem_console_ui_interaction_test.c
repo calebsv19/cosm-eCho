@@ -178,7 +178,8 @@ int main(void) {
     e=(SDL_Event){0};e.type=SDL_TEXTINPUT;strcpy(e.text.text,"9x");route(&state,&render,&ui,&e);assert(strcmp(state.graph_edge_limit_text,"128")==0);
     puts("Echo text adapter: UTF8, preedit, multiline host save intent and transactional numeric refusal pass");
     memset(&e,0,sizeof(e)); e.type=SDL_WINDOWEVENT; e.window.event=SDL_WINDOWEVENT_FOCUS_LOST;
-    route(&state,&render,&ui,&e); assert(!state.button_surface.interaction.focused_id);
+    state.pane_pointer_owner=(KitPanePointerOwner){1,1};
+    route(&state,&render,&ui,&e); assert(!state.button_surface.interaction.focused_id&&!state.pane_pointer_owner.down&&!state.pane_pointer_owner.captured_id);
     e.type=SDL_QUIT; route(&state,&render,&ui,&e); assert(!running);
     puts("eCho surfaces: production event/frame routes, preview/top controls, HUD release actions, FIFO, modal exclusion, editor ownership and quit pass");
     char *fields[]={state.search_text,state.title_edit_text,state.body_edit_text,state.graph_edge_limit_text,state.db_modal_text,state.relationship_target_text};
