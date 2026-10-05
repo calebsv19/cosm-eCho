@@ -418,13 +418,14 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
         result = mem_console_ui_draw_editable_line(ui_ctx,
                                                    render_ctx,
                                                    frame,
+                                               state,
                                                    (KitRenderRect){
                                                        graph_edge_input_rect.x + 6.0f,
                                                        graph_edge_input_rect.y + 2.0f,
                                                        graph_edge_input_rect.width - 12.0f,
                                                        graph_edge_input_rect.height - 4.0f
                                                    },
-                                                   state->graph_edge_limit_text[0] ? state->graph_edge_limit_text : "128",
+                                                   state->graph_edge_limit_text,
                                                    CORE_THEME_COLOR_TEXT_PRIMARY,
                                                    CORE_FONT_ROLE_UI_REGULAR,
                                                    CORE_FONT_TEXT_SIZE_CAPTION,
@@ -440,6 +441,7 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
             mem_console_input_target_set(state, MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT);
         mem_console_ui_surface_text_focus(state);
             state->graph_edge_limit_cursor = mem_console_ui_cursor_index_for_click(state->graph_edge_limit_text,
+                                                                          state,
                                                                                    render_ctx,
                                                                                    input->mouse_x,
                                                                                    text_origin_x,

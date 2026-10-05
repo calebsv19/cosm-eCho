@@ -264,6 +264,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         result = mem_console_ui_draw_editable_line(ui_ctx,
                                                    render_ctx,
                                                    frame,
+                                               state,
                                                    detail_title_row,
                                                    state->title_edit_text,
                                                    CORE_THEME_COLOR_TEXT_PRIMARY,
@@ -280,6 +281,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
             mem_console_input_target_set(state, MEM_CONSOLE_INPUT_TITLE_EDIT);
         mem_console_ui_surface_text_focus(state);
             state->title_edit_cursor = mem_console_ui_cursor_index_for_click(state->title_edit_text,
+                                                                          state,
                                                                              render_ctx,
                                                                              input->mouse_x,
                                                                              text_origin_x,
@@ -411,12 +413,16 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         body_panel.height - 10.0f
     };
 
+    if (state->body_edit_mode) {
+        result=mem_console_ui_draw_editable_body(ui_ctx,render_ctx,frame,state,body_content,input,wheel_y);
+        if(result.code!=CORE_OK)return result;
+    } else {
     result = detail_draw_scrollable_wrapped_text(ui_ctx,
                                                  frame,
                                                  state->wrapped_body_lines,
                                                  MEM_CONSOLE_DETAIL_BODY_WRAP_LINE_LIMIT,
                                                  body_content,
-                                                 state->body_edit_mode ? state->body_edit_text : state->selected_body,
+                                                 state->selected_body,
                                                  CORE_THEME_COLOR_TEXT_MUTED,
                                                  CORE_FONT_TEXT_SIZE_BASIC,
                                                  input,
@@ -428,180 +434,6 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         return result;
     }
 
-    if (state->body_edit_mode) {
-        KitRenderLineCommand caret_line;
-        KitRenderColor caret_color;
-        int char_w = mem_console_ui_estimate_char_width_px(CORE_FONT_TEXT_SIZE_BASIC);
-        int body_len = (int)strlen(state->body_edit_text);
-        int cursor = mem_console_ui_clamp_cursor_for_text(state->body_edit_text, state->body_edit_cursor);
-        int line_capacity;
-        int line_index;
-        int line_start_idx;
-        int line_prefix_len;
-        int i;
-        char line_prefix[256];
-        float caret_x;
-        float caret_y0;
-
-        (void)body_line_step;
-
-        if (char_w < 1) {
-            char_w = 8;
-        }
-        line_capacity = (int)((body_text_viewport.width - 16.0f) / (float)char_w);
-        if (line_capacity < 1) {
-            line_capacity = 1;
-        }
-        line_index = cursor / line_capacity;
-        if (cursor >= body_len && body_len > 0 && body_len % line_capacity == 0) {
-            line_index = body_len / line_capacity;
-        }
-
-        line_start_idx = line_index * line_capacity;
-        if (line_start_idx < 0) {
-            line_start_idx = 0;
-        }
-        if (line_start_idx > body_len) {
-            line_start_idx = body_len;
-        }
-        line_prefix_len = cursor - line_start_idx;
-        if (line_prefix_len < 0) {
-            line_prefix_len = 0;
-        }
-        if (line_prefix_len > (int)sizeof(line_prefix) - 1) {
-            line_prefix_len = (int)sizeof(line_prefix) - 1;
-        }
-        for (i = 0; i < line_prefix_len; ++i) {
-            line_prefix[i] = state->body_edit_text[line_start_idx + i];
-        }
-        line_prefix[line_prefix_len] = '\0';
-
-        caret_x = body_text_viewport.x + 8.0f +
-                  mem_console_ui_measure_text_width_px(render_ctx,
-                                                       CORE_FONT_ROLE_UI_REGULAR,
-                                                       CORE_FONT_TEXT_SIZE_BASIC,
-                                                       line_prefix);
-        caret_y0 = body_text_viewport.y + 8.0f + ((float)line_index * 24.0f) - state->detail_body_scroll;
-
-        if (caret_x > body_text_viewport.x + body_text_viewport.width - 8.0f) {
-            caret_x = body_text_viewport.x + body_text_viewport.width - 8.0f;
-        }
-
-        if (input->mouse_released &&
-            kit_ui_point_in_rect(body_text_viewport, input->mouse_x, input->mouse_y)) {
-            float text_x = body_text_viewport.x + 8.0f;
-            float text_y = body_text_viewport.y + 8.0f;
-            int click_row = (int)((input->mouse_y - text_y + state->detail_body_scroll + 12.0f) / 24.0f);
-            int candidate_cursor;
-            int line_end_idx;
-            float delta_x;
-            float advance = 0.0f;
-            char glyph[2];
-
-            if (click_row < 0) {
-                click_row = 0;
-            }
-            line_start_idx = click_row * line_capacity;
-            if (line_start_idx < 0) {
-                line_start_idx = 0;
-            }
-            if (line_start_idx > body_len) {
-                line_start_idx = body_len;
-            }
-
-            line_end_idx = line_start_idx + line_capacity;
-            if (line_end_idx > body_len) {
-                line_end_idx = body_len;
-            }
-
-            delta_x = input->mouse_x - text_x;
-            if (delta_x <= 0.0f) {
-                candidate_cursor = line_start_idx;
-            } else {
-                candidate_cursor = line_end_idx;
-                glyph[1] = '\0';
-                for (i = line_start_idx; i < line_end_idx; ++i) {
-                    float glyph_w;
-                    glyph[0] = state->body_edit_text[i];
-                    glyph_w = mem_console_ui_measure_text_width_px(render_ctx,
-                                                                   CORE_FONT_ROLE_UI_REGULAR,
-                                                                   CORE_FONT_TEXT_SIZE_BASIC,
-                                                                   glyph);
-                    if (glyph_w <= 0.0f) {
-                        glyph_w = (float)char_w;
-                    }
-                    if (delta_x < advance + (glyph_w * 0.5f)) {
-                        candidate_cursor = i;
-                        break;
-                    }
-                    advance += glyph_w;
-                }
-            }
-            if (candidate_cursor < 0) {
-                candidate_cursor = 0;
-            }
-            if (candidate_cursor > body_len) {
-                candidate_cursor = body_len;
-            }
-
-            mem_console_input_target_set(state, MEM_CONSOLE_INPUT_BODY_EDIT);
-        mem_console_ui_surface_text_focus(state);
-            state->body_edit_cursor = candidate_cursor;
-            cursor = candidate_cursor;
-            line_index = cursor / line_capacity;
-            line_start_idx = line_index * line_capacity;
-            if (line_start_idx < 0) {
-                line_start_idx = 0;
-            }
-            if (line_start_idx > body_len) {
-                line_start_idx = body_len;
-            }
-            line_prefix_len = cursor - line_start_idx;
-            if (line_prefix_len < 0) {
-                line_prefix_len = 0;
-            }
-            if (line_prefix_len > (int)sizeof(line_prefix) - 1) {
-                line_prefix_len = (int)sizeof(line_prefix) - 1;
-            }
-            for (i = 0; i < line_prefix_len; ++i) {
-                line_prefix[i] = state->body_edit_text[line_start_idx + i];
-            }
-            line_prefix[line_prefix_len] = '\0';
-            caret_x = body_text_viewport.x + 8.0f +
-                      mem_console_ui_measure_text_width_px(render_ctx,
-                                                           CORE_FONT_ROLE_UI_REGULAR,
-                                                           CORE_FONT_TEXT_SIZE_BASIC,
-                                                           line_prefix);
-            caret_y0 = body_text_viewport.y + 8.0f + ((float)line_index * 24.0f) - state->detail_body_scroll;
-        }
-
-        result = mem_console_ui_resolve_theme_color(render_ctx, CORE_THEME_COLOR_ACCENT_PRIMARY, &caret_color);
-        if (result.code != CORE_OK) {
-            return result;
-        }
-
-        result = kit_ui_clip_push(ui_ctx, frame, body_text_viewport);
-        if (result.code != CORE_OK) {
-            return result;
-        }
-
-        caret_line.p0.x = caret_x;
-        caret_line.p0.y = caret_y0;
-        caret_line.p1.x = caret_x;
-        caret_line.p1.y = caret_y0 + 18.0f;
-        caret_line.thickness = 1.0f;
-        caret_line.color = caret_color;
-        caret_line.transform = kit_render_identity_transform();
-        result = kit_render_push_line(frame, &caret_line);
-        if (result.code != CORE_OK) {
-            (void)kit_ui_clip_pop(ui_ctx, frame);
-            return result;
-        }
-
-        result = kit_ui_clip_pop(ui_ctx, frame);
-        if (result.code != CORE_OK) {
-            return result;
-        }
     }
 
     *out_right_layout = body_layout;

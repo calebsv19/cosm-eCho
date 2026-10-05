@@ -13,101 +13,6 @@
 #include <stdio.h>
 #include <string.h>
 
-static void mem_console_ui_build_visible_path_text(const KitRenderContext *render_ctx,
-                                                   const char *full_text,
-                                                   int cursor_index,
-                                                   float max_width,
-                                                   char *out_text,
-                                                   size_t out_cap,
-                                                   int *out_cursor_index,
-                                                   int *out_visible_start) {
-    int full_len;
-    int cursor;
-    int start;
-    const char *ellipsis = "...";
-    float width;
-    char candidate[896];
-
-    if (!full_text || !out_text || out_cap == 0u) {
-        return;
-    }
-
-    out_text[0] = '\0';
-    if (out_cursor_index) {
-        *out_cursor_index = 0;
-    }
-    if (out_visible_start) {
-        *out_visible_start = 0;
-    }
-
-    full_len = (int)strlen(full_text);
-    cursor = mem_console_ui_clamp_cursor_for_text(full_text, cursor_index);
-    width = mem_console_ui_measure_text_width_px(render_ctx,
-                                                 CORE_FONT_ROLE_UI_REGULAR,
-                                                 CORE_FONT_TEXT_SIZE_PARAGRAPH,
-                                                 full_text);
-    if (width <= max_width || full_len == 0) {
-        (void)snprintf(out_text, out_cap, "%s", full_text);
-        if (out_cursor_index) {
-            *out_cursor_index = cursor;
-        }
-        return;
-    }
-
-    start = cursor;
-    while (start > 0) {
-        (void)snprintf(candidate, sizeof(candidate), "%s%s", start > 1 ? ellipsis : "", full_text + start - 1);
-        width = mem_console_ui_measure_text_width_px(render_ctx,
-                                                     CORE_FONT_ROLE_UI_REGULAR,
-                                                     CORE_FONT_TEXT_SIZE_PARAGRAPH,
-                                                     candidate);
-        if (width > max_width) {
-            break;
-        }
-        start -= 1;
-    }
-
-    if (start > 0) {
-        (void)snprintf(out_text, out_cap, "%s%s", ellipsis, full_text + start);
-        if (out_cursor_index) {
-            *out_cursor_index = 3 + (cursor - start);
-        }
-    } else {
-        (void)snprintf(out_text, out_cap, "%s", full_text);
-        if (out_cursor_index) {
-            *out_cursor_index = cursor;
-        }
-    }
-
-    if (out_visible_start) {
-        *out_visible_start = start;
-    }
-}
-
-static float mem_console_ui_measure_prefix_width_local(const KitRenderContext *render_ctx,
-                                                       const char *text,
-                                                       int prefix_len) {
-    char prefix[896];
-    int len;
-
-    if (!text) {
-        return 0.0f;
-    }
-    len = mem_console_ui_clamp_cursor_for_text(text, prefix_len);
-    if (len <= 0) {
-        return 0.0f;
-    }
-    if (len >= (int)sizeof(prefix)) {
-        len = (int)sizeof(prefix) - 1;
-    }
-    memcpy(prefix, text, (size_t)len);
-    prefix[len] = '\0';
-    return mem_console_ui_measure_text_width_px(render_ctx,
-                                                CORE_FONT_ROLE_UI_REGULAR,
-                                                CORE_FONT_TEXT_SIZE_PARAGRAPH,
-                                                prefix);
-}
-
 static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
                                                KitUiContext *ui_ctx,
                                                KitRenderFrame *frame,
@@ -135,19 +40,12 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
     float button_width;
     float suffix_width;
     float editable_width;
-    float text_origin_x;
     float list_row_h = 22.0f;
     float list_row_gap = 4.0f;
     int list_max_rows = 0;
     int list_rows_drawn = 0;
     int list_start_index = 0;
     int list_index = 0;
-    int visible_cursor_index = 0;
-    int visible_start = 0;
-    int visible_bias = 0;
-    int visible_text_len = 0;
-    int visible_selection_start = 0;
-    int visible_selection_end = 0;
     const char *suffix_text = ".sqlite";
     int show_suffix;
 
@@ -264,75 +162,22 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
         input_rect.height - 8.0f
     };
     editable_width = input_rect.width - 16.0f - (show_suffix ? suffix_width : 0.0f);
-    mem_console_ui_build_visible_path_text(render_ctx,
-                                           state->db_modal_text,
-                                           state->db_modal_cursor,
-                                           editable_width - (ui_ctx->style.padding * 2.0f),
-                                           state->db_modal_visible_text,
-                                           sizeof(state->db_modal_visible_text),
-                                           &visible_cursor_index,
-                                           &visible_start);
-    visible_text_len = (int)strlen(state->db_modal_visible_text);
-    visible_bias = visible_start > 0 ? 3 : 0;
-    text_origin_x = input_rect.x + 8.0f + ui_ctx->style.padding;
-
-    if (mem_console_db_picker_has_selection(state)) {
-        visible_selection_start = state->db_modal_selection_start - visible_start + visible_bias;
-        visible_selection_end = state->db_modal_selection_end - visible_start + visible_bias;
-        if (visible_selection_start < 0) visible_selection_start = 0;
-        if (visible_selection_end < 0) visible_selection_end = 0;
-        if (visible_selection_start > visible_text_len) visible_selection_start = visible_text_len;
-        if (visible_selection_end > visible_text_len) visible_selection_end = visible_text_len;
-        if (visible_selection_end > visible_selection_start) {
-            KitRenderColor selection_color;
-            float start_x = text_origin_x +
-                            mem_console_ui_measure_prefix_width_local(render_ctx,
-                                                                      state->db_modal_visible_text,
-                                                                      visible_selection_start);
-            float end_x = text_origin_x +
-                          mem_console_ui_measure_prefix_width_local(render_ctx,
-                                                                    state->db_modal_visible_text,
-                                                                    visible_selection_end);
-            result = mem_console_ui_resolve_theme_color(render_ctx,
-                                                        CORE_THEME_COLOR_ACCENT_PRIMARY,
-                                                        &selection_color);
-            if (result.code != CORE_OK) {
-                return result;
-            }
-            selection_color.a = 72u;
-            result = kit_render_push_rect(frame,
-                                          &(KitRenderRectCommand){
-                                              (KitRenderRect){
-                                                  start_x,
-                                                  input_rect.y + 8.0f,
-                                                  end_x - start_x,
-                                                  input_rect.height - 16.0f
-                                              },
-                                              4.0f,
-                                              selection_color,
-                                              kit_render_identity_transform()
-                                          });
-            if (result.code != CORE_OK) {
-                return result;
-            }
-        }
-    }
-
     result = mem_console_ui_draw_editable_line(ui_ctx,
                                                render_ctx,
                                                frame,
+                                               state,
                                                (KitRenderRect){
                                                    input_rect.x + 8.0f,
                                                    input_rect.y + 4.0f,
                                                    editable_width,
                                                    input_rect.height - 8.0f
                                                },
-                                               state->db_modal_visible_text,
+                                               state->db_modal_text,
                                                CORE_THEME_COLOR_TEXT_PRIMARY,
                                                CORE_FONT_ROLE_UI_REGULAR,
                                                CORE_FONT_TEXT_SIZE_PARAGRAPH,
                                                state->input_target == MEM_CONSOLE_INPUT_DB_PATH,
-                                               visible_cursor_index);
+                                               state->db_modal_cursor);
     if (result.code != CORE_OK) {
         return result;
     }
@@ -357,31 +202,34 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
     }
 
     if (input->mouse_pressed && kit_ui_point_in_rect(input_rect, input->mouse_x, input->mouse_y)) {
-        int local_cursor = mem_console_ui_cursor_index_for_click(state->db_modal_visible_text,
+        int local_cursor = mem_console_ui_cursor_index_for_click(state->db_modal_text,
+                                                                          state,
                                                                  render_ctx,
                                                                  input->mouse_x,
-                                                                 text_origin_x,
+                                                                 0,
                                                                  CORE_FONT_ROLE_UI_REGULAR,
                                                                  CORE_FONT_TEXT_SIZE_PARAGRAPH);
         mem_console_input_target_set(state, MEM_CONSOLE_INPUT_DB_PATH);
         mem_console_ui_surface_text_focus(state);
-        mem_console_db_picker_begin_selection(state, visible_start + (local_cursor - visible_bias > 0 ? local_cursor - visible_bias : 0));
+        mem_console_db_picker_begin_selection(state, local_cursor);
     } else if (state->db_modal_drag_select_active && input->mouse_down) {
-        int local_cursor = mem_console_ui_cursor_index_for_click(state->db_modal_visible_text,
+        int local_cursor = mem_console_ui_cursor_index_for_click(state->db_modal_text,
+                                                                          state,
                                                                  render_ctx,
                                                                  input->mouse_x,
-                                                                 text_origin_x,
+                                                                 0,
                                                                  CORE_FONT_ROLE_UI_REGULAR,
                                                                  CORE_FONT_TEXT_SIZE_PARAGRAPH);
-        mem_console_db_picker_update_selection(state, visible_start + (local_cursor - visible_bias > 0 ? local_cursor - visible_bias : 0));
+        mem_console_db_picker_update_selection(state, local_cursor);
     } else if (state->db_modal_drag_select_active && input->mouse_released) {
-        int local_cursor = mem_console_ui_cursor_index_for_click(state->db_modal_visible_text,
+        int local_cursor = mem_console_ui_cursor_index_for_click(state->db_modal_text,
+                                                                          state,
                                                                  render_ctx,
                                                                  input->mouse_x,
-                                                                 text_origin_x,
+                                                                 0,
                                                                  CORE_FONT_ROLE_UI_REGULAR,
                                                                  CORE_FONT_TEXT_SIZE_PARAGRAPH);
-        mem_console_db_picker_update_selection(state, visible_start + (local_cursor - visible_bias > 0 ? local_cursor - visible_bias : 0));
+        mem_console_db_picker_update_selection(state, local_cursor);
         mem_console_db_picker_end_selection(state);
     }
 

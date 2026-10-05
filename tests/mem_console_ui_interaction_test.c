@@ -1,6 +1,7 @@
 #include "mem_console_workspace_authoring.h"
 #include "mem_console_ui_surface.h"
 #include "mem_console_ui.h"
+#include "mem_console_ui_common.h"
 #include "app/mem_console_app_internal.h"
 #include <assert.h>
 #include <stdio.h>
@@ -179,5 +180,41 @@ int main(void) {
     route(&state,&render,&ui,&e); assert(!state.button_surface.interaction.focused_id);
     e.type=SDL_QUIT; route(&state,&render,&ui,&e); assert(!running);
     puts("eCho surfaces: production event/frame routes, preview/top controls, HUD release actions, FIFO, modal exclusion, editor ownership and quit pass");
+    char *fields[]={state.search_text,state.title_edit_text,state.body_edit_text,state.graph_edge_limit_text,state.db_modal_text,state.relationship_target_text};
+    size_t caps[]={sizeof(state.search_text),sizeof(state.title_edit_text),sizeof(state.body_edit_text),sizeof(state.graph_edge_limit_text),sizeof(state.db_modal_text),sizeof(state.relationship_target_text)};
+    KitRenderCommand commands[256];KitRenderCommandBuffer queue={commands,256,0};KitRenderFrame presented;
+    assert(kit_render_begin_frame(&render,1440,1000,&queue,&presented).code==CORE_OK);
+    kit_ui_interaction_reset(&state.button_surface.interaction);state.button_keyboard_text=1;
+    for(int target=0;target<6;++target) {
+        strcpy(fields[target],"aéWz");state.text_edit=(KitUiTextEdit){0};state.input_target=(MemConsoleInputTarget)target;
+        assert(kit_ui_text_bind(&state.text_edit,fields[target],caps[target],0).code==CORE_OK);
+        assert(kit_ui_text_position(&state.text_edit,3,1).code==CORE_OK);
+        assert(kit_ui_text_compose(&state.text_edit,"中W",1,1).code==CORE_OK);state.db_modal_selection_anchor=1;
+        assert(mem_console_ui_draw_editable_line(&ui,&render,&presented,&state,(KitRenderRect){20,20+target*50,300,40},fields[target],CORE_THEME_COLOR_TEXT_PRIMARY,CORE_FONT_ROLE_UI_REGULAR,CORE_FONT_TEXT_SIZE_BASIC,1,3).code==CORE_OK);
+        const KitUiTextPresentation *v=mem_console_ui_text_view((MemConsoleInputTarget)target);
+        assert(!strcmp(v->display,"a中WWz") && v->rows[0].preedit.width>0 && v->rows[0].selection.width>0);
+        assert(mem_console_ui_cursor_index_for_click(fields[target],&state,&render,v->rows[0].origin.x,0,CORE_FONT_ROLE_UI_REGULAR,CORE_FONT_TEXT_SIZE_BASIC)==0);
+        assert(state.text_edit.cursor==0 && state.text_edit.anchor==0 && !state.text_edit.composition[0]);
+    }
+    for(int target=0;target<6;++target)strcpy(fields[target],"mutated");
+    for(int target=0;target<6;++target)assert(!strcmp(mem_console_ui_text_view((MemConsoleInputTarget)target)->row_text,"a中WWz"));
+    assert(kit_render_end_frame(&render,&presented).code==CORE_OK);
+    strcpy(state.body_edit_text,"first W row\nsecond é row\n");state.text_edit=(KitUiTextEdit){0};state.body_edit_cursor=0;state.input_target=MEM_CONSOLE_INPUT_BODY_EDIT;
+    assert(kit_render_begin_frame(&render,1440,1000,&queue,&presented).code==CORE_OK);
+    assert(mem_console_ui_draw_editable_body(&ui,&render,&presented,&state,(KitRenderRect){20,20,180,120},&input,0).code==CORE_OK);
+    assert(mem_console_ui_text_view(MEM_CONSOLE_INPUT_BODY_EDIT)->count>=3);
+    assert(kit_render_end_frame(&render,&presented).code==CORE_OK);
+    memset(state.body_edit_text,'W',1000);state.body_edit_text[1000]=0;state.body_edit_cursor=1000;
+    state.text_edit=(KitUiTextEdit){0};KitUiInputState body_pointer={0};body_pointer.mouse_x=50;body_pointer.mouse_y=50;
+    assert(kit_render_begin_frame(&render,1440,1000,&queue,&presented).code==CORE_OK);
+    assert(mem_console_ui_draw_editable_body(&ui,&render,&presented,&state,(KitRenderRect){20,20,180,120},&body_pointer,0).code==CORE_OK);
+    float revealed=state.detail_body_scroll;assert(revealed>0);
+    assert(kit_render_end_frame(&render,&presented).code==CORE_OK);
+    assert(kit_render_begin_frame(&render,1440,1000,&queue,&presented).code==CORE_OK);
+    assert(mem_console_ui_draw_editable_body(&ui,&render,&presented,&state,(KitRenderRect){20,20,180,120},&body_pointer,1).code==CORE_OK);
+    assert(state.detail_body_scroll<revealed && state.detail_body_scroll>=0);
+    assert(kit_render_end_frame(&render,&presented).code==CORE_OK);
+    puts("Echo presentation: field click cancels preedit/collapses selection; body caret reveal, wheel scroll and scrollbar pass");
+    puts("Echo six field presentation slots: Unicode preedit, measured hit, queued lifetime and explicit multiline rows pass");
     return 0;
 }

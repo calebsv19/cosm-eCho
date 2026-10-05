@@ -3,6 +3,7 @@
 
 #include "mem_console_state.h"
 #include "kit_ui.h"
+#include "kit_ui_text_presentation.h"
 #include "mem_console_ui_surface.h"
 
 void mem_console_ui_text_frame_begin(void);
@@ -16,6 +17,7 @@ float mem_console_ui_measure_text_width_px(const KitRenderContext *render_ctx,
                                            CoreFontTextSizeTier text_tier,
                                            const char *text);
 int mem_console_ui_cursor_index_for_click(const char *text,
+                                          MemConsoleState *state,
                                           const KitRenderContext *render_ctx,
                                           float mouse_x,
                                           float text_origin_x,
@@ -39,6 +41,7 @@ CoreResult mem_console_ui_draw_button_custom(KitUiContext *ui_ctx,
 CoreResult mem_console_ui_draw_editable_line(KitUiContext *ui_ctx,
                                              const KitRenderContext *render_ctx,
                                              KitRenderFrame *frame,
+                                             MemConsoleState *state,
                                              KitRenderRect rect,
                                              const char *text,
                                              CoreThemeColorToken token,
@@ -46,6 +49,8 @@ CoreResult mem_console_ui_draw_editable_line(KitUiContext *ui_ctx,
                                              CoreFontTextSizeTier text_tier,
                                              int draw_caret,
                                              int cursor_index);
+const KitUiTextPresentation *mem_console_ui_text_view(MemConsoleInputTarget target);
+CoreResult mem_console_ui_draw_editable_body(KitUiContext *,const KitRenderContext *,KitRenderFrame *,MemConsoleState *,KitRenderRect,const KitUiInputState *,int);
 CoreResult mem_console_ui_resolve_theme_color(const KitRenderContext *render_ctx,
                                               CoreThemeColorToken token,
                                               KitRenderColor *out_color);

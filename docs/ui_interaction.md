@@ -66,3 +66,10 @@ and wider program adoption after the trio's human workflow review.
 ## 2026-10-05 bounded text editing and modal focus
 
 See [the adopted text contract](ui_text_focus.md). The optional shared model now owns scalar editing, selection and clipboard/preedit mechanics; host actions, text layout and persistence retain their existing owners.
+
+
+## 2026-10-05 shared text presentation
+
+Search, title, body, DB/input-root path, graph edge limit and relationship target now adopt `kit_ui 0.16.0` measured text presentation in Main Edit. Six distinct UI-owned slots prevent queued text aliasing. Body editing uses measured scalar hard wrapping and explicit newlines; read-only bodies retain their existing layout. DB editing uses the full draft with horizontal caret-follow instead of an ellipsis string and duplicate byte-selection offsets. Numeric validation and database/session actions retain their owners.
+
+See [Shared text presentation](ui_text_presentation.md) for storage ownership, output gates and residual limits. The next behavioral slice is mixed field/button traversal; native IME/session/clipboard qualification and pane composition follow before wider adoption. Earlier dated milestones remain historical.

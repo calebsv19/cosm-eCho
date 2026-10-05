@@ -89,3 +89,10 @@ See [the current interaction reference](ui_interaction.md) for exact scope, repl
 Search, title, body, DB/input-root path, graph edge limit and relationship target now use `kit_ui 0.15.1` bounded editing in Main Edit. Title Enter saves and Escape cancels; body Enter inserts a newline and Ctrl/Cmd+Enter saves; DB Enter confirms and Escape cancels. Search Enter refreshes; numeric Enter uses the existing graph/relationship actions. Numeric fields reject a mixed invalid paste atomically. Only committed search edits trigger debounce invalidation. Opening a DB modal ends title/body editing by existing host policy; closing it returns to Search, not an abandoned text editor.
 
 See [Text editing and modal focus](ui_text_focus.md) for exact ownership, tests and limitations. Text presentation, native IME/platform acceptance, pane composition and wider program adoption remain later slices. Earlier dated milestones describe their historical state.
+
+
+## 2026-10-05 shared text presentation
+
+Search, title, body, DB/input-root path, graph edge limit and relationship target now adopt `kit_ui 0.16.0` measured text presentation in Main Edit. Six distinct UI-owned slots prevent queued text aliasing. Body editing uses measured scalar hard wrapping and explicit newlines; read-only bodies retain their existing layout. DB editing uses the full draft with horizontal caret-follow instead of an ellipsis string and duplicate byte-selection offsets. Numeric validation and database/session actions retain their owners.
+
+See [Shared text presentation](ui_text_presentation.md) for storage ownership, output gates and residual limits. The next behavioral slice is mixed field/button traversal; native IME/session/clipboard qualification and pane composition follow before wider adoption. Earlier dated milestones remain historical.

@@ -500,13 +500,14 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
         if (state->search_text[0]) {
             search_display_text = state->search_text;
         } else if (search_input_active) {
-            search_display_text = "";
+            search_display_text = state->search_text;
         } else {
             search_display_text = "ALL ACTIVE MEMORIES";
         }
         result = mem_console_ui_draw_editable_line(ui_ctx,
                                                    render_ctx,
                                                    frame,
+                                               state,
                                                    (KitRenderRect){
                                                        search_box.x + 6.0f,
                                                        search_box.y + 3.0f,
@@ -527,6 +528,7 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
             mem_console_input_target_set(state, MEM_CONSOLE_INPUT_SEARCH);
         mem_console_ui_surface_text_focus(state);
             state->search_cursor = mem_console_ui_cursor_index_for_click(state->search_text,
+                                                                          state,
                                                                           render_ctx,
                                                                           input->mouse_x,
                                                                           text_origin_x,
