@@ -1,7 +1,7 @@
 # Shared button interaction contract
 
-`kit_ui >= 0.13.0` provides an optional, caller-owned interaction context.
-`kit_workspace_authoring >= 0.6.0` registers the common Font/Theme surface.
+`kit_ui >= 0.13.1` provides an optional, caller-owned interaction context.
+`kit_workspace_authoring >= 0.6.1` registers the common Font/Theme surface.
 This is an additive button contract; legacy stateless `kit_ui_eval_*` callers
 keep their existing behavior until explicitly migrated.
 

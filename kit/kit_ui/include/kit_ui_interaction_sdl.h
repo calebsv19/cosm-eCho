@@ -3,6 +3,10 @@
 #include <SDL2/SDL.h>
 #include "kit_ui_interaction.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Optional platform bridge. Map event coordinates into control space in the
  * host before calling. Resize/focus loss cancel ownership; non-left buttons,
  * unrelated keys and text entry are left with the host. */
@@ -13,4 +17,7 @@ void kit_ui_interaction_sdl_draw_focus(SDL_Renderer *renderer,
                                        const KitUiInteractionControl *controls,
                                        uint32_t count,
                                        KitRenderColor color);
+#ifdef __cplusplus
+}
+#endif
 #endif

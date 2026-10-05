@@ -86,6 +86,11 @@ int main(void) {
     c[1].bounds.x = 50; c[1].enabled = 1;
     POINTER(KIT_UI_INTERACTION_POINTER_DOWN,50,20);
     assert(POINTER(KIT_UI_INTERACTION_POINTER_UP,50,20).activated_id == 22u);
+    KitUiInteractionControl tiny={99u,{10,10,1,1},1};
+    ctx.focused_id=99u;
+    KitRenderRect marker;
+    assert(kit_ui_interaction_focus_marker(&ctx,&tiny,1,&marker));
+    assert(marker.x>=10 && marker.y>=10 && marker.x+marker.width<=11 && marker.y+marker.height<=11);
     puts("kit_ui interaction: press origin, capture, disabled, focus, keyboard, cancel and validation pass");
     return 0;
 }
