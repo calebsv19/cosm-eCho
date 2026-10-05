@@ -1,8 +1,8 @@
 # Font/Theme button interaction
 
-The Main Edit Font/Theme surface adopts `kit_ui 0.13.0` and
-`kit_workspace_authoring 0.6.0`. Shared source is pinned to
-`0d2c72ddca5c981042afa5a8f844ae93591b55c5`; the earlier Vulkan geometry/texture
+The Main Edit Font/Theme surface adopts `kit_ui 0.13.1` and
+`kit_workspace_authoring 0.6.1`. Shared source is pinned to
+`ad3b83b64df01770308ef52b4443252d4717266e`; the earlier Vulkan geometry/texture
 contract remains in force.
 
 A press owns its button until release or cancellation. Release inside that same
