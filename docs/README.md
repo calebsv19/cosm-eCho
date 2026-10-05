@@ -21,3 +21,12 @@ Repository and source-level identifiers still use `mem_console`.
   - node-kind filters
   - project pod overlays
 - packaging docs must reflect the current multi-arch Intel staging lane rather than the older single-dist contract
+
+
+## Font/Theme interaction reference
+
+See [Shared button interaction](ui_interaction.md) for the optional focus,
+keyboard and press-origin capture contract, host ownership, current shared pin,
+and `make ui-interaction-self-test`. This is the retained Main Edit Font/Theme
+surface only; ordinary runtime controls, text entry and panes retain their own
+input paths.

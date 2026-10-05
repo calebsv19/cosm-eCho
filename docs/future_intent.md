@@ -66,3 +66,12 @@ Last updated: 2026-05-04
 ## Large-File Maintenance Posture
 - continue behavior-preserving helper extraction when modules exceed readability/size thresholds.
 - keep function ownership docs in sync when helper modules move between `src/runtime/` and `src/ui/graph/`.
+
+
+## Shared interaction follow-on
+
+Main Edit has adopted the shared button interaction contract on the common
+Font/Theme authoring controls. Extend the same optional context to normal
+runtime HUD/inspector controls after reviewing each input scope and shortcut
+owner. Text-entry/modal composition, pane layout and native Linux qualification
+remain separate slices. See [the implemented reference](ui_interaction.md).
