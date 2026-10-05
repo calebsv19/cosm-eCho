@@ -7,7 +7,9 @@ import struct
 import subprocess
 from pathlib import Path
 
-EXPECTED_SHARED_COMMIT = "e5887348657f782e6094cdeeb095259dedb32bf8"
+EXPECTED_SHARED_COMMIT = "f80f91d6f1e1ec731434934d83fac85b338172a3"
+SOURCE_MODULES = ("vk_runtime", "vk_renderer", "kit/kit_render", "kit/kit_ui",
+                  "kit/kit_workspace_authoring")
 
 
 def command_output(command: list[str], cwd: Path) -> str:
@@ -38,13 +40,13 @@ def verify_shared_source(root: Path, canonical: Path) -> None:
                          f"{EXPECTED_SHARED_COMMIT}, found {commit}")
     status = command_output(
         ["git", "status", "--porcelain", "--untracked-files=all", "--",
-         "vk_runtime", "vk_renderer"], canonical)
+         *SOURCE_MODULES], canonical)
     if status:
         raise SystemExit("canonical shared Vulkan source is not exact/clean:\n" + status)
 
     tracked = command_output(
         ["git", "ls-tree", "-r", "--name-only", EXPECTED_SHARED_COMMIT, "--",
-         "vk_runtime", "vk_renderer"], canonical
+         *SOURCE_MODULES], canonical
     ).splitlines()
     if not tracked:
         raise SystemExit("canonical shared Vulkan source has no tracked files")
@@ -64,6 +66,8 @@ def verify_shared_source(root: Path, canonical: Path) -> None:
     if mismatches:
         raise SystemExit("adopted Vulkan source differs from canonical: " +
                          ", ".join(mismatches[:12]))
+    print(f"render fidelity exact-source contract: {EXPECTED_SHARED_COMMIT}; "
+          f"{len(tracked)} files")
 
 
 def bmp_evidence(path: Path) -> tuple[int, int, int]:
@@ -156,8 +160,10 @@ def main() -> int:
     renderer = read_version(root / "vk_renderer/VERSION")
     if runtime != (0, 6, 0):
         raise SystemExit(f"vk_runtime 0.6.0 required, found {runtime}")
-    if renderer != (1, 4, 0):
-        raise SystemExit(f"vk_renderer 1.4.0 required, found {renderer}")
+    if renderer != (1, 5, 0):
+        raise SystemExit(f"vk_renderer 1.5.0 required, found {renderer}")
+    if read_version(root / "kit/kit_render/VERSION") != (0, 14, 6):
+        raise SystemExit("kit_render 0.14.6 required")
 
     if args.app:
         if not args.initial_capture or not args.resized_capture or not args.log:

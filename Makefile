@@ -14,6 +14,7 @@ include make/rules-memory-check.mk
 include make/rules-build.mk
 include make/rules-test.mk
 include make/rules-vulkan-runtime.mk
+include make/rules-render-fidelity.mk
 include make/package-macos.mk
 include make/release.mk
 include make/release-disposable.mk

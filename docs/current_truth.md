@@ -288,3 +288,12 @@ for checks and a visual review route.
 - Full execution history is in:
   - `/Users/calebsv/Desktop/CodeWork/docs/private_program_docs/memory_console/`
 - This file is the compressed public current-state contract.
+
+## 2026-10-04 Main Edit render fidelity
+
+The retained development lane adopts shared `f80f91d`, with `kit_render 0.14.6`,
+`vk_renderer 1.5.0`, `kit_ui 0.12.0`, `kit_workspace_authoring 0.5.2` and
+`vk_runtime 0.6.0`. Command transforms, texture UVs and RGBA tint have native
+Vulkan conformance coverage through the application's copied shared archives.
+See [Native render command fidelity](render_fidelity.md) for repeatable gates
+and the source/package/interactive-review boundaries.

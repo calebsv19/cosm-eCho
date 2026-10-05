@@ -12,6 +12,7 @@ Repository and source-level identifiers still use `mem_console`.
 - `desktop_packaging.md`: `.app` packaging contract, launcher behavior, and validation workflow.
 - `main_edit_worktree.md`: persistent implementation worktree, isolated package identity, and adoption gates.
 - `memory_check_audit.md`: opt-in fisiCs memory-check audit command and latest clean graph allocation result.
+- `render_fidelity.md`: shared Vulkan command contract and host-linked 1x/2x image proof.
 
 ## Current Emphasis
 - async refresh/runtime-loop hardening is part of the shipped host contract now
