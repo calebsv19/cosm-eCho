@@ -846,3 +846,34 @@ worker-capability semantic contract for cross-program compute.
 - LineDrawing
 - MapForge
 - fisiCs
+
+## Rounded UI Rendering First Slice (2026-10-04)
+
+`vk_renderer 1.4.0` adds `vk_renderer_fill_rounded_rect(...)`, drawable-scale
+coverage geometry, and frame-fence retirement of replaced vertex storage.
+`kit_render 0.14.5` honors recorded positive corner radii through that primitive.
+`kit_ui 0.11.3` fixes sibling runtime linkage in live harnesses and adds the
+bounded `test-rounded-vk` real-image gate; its existing button API is unchanged.
+Widget appearance remains kit-owned, renderer resources stay renderer-owned,
+and actions/layout/persistence remain app-owned. No UI dependency was added to
+core modules. WorkspaceSandbox and MemConsole Main Edit are the first contained
+adopters; their canonical/release identities are unchanged.
+
+HUD follow-up shared source `51b331a` supplies `kit_workspace_authoring 0.5.2`.
+Its top-level HUD draw helper consumes the existing `kit_ui` compact rounded
+appearance/state resolver and measures centered captions with the renderer's
+vertical midpoint. Hosts calling this UI helper link `kit_ui` before `kit_render`;
+input/runtime-only authoring helpers remain usable without a UI runtime.
+WorkspaceSandbox Main Edit adopts it for top-level controls and unifies its
+floating HUD and Font/Theme adapter. Other hosts retain their pinned snapshots.
+
+## 2026-10-04 Direct SDL Button Appearance
+
+`kit_ui 0.12.0` adds `kit_ui_sdl_draw_button_spec_appearance` as an optional
+SDL expression of the existing button spec/theme/appearance contracts. It
+reuses the shared state resolver, nested rounded outline/fill model, and
+measured caption callbacks. `test-sdl-appearance` covers 1x/2x pixels, state
+precedence, caption coordinates, clipping, narrow controls and invalid inputs.
+The generic archive/default tests retain no SDL dependency. DataLab Main Edit
+is the first host of this adapter; its product behavior, theme persistence,
+event routing, renderer resources and lifecycle stay app-owned.

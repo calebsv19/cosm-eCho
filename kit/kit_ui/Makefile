@@ -89,6 +89,12 @@ $(TEST_BIN): tests/kit_ui_test.c $(LIB) $(KIT_RENDER_BUILD_DIR)/libkit_render.a 
 test: $(TEST_BIN)
 	./$(TEST_BIN)
 
+# SDL stays optional: the generic archive/test do not link SDL or this adapter.
+.PHONY: test-sdl-appearance
+test-sdl-appearance: $(LIB) $(KIT_RENDER_BUILD_DIR)/libkit_render.a ../../core/core_theme/build/libcore_theme.a ../../core/core_font/build/libcore_font.a ../../core/core_base/build/libcore_base.a
+	$(CC) $(CFLAGS) $(INC) $(shell $(PKG_CONFIG) --cflags sdl2) tests/kit_ui_sdl_appearance_test.c src/kit_ui_sdl.c $(LIB) $(KIT_RENDER_BUILD_DIR)/libkit_render.a ../../core/core_theme/build/libcore_theme.a ../../core/core_font/build/libcore_font.a ../../core/core_base/build/libcore_base.a $(shell $(PKG_CONFIG) --libs sdl2) -lm -o $(OBJ_DIR)/kit_ui_sdl_appearance_test
+	./$(OBJ_DIR)/kit_ui_sdl_appearance_test
+
 $(VALIDATION_BIN): examples/kit_ui_vk_validation.c $(LIB) $(KIT_RENDER_BUILD_DIR)/libkit_render.a vk-renderer-lib ../../core/core_theme/build/libcore_theme.a ../../core/core_font/build/libcore_font.a ../../core/core_base/build/libcore_base.a | $(OBJ_DIR)
 ifeq ($(KIT_RENDER_ENABLE_VK),1)
 	$(CC) $(CFLAGS) $(INC) $< $(LIB) $(KIT_RENDER_BUILD_DIR)/libkit_render.a $(VK_RENDERER_DIR)/build/lib/libvkrenderer.a $(VK_RUNTIME_DIR)/build/lib/libvkruntime.a ../../core/core_theme/build/libcore_theme.a ../../core/core_font/build/libcore_font.a ../../core/core_base/build/libcore_base.a $(VULKAN_LIBS) $(SDL_LIBS) $(SDL_TTF_LIBS) $(APPLE_FW) -o $@

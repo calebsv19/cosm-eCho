@@ -242,3 +242,21 @@ separate from the display-free `make test` contract tests.
 The 0.11.3 harness build also includes and links sibling `vk_runtime`. The shared
 button API and default appearance remain unchanged. The rounded Vulkan path
 requires `kit_render` 0.14.5 and `vk_renderer` 1.4.0; the SDL adapter is unchanged.
+
+## Direct SDL Appearance Adapter (0.12.0)
+
+`kit_ui_sdl_draw_button_spec_appearance` expresses the existing
+`KitUiButtonSpec`, `KitUiButtonTheme`, and `KitUiButtonAppearance` contract in
+plain SDL hosts. It reuses the shared state resolver for idle, hover, selected,
+pressed, focused, and disabled colors, draws nested rounded outline/fill geometry,
+and centers measured captions through the host's synchronous `KitUiSdlTextApi`.
+Scale radius and border once into drawable pixels; text callbacks use top-left
+origins. Labels need to remain valid only through the draw call. The older HUD
+SDL helper remains available with its existing fill-only behavior. Neither the
+generic kit archive nor its default tests acquire an SDL dependency.
+
+Run `make test-sdl-appearance` for 1x/2x software-surface pixel, state, caption,
+clipping, narrow-control, and invalid-input checks. This optional adapter preserves
+SDL rasterization; a Vulkan compatibility canvas that uploads those pixels is
+still CPU-composed UI. Input routing, focus ownership, action policy, persistence,
+and renderer lifetime stay with the host.
