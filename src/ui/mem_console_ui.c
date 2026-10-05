@@ -604,6 +604,7 @@ int run_frame(KitRenderContext *render_ctx,
         return MEM_CONSOLE_FRAME_FATAL;
     }
     mem_console_ui_text_frame_begin();
+    (void)kit_ui_focus_scope_sync(&state->focus_scope,&state->button_surface,mem_console_ui_surface_scope(state),state->db_modal_open);
     kit_ui_surface_begin(&state->button_surface,mem_console_ui_surface_scope(state));
     *out_action = MEM_CONSOLE_ACTION_NONE;
     draw_width = frame_width;
@@ -863,6 +864,7 @@ int run_frame(KitRenderContext *render_ctx,
     }
 
     result=kit_ui_surface_end(&state->button_surface);
+    kit_ui_focus_scope_restore(&state->focus_scope,&state->button_surface);
     if (result.code!=CORE_OK) {
         fprintf(stderr,"mem_console: button surface collection: %s\n",result.message);
         return MEM_CONSOLE_FRAME_FATAL;

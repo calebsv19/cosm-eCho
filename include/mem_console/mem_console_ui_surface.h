@@ -9,6 +9,7 @@ enum {
     MC_BUTTON_GRAPH_HOP, MC_BUTTON_GRAPH_ROLE, MC_BUTTON_ACTION,
     MC_BUTTON_LEGEND, MC_BUTTON_FONT, MC_BUTTON_OVERLAY
 };
+int mem_console_ui_text_event(MemConsoleState *state, const SDL_Event *event, MemConsoleAction *action);
 uint32_t mem_console_ui_surface_scope(const MemConsoleState *state);
 uint64_t mem_console_ui_surface_string_key(const char *text);
 KitUiButtonResult mem_console_ui_surface_button(KitUiContext *ui, MemConsoleState *state,

@@ -38,6 +38,7 @@ APP_SRCS := src/app/mem_console.c \
 	src/ui/mem_console_ui_common.c \
 	src/ui/mem_console_ui_text_frame.c \
 	src/ui/mem_console_ui_surface.c \
+	src/ui/mem_console_ui_text_edit.c \
 	src/ui/mem_console_ui_detail_panel.c \
 	src/ui/mem_console_ui_detail_relationships.c \
 	src/ui/mem_console_ui_detail_references.c \

@@ -68,6 +68,11 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
         return;
     }
 
+    if(mem_console_ui_text_event(state,event,keyboard_action)) {
+        mem_console_redraw_mark(state,MEM_CONSOLE_REDRAW_REASON_INPUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        if(state->text_edit_changed && state->text_edit.text==state->search_text)mark_search_input_changed(state);
+        return;
+    }
     if (!mem_console_workspace_authoring_host_active(&state->workspace_authoring) &&
         mem_console_ui_surface_event(state,render_ctx,ui_ctx,event,input)) {
         mem_console_redraw_mark(state,MEM_CONSOLE_REDRAW_REASON_INPUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);

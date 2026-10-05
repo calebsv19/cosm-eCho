@@ -7,6 +7,8 @@
 #include "kit_graph_struct.h"
 #include "mem_console_workspace_authoring.h"
 #include "kit_ui_surface.h"
+#include "kit_ui_text_edit.h"
+#include "kit_ui_focus_scope.h"
 
 enum {
     MEM_CONSOLE_LIST_FETCH_LIMIT = 96,
@@ -224,6 +226,10 @@ typedef struct MemConsoleState {
     int db_modal_open;
     int db_modal_create_mode;
     int db_modal_input_root_mode;
+    KitUiTextEdit text_edit;
+    int text_edit_changed;
+    KitUiFocusScope focus_scope;
+    MemConsoleInputTarget text_edit_target;
     int search_cursor;
     int title_edit_cursor;
     int body_edit_cursor;

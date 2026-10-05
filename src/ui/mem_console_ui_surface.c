@@ -83,7 +83,7 @@ int mem_console_ui_surface_event(MemConsoleState *state, KitRenderContext *rende
     if (!kit_ui_interaction_event_from_sdl(event,&e)) return 0;
     KitUiSurface *s=&state->button_surface;
     uint32_t scope=mem_console_ui_surface_scope(state);
-    kit_ui_surface_set_scope(s,scope);
+    if(kit_ui_focus_scope_sync(&state->focus_scope,s,scope,scope==4).code!=CORE_OK)return 1;
     if ((scope==5 || scope==6) && !state->db_modal_open) collect_authoring(state,render);
     if (e.type==KIT_UI_INTERACTION_KEY_DOWN && (state->button_keyboard_text ||
         ((scope==2 || scope==3 || scope==4) && !s->interaction.focused_id))) return 0;
