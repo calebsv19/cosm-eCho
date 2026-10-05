@@ -52,6 +52,9 @@ typedef struct MemConsoleWorkspaceAuthoringHost {
     char custom_preset_line[160];
 } MemConsoleWorkspaceAuthoringHost;
 
+int mem_console_workspace_authoring_apply_overlay_button(MemConsoleWorkspaceAuthoringHost *host,
+    struct MemConsoleState *state, KitRenderContext *render_ctx, KitUiContext *ui_ctx,
+    KitWorkspaceAuthoringOverlayButtonId button_id);
 int mem_console_workspace_authoring_apply_font_theme_button(MemConsoleWorkspaceAuthoringHost *host,
     struct MemConsoleState *state, KitRenderContext *render_ctx, KitUiContext *ui_ctx,
     KitWorkspaceAuthoringFontThemeButtonId button_id);

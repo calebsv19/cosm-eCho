@@ -278,6 +278,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
             kit_ui_point_in_rect(detail_title_row, input->mouse_x, input->mouse_y)) {
             float text_origin_x = detail_title_row.x + ui_ctx->style.padding;
             mem_console_input_target_set(state, MEM_CONSOLE_INPUT_TITLE_EDIT);
+        mem_console_ui_surface_text_focus(state);
             state->title_edit_cursor = mem_console_ui_cursor_index_for_click(state->title_edit_text,
                                                                              render_ctx,
                                                                              input->mouse_x,
@@ -544,6 +545,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
             }
 
             mem_console_input_target_set(state, MEM_CONSOLE_INPUT_BODY_EDIT);
+        mem_console_ui_surface_text_focus(state);
             state->body_edit_cursor = candidate_cursor;
             cursor = candidate_cursor;
             line_index = cursor / line_capacity;

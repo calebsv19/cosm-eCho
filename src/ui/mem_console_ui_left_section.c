@@ -377,7 +377,7 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
         edit_rect = (KitRenderRect){ button_row.x, button_row.y, half_width, button_row.height };
         folder_rect = (KitRenderRect){ button_row.x + half_width + gap, button_row.y, button_row.width - half_width - gap, button_row.height };
 
-        button_result = kit_ui_eval_button(edit_rect, input, 1103);
+        button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_LEFT, 1103, edit_rect, 1);
         if (button_result.clicked && *io_action == MEM_CONSOLE_ACTION_NONE) {
             *io_action = MEM_CONSOLE_ACTION_BEGIN_INPUT_ROOT_PICKER;
         }
@@ -390,7 +390,7 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
                                                    CORE_FONT_TEXT_SIZE_CAPTION);
         if (result.code != CORE_OK) return result;
 
-        button_result = kit_ui_eval_button(folder_rect, input, 1104);
+        button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_LEFT, 1104, folder_rect, 1);
         if (button_result.clicked && *io_action == MEM_CONSOLE_ACTION_NONE) {
             *io_action = MEM_CONSOLE_ACTION_PICK_INPUT_ROOT_FOLDER;
         }
@@ -421,7 +421,7 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
     {
         CoreResult result = kit_ui_stack_next(&top_layout, layout_cfg->left_reload_h, 0.0f, &row);
         if (result.code != CORE_OK) return result;
-        button_result = kit_ui_eval_button(row, input, 1);
+        button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_LEFT, 1100, row, 1);
         if (button_result.clicked) {
             *io_action = MEM_CONSOLE_ACTION_REFRESH;
         }
@@ -448,7 +448,7 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
         load_rect = (KitRenderRect){ button_row.x, button_row.y, half_width, button_row.height };
         new_rect = (KitRenderRect){ button_row.x + half_width + gap, button_row.y, button_row.width - half_width - gap, button_row.height };
 
-        button_result = kit_ui_eval_button(load_rect, input, 1101);
+        button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_LEFT, 1101, load_rect, 1);
         if (button_result.clicked && *io_action == MEM_CONSOLE_ACTION_NONE) {
             *io_action = MEM_CONSOLE_ACTION_BEGIN_DB_PICKER;
         }
@@ -461,7 +461,7 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
                                                    CORE_FONT_TEXT_SIZE_CAPTION);
         if (result.code != CORE_OK) return result;
 
-        button_result = kit_ui_eval_button(new_rect, input, 1102);
+        button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_LEFT, 1102, new_rect, 1);
         if (button_result.clicked && *io_action == MEM_CONSOLE_ACTION_NONE) {
             *io_action = MEM_CONSOLE_ACTION_BEGIN_DB_CREATE;
         }
@@ -525,6 +525,7 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
             kit_ui_point_in_rect(search_box, input->mouse_x, input->mouse_y)) {
             float text_origin_x = search_box.x + 6.0f + ui_ctx->style.padding;
             mem_console_input_target_set(state, MEM_CONSOLE_INPUT_SEARCH);
+        mem_console_ui_surface_text_focus(state);
             state->search_cursor = mem_console_ui_cursor_index_for_click(state->search_text,
                                                                           render_ctx,
                                                                           input->mouse_x,
@@ -805,9 +806,7 @@ CoreResult mem_console_ui_draw_left_section(KitRenderContext *render_ctx,
 
                 (void)mem_console_left_panel_derive_item_label(&render_state, &render_storage, i);
 
-                button_result = kit_ui_eval_button(item_rect,
-                                                   input,
-                                                   !has_any_edit_mode);
+                button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_ITEM, (uint64_t)state->visible_items[i].id, item_rect, !has_any_edit_mode);
                 if (button_result.clicked) {
                     int64_t clicked_item_id = state->visible_items[i].id;
                     uint64_t now_ms = SDL_GetTicks64();

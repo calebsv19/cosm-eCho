@@ -1,4 +1,5 @@
 #include "mem_console_app_internal.h"
+#include "mem_console_ui_surface.h"
 
 static void mark_search_input_changed(MemConsoleState *state);
 static void append_graph_edge_limit_digits(MemConsoleState *state, const char *text);
@@ -67,6 +68,17 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
         return;
     }
 
+    if (!mem_console_workspace_authoring_host_active(&state->workspace_authoring) &&
+        mem_console_ui_surface_event(state,render_ctx,ui_ctx,event,input)) {
+        mem_console_redraw_mark(state,MEM_CONSOLE_REDRAW_REASON_INPUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
+        return;
+    }
+    if (event->type==SDL_MOUSEWHEEL || (event->type==SDL_WINDOWEVENT &&
+        (event->window.event==SDL_WINDOWEVENT_RESIZED || event->window.event==SDL_WINDOWEVENT_SIZE_CHANGED))) {
+        /* Do not route queued pointer events against pre-scroll/pre-resize rows. */
+        kit_ui_surface_begin(&state->button_surface,mem_console_ui_surface_scope(state));
+        (void)kit_ui_surface_end(&state->button_surface);
+    }
     if (mem_console_workspace_authoring_host_handle_sdl_event(
             &state->workspace_authoring,
             state,

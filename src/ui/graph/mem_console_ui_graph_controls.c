@@ -378,7 +378,7 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
                                   &graph_hops_label_rect,
                                   graph_hop_btn_rects);
 
-        button_result = kit_ui_eval_button(graph_labels_toggle_rect, input, 1);
+        button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_GRAPH_SETTING, 1, graph_labels_toggle_rect, 1);
         if (button_result.clicked) {
             state->graph_edge_labels_enabled = state->graph_edge_labels_enabled ? 0 : 1;
             mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_CONTENT);
@@ -438,6 +438,7 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
             kit_ui_point_in_rect(graph_edge_input_rect, input->mouse_x, input->mouse_y)) {
             float text_origin_x = graph_edge_input_rect.x + 6.0f + ui_ctx->style.padding;
             mem_console_input_target_set(state, MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT);
+        mem_console_ui_surface_text_focus(state);
             state->graph_edge_limit_cursor = mem_console_ui_cursor_index_for_click(state->graph_edge_limit_text,
                                                                                    render_ctx,
                                                                                    input->mouse_x,
@@ -447,7 +448,7 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
             graph_edge_input_active = 1;
         }
 
-        button_result = kit_ui_eval_button(graph_edge_apply_rect, input, 1);
+        button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_GRAPH_SETTING, 2, graph_edge_apply_rect, 1);
         if (button_result.clicked) {
             int parsed_limit = mem_console_graph_edge_limit_parse(state->graph_edge_limit_text,
                                                                   state->graph_query_edge_limit);
@@ -494,7 +495,7 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
             } else if (i == graph_hops_hovered_index) {
                 hop_state = KIT_UI_STATE_HOVERED;
             }
-            button_result = kit_ui_eval_button(graph_hop_btn_rects[i], input, enabled);
+            button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_GRAPH_HOP, (uint64_t)(MEM_CONSOLE_GRAPH_HOPS_MIN+i), graph_hop_btn_rects[i], enabled);
             if (button_result.clicked) {
                 state->graph_query_hops = mem_console_graph_hops_clamp(MEM_CONSOLE_GRAPH_HOPS_MIN + i);
                 if (*io_action == MEM_CONSOLE_ACTION_NONE) {
@@ -647,7 +648,7 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
             int selected = 0;
             CoreFontRoleId font_role = CORE_FONT_ROLE_UI_MONO_SMALL;
             CoreFontTextSizeTier text_tier = CORE_FONT_TEXT_SIZE_CAPTION;
-            button_result = kit_ui_eval_button(graph_role_btn_rects[i], input, 1);
+            button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_GRAPH_ROLE, (uint64_t)i, graph_role_btn_rects[i], 1);
 
             if (i < graph_role_button_count) {
                 if (i == 0) {
@@ -739,6 +740,7 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
     } else {
         if (state->input_target == MEM_CONSOLE_INPUT_GRAPH_EDGE_LIMIT) {
             mem_console_input_target_set(state, MEM_CONSOLE_INPUT_SEARCH);
+        mem_console_ui_surface_text_focus(state);
         }
         result = kit_ui_stack_next(right_layout, layout_cfg->graph_collapsed_hint_h, 0.0f, &graph_hint_row);
         if (result.code != CORE_OK) {
@@ -851,7 +853,7 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
 
     for (i = 0; i < action_button_count; ++i) {
         KitUiWidgetState draw_state;
-        button_result = kit_ui_eval_button(action_btn_rects[i], input, actions[i].enabled);
+        button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_ACTION, (uint64_t)actions[i].action, action_btn_rects[i], actions[i].enabled);
         draw_state = button_result.state;
         if (actions[i].selected && draw_state == KIT_UI_STATE_NORMAL) {
             draw_state = KIT_UI_STATE_ACTIVE;

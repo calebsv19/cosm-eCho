@@ -353,6 +353,7 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
     if (input->mouse_released &&
         kit_ui_point_in_rect(input_rect, input->mouse_x, input->mouse_y)) {
         mem_console_input_target_set(state, MEM_CONSOLE_INPUT_DB_PATH);
+        mem_console_ui_surface_text_focus(state);
     }
 
     if (input->mouse_pressed && kit_ui_point_in_rect(input_rect, input->mouse_x, input->mouse_y)) {
@@ -363,6 +364,7 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
                                                                  CORE_FONT_ROLE_UI_REGULAR,
                                                                  CORE_FONT_TEXT_SIZE_PARAGRAPH);
         mem_console_input_target_set(state, MEM_CONSOLE_INPUT_DB_PATH);
+        mem_console_ui_surface_text_focus(state);
         mem_console_db_picker_begin_selection(state, visible_start + (local_cursor - visible_bias > 0 ? local_cursor - visible_bias : 0));
     } else if (state->db_modal_drag_select_active && input->mouse_down) {
         int local_cursor = mem_console_ui_cursor_index_for_click(state->db_modal_visible_text,
@@ -494,10 +496,9 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
                     list_rect.width - 12.0f,
                     list_row_h
                 };
-                int button_id = 4200 + list_index;
                 int selected = list_index == state->db_picker_selected_index;
                 KitUiWidgetState draw_state;
-                button_result = kit_ui_eval_button(row_rect, input, button_id);
+                button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_DB_ROW, mem_console_ui_surface_string_key(state->db_picker_entry_paths[list_index]), row_rect, 1);
                 if (button_result.clicked) {
                     state->db_picker_selected_index = list_index;
                     (void)snprintf(state->db_modal_text, sizeof(state->db_modal_text), "%s", state->db_picker_entry_paths[list_index]);
@@ -535,7 +536,7 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
     cancel_rect = (KitRenderRect){ buttons_rect.x, buttons_rect.y, button_width, buttons_rect.height };
     apply_rect = (KitRenderRect){ buttons_rect.x + button_width + button_gap, buttons_rect.y, buttons_rect.width - button_width - button_gap, buttons_rect.height };
 
-    button_result = kit_ui_eval_button(cancel_rect, input, 4101);
+    button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_DB_ACTION, 4101, cancel_rect, 1);
     if (button_result.clicked && *out_action == MEM_CONSOLE_ACTION_NONE) {
         *out_action = MEM_CONSOLE_ACTION_CANCEL_DB_PICKER;
     }
@@ -550,7 +551,7 @@ static CoreResult mem_console_ui_draw_db_modal(KitRenderContext *render_ctx,
         return result;
     }
 
-    button_result = kit_ui_eval_button(apply_rect, input, 4102);
+    button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_DB_ACTION, 4102, apply_rect, 1);
     if (button_result.clicked && *out_action == MEM_CONSOLE_ACTION_NONE) {
         *out_action = MEM_CONSOLE_ACTION_CONFIRM_DB_PICKER;
     }
@@ -598,6 +599,12 @@ int run_frame(KitRenderContext *render_ctx,
     }
     layout_cfg = mem_console_layout_config_get();
 
+    if (state->button_surface_error.code!=CORE_OK) {
+        fprintf(stderr,"mem_console: button surface: %s\n",state->button_surface_error.message);
+        return MEM_CONSOLE_FRAME_FATAL;
+    }
+    mem_console_ui_text_frame_begin();
+    kit_ui_surface_begin(&state->button_surface,mem_console_ui_surface_scope(state));
     *out_action = MEM_CONSOLE_ACTION_NONE;
     draw_width = frame_width;
     draw_height = frame_height;
@@ -855,6 +862,16 @@ int run_frame(KitRenderContext *render_ctx,
         return 1;
     }
 
+    result=kit_ui_surface_end(&state->button_surface);
+    if (result.code!=CORE_OK) {
+        fprintf(stderr,"mem_console: button surface collection: %s\n",result.message);
+        return MEM_CONSOLE_FRAME_FATAL;
+    }
+    result=kit_ui_interaction_draw_focus(&frame,&state->button_surface.interaction,
+        state->button_surface.controls,state->button_surface.count,(KitRenderColor){80,180,255,255});
+    if (result.code!=CORE_OK) return MEM_CONSOLE_FRAME_FATAL;
+    if (kit_ui_surface_pending(&state->button_surface))
+        mem_console_redraw_mark(state,MEM_CONSOLE_REDRAW_REASON_INPUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
     result = kit_render_end_frame(render_ctx, &frame);
     if (result.code != CORE_OK) {
         fprintf(stderr, "mem_console: kit_render_end_frame failed: %d\n", (int)result.code);

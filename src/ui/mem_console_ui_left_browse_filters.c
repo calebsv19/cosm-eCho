@@ -6,7 +6,7 @@
 
 static CoreResult draw_browse_filter_button(KitUiContext *ui_ctx,
                                             KitRenderFrame *frame,
-                                            const KitUiInputState *input,
+                                            MemConsoleState *state,
                                             KitRenderRect rect,
                                             const char *label,
                                             int active,
@@ -14,7 +14,7 @@ static CoreResult draw_browse_filter_button(KitUiContext *ui_ctx,
                                             int widget_id,
                                             MemConsoleAction action,
                                             MemConsoleAction *io_action) {
-    KitUiButtonResult button = kit_ui_eval_button(rect, input, enabled);
+    KitUiButtonResult button = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_LEFT, (uint64_t)widget_id, rect, enabled);
     KitUiWidgetState draw_state = button.state;
 
     if (active) {
@@ -23,7 +23,6 @@ static CoreResult draw_browse_filter_button(KitUiContext *ui_ctx,
     if (button.clicked && io_action && *io_action == MEM_CONSOLE_ACTION_NONE) {
         *io_action = action;
     }
-    (void)widget_id;
     return mem_console_ui_draw_button_custom(ui_ctx,
                                              frame,
                                              rect,
@@ -104,7 +103,7 @@ CoreResult mem_console_ui_left_draw_browse_filters(KitRenderContext *render_ctx,
 
     result = draw_browse_filter_button(ui_ctx,
                                        frame,
-                                       input,
+                                       state,
                                        pin_rect,
                                        "PINNED",
                                        state->browse_pinned_only,
@@ -115,7 +114,7 @@ CoreResult mem_console_ui_left_draw_browse_filters(KitRenderContext *render_ctx,
     if (result.code != CORE_OK) return result;
     result = draw_browse_filter_button(ui_ctx,
                                        frame,
-                                       input,
+                                       state,
                                        can_rect,
                                        "CANON",
                                        state->browse_canonical_only,
@@ -126,7 +125,7 @@ CoreResult mem_console_ui_left_draw_browse_filters(KitRenderContext *render_ctx,
     if (result.code != CORE_OK) return result;
     result = draw_browse_filter_button(ui_ctx,
                                        frame,
-                                       input,
+                                       state,
                                        kind_rect,
                                        kind_label,
                                        state->browse_kind_index != 0,

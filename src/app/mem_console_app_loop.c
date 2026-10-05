@@ -432,6 +432,7 @@ static MemConsoleLoopRenderPhaseResult mem_console_loop_render_phase(const MemCo
                                     run_state->frame_height,
                                     frame->wheel_y,
                                     frame->frame_reasons);
+    ctx->state->button_defer_actions = frame->keyboard_action != MEM_CONSOLE_ACTION_NONE;
     mem_console_render_submit_frame(ctx, &render_derive, &render_submit);
     frame->frame_result = render_submit.frame_result;
     frame->ui_action = render_submit.ui_action;

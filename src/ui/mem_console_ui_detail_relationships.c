@@ -103,6 +103,7 @@ static CoreResult relationship_draw_add_controls(KitRenderContext *render_ctx,
     if (input->mouse_released && kit_ui_point_in_rect(input_rect, input->mouse_x, input->mouse_y)) {
         float text_origin_x = input_rect.x + ui_ctx->style.padding;
         mem_console_input_target_set(state, MEM_CONSOLE_INPUT_RELATIONSHIP_TARGET);
+        mem_console_ui_surface_text_focus(state);
         state->relationship_target_cursor = mem_console_ui_cursor_index_for_click(state->relationship_target_text,
                                                                                   render_ctx,
                                                                                   input->mouse_x,
@@ -111,9 +112,7 @@ static CoreResult relationship_draw_add_controls(KitRenderContext *render_ctx,
                                                                                   CORE_FONT_TEXT_SIZE_CAPTION);
     }
 
-    button = kit_ui_eval_button(add_rect,
-                                input,
-                                navigation_enabled && state->selected_item_id > 0 &&
+    button = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_REL_ADD, 1, add_rect, navigation_enabled && state->selected_item_id > 0 &&
                                     state->relationship_target_text[0] != '\0');
     if (button.clicked && io_action && *io_action == MEM_CONSOLE_ACTION_NONE) {
         *io_action = MEM_CONSOLE_ACTION_ADD_RELATIONSHIP;
@@ -354,9 +353,7 @@ CoreResult mem_console_ui_detail_draw_relationships(KitRenderContext *render_ctx
                 delete_rect = (KitRenderRect){0};
             }
 
-            button = kit_ui_eval_button(nav_rect,
-                                        input,
-                                        navigation_enabled);
+            button = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_REL_NAV, (uint64_t)item->link_id, nav_rect, navigation_enabled);
             if (item->neighbor_item_id == state->selected_item_id) {
                 button.state = KIT_UI_STATE_ACTIVE;
             }
@@ -379,7 +376,7 @@ CoreResult mem_console_ui_detail_draw_relationships(KitRenderContext *render_ctx
                 return result;
             }
             if (kind_rect.width > 0.0f && delete_rect.width > 0.0f) {
-                kind_button = kit_ui_eval_button(kind_rect, input, navigation_enabled);
+                kind_button = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_REL_KIND, (uint64_t)item->link_id, kind_rect, navigation_enabled);
                 if (kind_button.clicked && io_action && *io_action == MEM_CONSOLE_ACTION_NONE) {
                     state->relationship_action_link_id = item->link_id;
                     *io_action = MEM_CONSOLE_ACTION_CYCLE_RELATIONSHIP_KIND;
@@ -396,7 +393,7 @@ CoreResult mem_console_ui_detail_draw_relationships(KitRenderContext *render_ctx
                     return result;
                 }
 
-                delete_button = kit_ui_eval_button(delete_rect, input, navigation_enabled);
+                delete_button = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_REL_DELETE, (uint64_t)item->link_id, delete_rect, navigation_enabled);
                 if (delete_button.clicked && io_action && *io_action == MEM_CONSOLE_ACTION_NONE) {
                     state->relationship_action_link_id = item->link_id;
                     *io_action = MEM_CONSOLE_ACTION_REMOVE_RELATIONSHIP;

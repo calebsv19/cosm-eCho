@@ -1,4 +1,5 @@
 #include "mem_console_workspace_authoring.h"
+#include "mem_console_ui_surface.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -242,7 +243,7 @@ static void mem_console_workspace_authoring_cycle_overlay(MemConsoleWorkspaceAut
     mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_LAYOUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
 }
 
-static int mem_console_workspace_authoring_apply_overlay_button(MemConsoleWorkspaceAuthoringHost *host,
+int mem_console_workspace_authoring_apply_overlay_button(MemConsoleWorkspaceAuthoringHost *host,
                                                                 MemConsoleState *state,
                                                                 KitRenderContext *render_ctx,
                                                                 KitUiContext *ui_ctx,
@@ -334,30 +335,6 @@ int mem_console_workspace_authoring_apply_font_theme_button(MemConsoleWorkspaceA
     return 1;
 }
 
-static int mem_console_workspace_authoring_handle_overlay_click(MemConsoleWorkspaceAuthoringHost *host,
-                                                                MemConsoleState *state,
-                                                                KitRenderContext *render_ctx,
-                                                                KitUiContext *ui_ctx,
-                                                                int x,
-                                                                int y) {
-    KitWorkspaceAuthoringOverlayButton buttons[4];
-    KitWorkspaceAuthoringOverlayButtonId hit = KIT_WORKSPACE_AUTHORING_OVERLAY_BUTTON_NONE;
-    uint32_t count;
-
-    if (!host || !host->active || host->viewport_width == 0u) {
-        return 0;
-    }
-
-    count = kit_workspace_authoring_ui_build_overlay_buttons(
-        (int)host->viewport_width,
-        1,
-        mem_console_workspace_authoring_host_pane_overlay_active(host),
-        buttons,
-        (uint32_t)(sizeof(buttons) / sizeof(buttons[0])));
-    hit = kit_workspace_authoring_ui_overlay_hit_test(buttons, count, (float)x, (float)y);
-    return mem_console_workspace_authoring_apply_overlay_button(host, state, render_ctx, ui_ctx, hit);
-}
-
 int mem_console_workspace_authoring_host_handle_sdl_event(MemConsoleWorkspaceAuthoringHost *host,
                                                           MemConsoleState *state,
                                                           KitRenderContext *render_ctx,
@@ -372,8 +349,7 @@ int mem_console_workspace_authoring_host_handle_sdl_event(MemConsoleWorkspaceAut
     }
 
     mem_console_workspace_authoring_clear_event_flags(host);
-    if (mem_console_workspace_authoring_interaction_event(host, state, render_ctx, ui_ctx,
-                                                          event, text_entry_active)) {
+    if (host->active && mem_console_ui_surface_event(state,render_ctx,ui_ctx,event,NULL)) {
         mem_console_workspace_authoring_note_consumed(host, 0);
         return 1;
     }
@@ -393,17 +369,8 @@ int mem_console_workspace_authoring_host_handle_sdl_event(MemConsoleWorkspaceAut
         return host->active ? 1 : 0;
     }
 
-    if (event->type == SDL_MOUSEBUTTONDOWN &&
-        event->button.button == SDL_BUTTON_LEFT &&
-        host->active) {
-        int overlay_hit = mem_console_workspace_authoring_handle_overlay_click(host,
-                                                                               state,
-                                                                               render_ctx,
-                                                                               ui_ctx,
-                                                                               event->button.x,
-                                                                               event->button.y);
-        mem_console_workspace_authoring_note_consumed(host, overlay_hit ? 0 : 1);
-        return 1;
+    if (event->type == SDL_MOUSEBUTTONDOWN || event->type == SDL_MOUSEBUTTONUP) {
+        return host->active ? 1 : 0;
     }
 
     if (event->type != SDL_KEYDOWN) {

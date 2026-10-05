@@ -535,7 +535,7 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
                                          ? CORE_THEME_COLOR_TEXT_PRIMARY
                                          : CORE_THEME_COLOR_TEXT_MUTED;
         label_text_cmd.transform = kit_render_identity_transform();
-        result = kit_render_push_text(frame, &label_text_cmd);
+        result = mem_console_ui_push_text(frame, &label_text_cmd);
         if (result.code != CORE_OK) {
             return result;
         }
@@ -739,7 +739,7 @@ CoreResult mem_console_ui_graph_draw_preview(const KitRenderContext *render_ctx,
             text_cmd.text_tier = CORE_FONT_TEXT_SIZE_CAPTION;
             text_cmd.color_token = text_color_token;
             text_cmd.transform = kit_render_identity_transform();
-            result = kit_render_push_text(frame, &text_cmd);
+            result = mem_console_ui_push_text(frame, &text_cmd);
             if (result.code != CORE_OK) {
                 return result;
             }

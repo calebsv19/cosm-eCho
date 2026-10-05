@@ -166,7 +166,7 @@ CoreResult draw_project_pod_overlays(const KitRenderContext *render_ctx,
             text_cmd.text_tier = CORE_FONT_TEXT_SIZE_CAPTION;
             text_cmd.color_token = CORE_THEME_COLOR_TEXT_MUTED;
             text_cmd.transform = kit_render_identity_transform();
-            result = kit_render_push_text(frame, &text_cmd);
+            result = mem_console_ui_push_text(frame, &text_cmd);
             if (result.code != CORE_OK) {
                 return result;
             }
@@ -299,13 +299,12 @@ CoreResult draw_graph_edge_legend(KitUiContext *ui_ctx,
         }
     }
 
-    if (hovered_row >= 0 &&
-        input &&
-        input->mouse_released) {
-        clicked_row = hovered_row;
-        if (out_click_consumed) {
-            *out_click_consumed = 1;
-        }
+    for (i=0;i<row_count;++i) {
+        KitRenderRect row_rect={legend_inner.x+4.0f,
+            legend_inner.y+pad+title_h+1.0f+(float)i*row_h,legend_inner.width-8.0f,row_h};
+        uint64_t key=mem_console_ui_surface_string_key(i==0?"ALL":rows[i]->kind);
+        KitUiButtonResult button=mem_console_ui_surface_button(ui_ctx,state,MC_BUTTON_LEGEND,key,row_rect,1);
+        if (button.clicked) { clicked_row=i; if(out_click_consumed) *out_click_consumed=1; }
     }
 
     if (clicked_row >= 0) {

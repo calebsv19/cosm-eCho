@@ -113,10 +113,13 @@ static CoreResult draw_project_chip(KitUiContext *ui_ctx,
         return result;
     }
 
+    const char *owned;
+    CoreResult text_result=mem_console_ui_frame_text(label,&owned);
+    if(text_result.code!=CORE_OK) return text_result;
     return kit_ui_draw_label_custom(ui_ctx,
                                     frame,
                                     rect,
-                                    label,
+                                    owned,
                                     text_token,
                                     CORE_FONT_ROLE_UI_REGULAR,
                                     CORE_FONT_TEXT_SIZE_CAPTION);
@@ -286,7 +289,7 @@ CoreResult mem_console_ui_left_draw_project_filter_chips(KitUiContext *ui_ctx,
             continue;
         }
 
-        button_result = kit_ui_eval_button(chip_rect, input, input_enabled);
+        button_result = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_PROJECT, mem_console_ui_surface_string_key(project_key), chip_rect, input_enabled);
         if (!project_key || project_key[0] == '\0') {
             if (state->selected_project_count == 0) {
                 button_result.state = KIT_UI_STATE_ACTIVE;

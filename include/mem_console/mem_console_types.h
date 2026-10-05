@@ -6,6 +6,7 @@
 #include "core_memdb.h"
 #include "kit_graph_struct.h"
 #include "mem_console_workspace_authoring.h"
+#include "kit_ui_surface.h"
 
 enum {
     MEM_CONSOLE_LIST_FETCH_LIMIT = 96,
@@ -150,6 +151,10 @@ typedef struct MemConsoleRelationshipItem {
 } MemConsoleRelationshipItem;
 
 typedef struct MemConsoleState {
+    KitUiSurface button_surface;
+    CoreResult button_surface_error;
+    int button_keyboard_text;
+    int button_defer_actions;
     const char *db_path;
     char db_path_storage[1024];
     char input_root[1024];

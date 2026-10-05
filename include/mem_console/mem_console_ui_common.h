@@ -3,6 +3,11 @@
 
 #include "mem_console_state.h"
 #include "kit_ui.h"
+#include "mem_console_ui_surface.h"
+
+void mem_console_ui_text_frame_begin(void);
+CoreResult mem_console_ui_frame_text(const char *source, const char **out);
+CoreResult mem_console_ui_push_text(KitRenderFrame *frame, const KitRenderTextCommand *command);
 
 int mem_console_ui_estimate_char_width_px(CoreFontTextSizeTier text_tier);
 int mem_console_ui_clamp_cursor_for_text(const char *text, int cursor);

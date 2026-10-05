@@ -141,7 +141,10 @@ CoreResult mem_console_ui_draw_info_line_custom(KitUiContext *ui_ctx,
     if (text[0] == '\0') {
         return core_result_ok();
     }
-    return kit_ui_draw_label_custom(ui_ctx, frame, rect, text, token, font_role, text_tier);
+    const char *owned;
+    CoreResult result=mem_console_ui_frame_text(text,&owned);
+    if (result.code!=CORE_OK) return result;
+    return kit_ui_draw_label_custom(ui_ctx, frame, rect, owned, token, font_role, text_tier);
 }
 
 CoreResult mem_console_ui_draw_button_custom(KitUiContext *ui_ctx,
@@ -157,7 +160,10 @@ CoreResult mem_console_ui_draw_button_custom(KitUiContext *ui_ctx,
     if (!ui_ctx || !frame || !text) {
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid button draw request" };
     }
-    kit_ui_button_spec_init(&spec, text);
+    const char *owned;
+    CoreResult result=mem_console_ui_frame_text(text,&owned);
+    if (result.code!=CORE_OK) return result;
+    kit_ui_button_spec_init(&spec, owned);
     spec.state.hovered = state == KIT_UI_STATE_HOVERED;
     spec.state.pressed = state == KIT_UI_STATE_ACTIVE;
     spec.state.disabled = state == KIT_UI_STATE_DISABLED;
