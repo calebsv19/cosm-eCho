@@ -22,7 +22,7 @@ Scope: active build wiring and integration across `ball_bounce_sim`, `behavior_s
 - `core_viewport2d`: `0.2.2`
 - `core_viewport3d`: `0.1.0`
 - `core_screen_pick`: `0.1.0`
-- `kit_ui`: `0.11.2`
+- `kit_ui`: `0.11.3`
 - `core_units`: `0.2.0`
 - `core_object`: `0.1.1`
 - `core_authored_texture`: `0.2.0`
@@ -52,7 +52,7 @@ Scope: active build wiring and integration across `ball_bounce_sim`, `behavior_s
 
 ## Non-Core GPU Runtime Versions
 - `vk_runtime`: `0.6.0` (committed shared source)
-- `vk_renderer`: `1.3.2` (committed shared source)
+- `vk_renderer`: `1.4.0` (committed shared source)
 
 ## New Bootstrap Modules
 - `vk_runtime`: shared SDL-independent Vulkan runtime foundation (`v0.6.0`) for
@@ -504,3 +504,49 @@ no shared API/version change or distributed worker claim follows.
 - `workspace_sandbox` corner/seam lane C3 has started with first rewrite slice: `Alt` orthogonal-drag threshold (`24px`) arms `promote_center_cross`, with hard-cancel and console reason on invalid rewrites.
 - future-work note: `shared/docs/memory_db_autonomous_maintenance/` (Plan 01-03) is planning-only and not yet counted as implemented runtime/adoption state in this snapshot.
 - detailed per-program connective-tissue snapshot now lives in `shared/docs/ecosystem_north_star_docs/44_program_library_connective_tissue_state.md`.
+
+## 2026-10-04 Rounded UI Rendering — Main Edit First Hosts
+
+Committed shared source `e588734` provides `vk_renderer 1.4.0`,
+`kit_render 0.14.5`, and `kit_ui 0.11.3`; `vk_runtime` stays at `0.6.0`.
+Positive rectangle radii now reach solid rounded Vulkan geometry with
+scale-aware edge coverage. Replaced frame vertex allocations remain alive
+through the owning frame fence. The real-image gate checks 1x/2x geometry,
+clipping, alpha, nested borders, shared button appearance, forced growth,
+and fence reuse; renderer lifecycle/resize checks also pass.
+
+WorkspaceSandbox Main Edit `d9b5982` imports shared `51b331a` and adopts shared
+compact rounded Font/Theme, floating Workspace HUD and top-level authoring
+buttons. `kit_workspace_authoring 0.5.2` delegates HUD drawing to the existing
+`kit_ui` appearance/state resolver. The widget kit remains UI-only. MemConsole Main Edit `7120201`
+uses the same appearance/state resolver in its common button helper, with
+measured horizontal caption centering. Managed
+subtree imports are separate dependency commits. Both app unit/headless,
+Vulkan, and isolated Main Edit package checks pass. Canonical app checkouts
+remain on their previous snapshots, so earlier program matrix entries describe
+those canonical states. No app VERSION bump or publication occurred.
+
+See [the shared rounded-rendering contract](UI_ROUNDED_RENDERING.md).
+
+## 2026-10-04 DataLab Main Edit Shared Button Adoption
+
+Shared `5b017d4` adds `kit_ui 0.12.0`'s optional direct-SDL appearance adapter.
+The generic kit archive remains independent of SDL. The new path reuses the
+existing spec/theme state resolver, compact rounded appearance, nested
+outline/fill geometry, and synchronous measured caption placement.
+
+DataLab Main Edit `d640b7d` imports that committed snapshot and routes playback,
+top-level authoring, Font/Theme/custom-theme, and Recent Directories controls
+through one small presentation adapter. The directory control composes its
+caption above a separate path readout. This lane imports `kit_render 0.14.5`,
+`kit_workspace_authoring 0.5.2`, `vk_renderer 1.4.0`, and `vk_runtime 0.6.0`.
+Its clean build, targeted contracts, full stable/headless smoke, native Vulkan
+resize/restart and real-host captures, and isolated Main Edit packages pass.
+
+The separate Desktop Main Edit package is installed with `com.cosm.scope.main-edit`
+and `DataLab-Main-Edit` runtime/log roots. Canonical DataLab stays at accepted
+`4bf29e6`, VERSION 0.4.0; its installed stable Desktop bundle remains 0.3.6 and
+byte-for-byte unchanged. The UI is still SDL-rasterized and Vulkan-presented;
+native image rendering retains its own path. Input/action/persistence semantics
+remain app-owned. Source adoption, program release, and Linux qualification are
+separate. Other apps retain their previously imported module snapshots.

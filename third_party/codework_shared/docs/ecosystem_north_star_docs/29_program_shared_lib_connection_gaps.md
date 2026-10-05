@@ -1066,3 +1066,48 @@ When any app materially changes shared-lib usage:
 - Update this doc first (gap state + next steps).
 - Update `11_version_compat_matrix.md` if minimum required versions changed.
 - Update `SHARED_LIBS_CURRENT_STATE.md` if adoption level changed.
+
+## Rounded UI First-Host Adoption (2026-10-04)
+
+- WorkspaceSandbox Main Edit: `Partial` shared compact rounded button drawing
+  now covers Font/Theme presets and controls through `kit_ui 0.11.3`,
+  `kit_render 0.14.5`, and `vk_renderer 1.4.0`. Other host-local HUD/authoring
+  controls remain a separate migration boundary.
+- MemConsole Main Edit: `Partial` common DB/browser/graph inspector buttons now
+  use the same shared appearance/state resolver. App hit testing, selection,
+  DB mutations, refresh scheduling, and caption anchors remain host-owned.
+- Renderer contract: positive rounded rectangles are now proven by actual
+  pixels at 1x/2x, including clipping/borders/alpha and buffer growth/fence reuse.
+  Transform fidelity, texture UV/tint, shared focus/navigation, and pane/layout
+  unification remain later slices. This slice proves macOS/MoltenVK only.
+- Canonical app adoption and release rollout remain pending separate decisions;
+  no other program's working lane was updated.
+
+### WorkspaceSandbox Main Edit HUD follow-up (2026-10-04)
+
+`d9b5982` imports shared `51b331a` and adopts `kit_workspace_authoring 0.5.2`
+for top-level compact rounded controls. Font/Theme and both floating Workspace
+HUD tabs share one small host caption adapter. Clean build, shared kit contracts,
+app regression/headless/visual checks, validation-clean native Vulkan resize and
+Main Edit package/installed-app review pass. MemConsole's earlier common-button
+adoption is unchanged; its authoring HUD has not yet imported this follow-up.
+Panel chrome, module-picker rows, retained focus/capture, full render-command
+fidelity and Linux presentation remain separate gaps. Canonical app rows remain
+on their existing snapshots; no app VERSION or publication changes.
+
+## DataLab Rounded Button Adoption — 2026-10-04 Main Edit
+
+The bounded appearance gap is closed in retained Main Edit `d640b7d` using
+managed shared `5b017d4`. `kit_ui 0.12.0`'s optional SDL adapter carries the
+existing shared state/appearance contract into playback, authoring top bar,
+Font/Theme/custom-theme, and Recent Directories buttons. Captions use common
+measurement; the two-line directory title/path no longer overlap. Shared pixel
+checks and host build/contract/stable/headless/native/package checks pass.
+
+Remaining gaps are narrower: retained focus/capture and keyboard navigation,
+transform and texture UV/tint command conformance, generalized pane editing,
+and native Linux presentation qualification still need independent slices.
+DataLab's UI remains CPU-composed in its SDL compatibility canvas; the existing
+native image-session path does not imply all-UI native GPU adoption. Broader
+picker/list/pane chrome stays app-specific. No other app or canonical/release
+snapshot was migrated by this cohort.
