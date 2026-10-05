@@ -30,3 +30,10 @@ keyboard and press-origin capture contract, host ownership, current shared pin,
 and `make ui-interaction-self-test`. This is the retained Main Edit Font/Theme
 surface only; ordinary runtime controls, text entry and panes retain their own
 input paths.
+
+
+## 2026-10-05 bounded text editing and modal focus
+
+Search, title, body, DB/input-root path, graph edge limit and relationship target now use `kit_ui 0.15.1` bounded editing in Main Edit. Title Enter saves and Escape cancels; body Enter inserts a newline and Ctrl/Cmd+Enter saves; DB Enter confirms and Escape cancels. Search Enter refreshes; numeric Enter uses the existing graph/relationship actions. Numeric fields reject a mixed invalid paste atomically. Only committed search edits trigger debounce invalidation. Opening a DB modal ends title/body editing by existing host policy; closing it returns to Search, not an abandoned text editor.
+
+See [Text editing and modal focus](ui_text_focus.md) for exact ownership, tests and limitations. Text presentation, native IME/platform acceptance, pane composition and wider program adoption remain later slices. Earlier dated milestones describe their historical state.
