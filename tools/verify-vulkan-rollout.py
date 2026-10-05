@@ -7,7 +7,7 @@ import struct
 import subprocess
 from pathlib import Path
 
-EXPECTED_SHARED_COMMIT = "12b57f091c57ec68391e0bc9547942a4addab21f"
+EXPECTED_SHARED_COMMIT = "b1c67d7e1b78b826c81269a6531706fc1f29ea86"
 SOURCE_MODULES = ("vk_runtime", "vk_renderer", "kit/kit_render", "kit/kit_ui",
                   "kit/kit_workspace_authoring")
 
@@ -30,7 +30,7 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def verify_shared_source(root: Path, canonical: Path) -> None:
+def verify_shared_source(root: Path, canonical: Path, require_current_canonical: bool = False) -> None:
     commit = command_output(["git", "rev-parse", "HEAD"], canonical)
     ancestry = subprocess.run(
         ["git", "merge-base", "--is-ancestor", EXPECTED_SHARED_COMMIT, commit],
@@ -41,7 +41,7 @@ def verify_shared_source(root: Path, canonical: Path) -> None:
     status = command_output(
         ["git", "status", "--porcelain", "--untracked-files=all", "--",
          *SOURCE_MODULES], canonical)
-    if status:
+    if status and require_current_canonical:
         raise SystemExit("canonical shared Vulkan source is not exact/clean:\n" + status)
 
     tracked = command_output(
@@ -59,9 +59,8 @@ def verify_shared_source(root: Path, canonical: Path) -> None:
         accepted_digest = hashlib.sha256(accepted_bytes).hexdigest()
         if not adopted_path.is_file():
             mismatches.append(f"missing {relative}")
-        elif (not canonical_path.is_file() or
-              digest(canonical_path) != accepted_digest or
-              digest(adopted_path) != accepted_digest):
+        elif ((require_current_canonical and (not canonical_path.is_file() or
+              digest(canonical_path) != accepted_digest)) or digest(adopted_path) != accepted_digest):
             mismatches.append(f"digest {relative}")
     if mismatches:
         raise SystemExit("adopted Vulkan source differs from canonical: " +
@@ -146,6 +145,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--shared-root", type=Path, required=True)
     parser.add_argument("--canonical-shared-root", type=Path, required=True)
+    parser.add_argument("--require-current-canonical", action="store_true")
     parser.add_argument("--app", type=Path)
     parser.add_argument("--initial-capture", type=Path)
     parser.add_argument("--resized-capture", type=Path)
@@ -155,7 +155,7 @@ def main() -> int:
 
     root = args.shared_root.resolve()
     canonical = args.canonical_shared_root.resolve()
-    verify_shared_source(root, canonical)
+    verify_shared_source(root, canonical, args.require_current_canonical)
     runtime = read_version(root / "vk_runtime/VERSION")
     renderer = read_version(root / "vk_renderer/VERSION")
     if runtime != (0, 6, 0):

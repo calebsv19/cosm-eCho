@@ -303,3 +303,10 @@ and the source/package/interactive-review boundaries.
 Main Edit now adopts optional shared button focus/capture and rounded Font/Theme control state.
 See [Font/Theme interaction](ui_interaction.md) for scope, shortcuts and proof gates.
 The composite source pin advances to the interaction snapshot; Vulkan transforms, UVs and tint remain unchanged.
+
+
+## 2026-10-04 complete button surface adoption
+
+Main Edit now uses `kit_ui 0.14.1` surface snapshots across the inventoried button surfaces, with the shared `b1c67d7` source pin. Left root/DB/load/refresh controls, browse filters, project chips and item rows; graph labels/edge limit/hops/kinds/view/sort/flags and action HUD; relationship Add/navigation/kind/delete; graph legend filters; DB-modal rows/actions; common Font/Theme and top authoring controls. DB-modal and authoring scopes exclude background buttons. Text fields explicitly take keyboard ownership while pointer controls remain available.
+
+See [the current interaction reference](ui_interaction.md) for exact scope, replay gates, capture proof and remaining text-edit/pane/native-Linux boundaries. This is local Development adoption; app VERSION and canonical/production release state are unchanged.

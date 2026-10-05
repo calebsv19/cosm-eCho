@@ -17,7 +17,7 @@ static CoreResult draw_browse_filter_button(KitUiContext *ui_ctx,
     KitUiButtonResult button = mem_console_ui_surface_button(ui_ctx, state, MC_BUTTON_LEFT, (uint64_t)widget_id, rect, enabled);
     KitUiWidgetState draw_state = button.state;
 
-    if (active) {
+    if (active && enabled) {
         draw_state = KIT_UI_STATE_ACTIVE;
     }
     if (button.clicked && io_action && *io_action == MEM_CONSOLE_ACTION_NONE) {

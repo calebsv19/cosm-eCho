@@ -2,6 +2,7 @@
 #include "mem_console_ui_common.h"
 #include "kit_ui_interaction_sdl.h"
 #include "kit_workspace_authoring_interaction.h"
+#include <math.h>
 
 uint32_t mem_console_ui_surface_scope(const MemConsoleState *s) {
     if (s->db_modal_open) return 4;
@@ -33,8 +34,12 @@ KitUiButtonResult mem_console_ui_surface_button(KitUiContext *ui, MemConsoleStat
     }
     if (s->collecting) {
         KitRenderRect viewport={0,0,(float)state->workspace_authoring.viewport_width,(float)state->workspace_authoring.viewport_height};
-        const KitRenderRect *clip=ui->clip_depth?&ui->clip_stack[ui->clip_depth-1]:&viewport;
-        if (kit_ui_surface_register(s,(KitUiSurfaceKey){domain,key},bounds,clip,enabled,&control).code!=CORE_OK) return result;
+        KitRenderRect clip=ui->clip_depth?ui->clip_stack[ui->clip_depth-1]:viewport;
+        float right=fminf(clip.x+clip.width,viewport.width),bottom=fminf(clip.y+clip.height,viewport.height);
+        clip.x=fmaxf(clip.x,0); clip.y=fmaxf(clip.y,0);
+        clip.width=right-clip.x;clip.height=bottom-clip.y;
+        if (clip.width<=0 || clip.height<=0) return result;
+        if (kit_ui_surface_register(s,(KitUiSurfaceKey){domain,key},bounds,&clip,enabled,&control).code!=CORE_OK) return result;
     } else {
         for (uint32_t i=0;i<s->count;++i) if (s->keys[i].domain==domain && s->keys[i].value==key) { control=s->controls[i]; break; }
     }

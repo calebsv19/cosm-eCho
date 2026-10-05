@@ -69,6 +69,50 @@ int main(void) {
     assert(state.workspace_authoring.overlay_mode==MEM_CONSOLE_WORKSPACE_AUTHORING_OVERLAY_PANES);
     state.workspace_authoring.active=0;
     frame(&state,&render,&ui);
+    /* Seed real draw models so item/project/relationship surfaces are included
+     * in the same production frame used by the button event replay. */
+    state.selected_item_id=42; state.visible_count=1; state.visible_items[0].id=42;
+    snprintf(state.visible_items[0].title,sizeof(state.visible_items[0].title),"Fixture item");
+    state.project_filter_option_count=1;
+    snprintf(state.project_filter_keys[0],sizeof(state.project_filter_keys[0]),"fixture-project");
+    state.project_filter_counts[0]=1;
+    snprintf(state.project_filter_labels[0],sizeof(state.project_filter_labels[0]),"Fixture project");
+    state.detail_relationship_count=1; state.detail_relationships[0].link_id=1001;
+    state.detail_relationships[0].neighbor_item_id=43; state.detail_relationships[0].outgoing=1;
+    snprintf(state.detail_relationships[0].kind,sizeof(state.detail_relationships[0].kind),"related");
+    snprintf(state.detail_relationships[0].neighbor_title,sizeof(state.detail_relationships[0].neighbor_title),"Fixture neighbor");
+    snprintf(state.relationship_target_text,sizeof(state.relationship_target_text),"43");
+    state.graph_node_count=2; state.graph_edge_count=1;
+    for(int i=0;i<2;++i) {
+        state.graph_nodes[i].item_id=42+i;
+        snprintf(state.graph_nodes[i].title,sizeof(state.graph_nodes[i].title),"Fixture graph %d",i);
+        snprintf(state.graph_nodes[i].kind,sizeof(state.graph_nodes[i].kind),"plan");
+        snprintf(state.graph_nodes[i].project_key,sizeof(state.graph_nodes[i].project_key),"fixture-project");
+    }
+    state.graph_edges[0].from_index=0; state.graph_edges[0].to_index=1;
+    snprintf(state.graph_edges[0].kind,sizeof(state.graph_edges[0].kind),"related");
+    frame(&state,&render,&ui);
+    control(&state,MC_BUTTON_ITEM,42);
+    control(&state,MC_BUTTON_PROJECT,mem_console_ui_surface_string_key("fixture-project"));
+    KitRenderRect legend=control(&state,MC_BUTTON_LEGEND,mem_console_ui_surface_string_key("ALL")).bounds;
+    pointer(&state,&render,&ui,legend,SDL_MOUSEBUTTONDOWN);
+    frame(&state,&render,&ui);
+    pointer(&state,&render,&ui,legend,SDL_MOUSEBUTTONUP);
+    frame(&state,&render,&ui);
+    KitRenderRect add=control(&state,MC_BUTTON_REL_ADD,1).bounds;
+    pointer(&state,&render,&ui,add,SDL_MOUSEBUTTONDOWN);
+    assert(frame(&state,&render,&ui)==MEM_CONSOLE_ACTION_NONE);
+    pointer(&state,&render,&ui,add,SDL_MOUSEBUTTONUP);
+    assert(frame(&state,&render,&ui)==MEM_CONSOLE_ACTION_ADD_RELATIONSHIP);
+    const uint32_t rel_domains[]={MC_BUTTON_REL_KIND,MC_BUTTON_REL_DELETE};
+    const MemConsoleAction rel_actions[]={MEM_CONSOLE_ACTION_CYCLE_RELATIONSHIP_KIND,MEM_CONSOLE_ACTION_REMOVE_RELATIONSHIP};
+    for(int i=0;i<2;++i) {
+        KitRenderRect row=control(&state,rel_domains[i],1001).bounds;
+        pointer(&state,&render,&ui,row,SDL_MOUSEBUTTONDOWN);
+        assert(frame(&state,&render,&ui)==MEM_CONSOLE_ACTION_NONE);
+        pointer(&state,&render,&ui,row,SDL_MOUSEBUTTONUP);
+        assert(frame(&state,&render,&ui)==rel_actions[i] && state.relationship_action_link_id==1001);
+    }
     KitRenderRect labels=control(&state,MC_BUTTON_GRAPH_SETTING,1).bounds;
     int enabled=state.graph_edge_labels_enabled;
     pointer(&state,&render,&ui,labels,SDL_MOUSEBUTTONUP); frame(&state,&render,&ui);
@@ -85,10 +129,18 @@ int main(void) {
     KitRenderRect root=control(&state,MC_BUTTON_LEFT,1103).bounds;
     pointer(&state,&render,&ui,root,SDL_MOUSEBUTTONDOWN);
     state.db_modal_open=1; state.db_modal_create_mode=0;
+    state.db_picker_entry_count=1;
+    snprintf(state.db_picker_entry_names[0],sizeof(state.db_picker_entry_names[0]),"fixture.sqlite");
+    snprintf(state.db_picker_entry_paths[0],sizeof(state.db_picker_entry_paths[0]),"fixture.sqlite");
     pointer(&state,&render,&ui,root,SDL_MOUSEBUTTONUP);
     assert(frame(&state,&render,&ui)==MEM_CONSOLE_ACTION_NONE);
     for(uint32_t i=0;i<state.button_surface.count;++i)
         assert(state.button_surface.keys[i].domain==MC_BUTTON_DB_ROW || state.button_surface.keys[i].domain==MC_BUTTON_DB_ACTION);
+    KitRenderRect dbrow=control(&state,MC_BUTTON_DB_ROW,mem_console_ui_surface_string_key("fixture.sqlite")).bounds;
+    pointer(&state,&render,&ui,dbrow,SDL_MOUSEBUTTONDOWN);
+    assert(frame(&state,&render,&ui)==MEM_CONSOLE_ACTION_NONE && !state.db_modal_text[0]);
+    pointer(&state,&render,&ui,dbrow,SDL_MOUSEBUTTONUP);
+    assert(frame(&state,&render,&ui)==MEM_CONSOLE_ACTION_NONE && strcmp(state.db_modal_text,"fixture.sqlite")==0);
     KitRenderRect cancel=control(&state,MC_BUTTON_DB_ACTION,4101).bounds;
     pointer(&state,&render,&ui,cancel,SDL_MOUSEBUTTONDOWN);
     assert(frame(&state,&render,&ui)==MEM_CONSOLE_ACTION_NONE);
