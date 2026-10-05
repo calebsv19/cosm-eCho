@@ -70,4 +70,5 @@ CoreResult mem_console_ui_draw_wrapped_text_block(KitUiContext *ui_ctx,
                                                   CoreFontTextSizeTier text_tier,
                                                   int max_lines);
 
+CoreResult mem_console_ui_pane_header(KitRenderContext *render,KitUiContext *ui,KitRenderFrame *frame,MemConsoleState *state,KitRenderRect row,MemConsoleAction *action);
 #endif

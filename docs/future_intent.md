@@ -105,3 +105,9 @@ See [pane composition adoption](ui_pane_composition.md). Pane composition now ha
 a shared foundation; the next boundary is pane-host lifecycle/dispatch and
 transactional splitter/focus takeover. Mixed traversal is kit-only preparation;
 native caret anchoring is integrated, with OS IME acceptance still pending.
+
+## Pane host behavior
+
+Echo gives metadata, relationships and body separate visible/input clips. Splitters use current parent spans, defer preference writes to accepted commit and restore all four ratios on cancel. GRAPH header REFRESH dispatches the existing domain action.
+
+See [pane host behavior](ui_pane_host.md). Shared source ddc9fee6e17482dcd64cf777d7a105b7ed9b157d. Next: fullscreen/window lifecycle qualification in the trio, then one-program-at-a-time migration. Product mixed traversal, human native IME acceptance and generic docking remain follow-on work.

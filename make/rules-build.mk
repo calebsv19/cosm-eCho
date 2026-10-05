@@ -62,3 +62,13 @@ $(UI_PANE_COMPOSITION_OBJ): $(KIT_PANE_DIR)/src/kit_pane_composition.c $(KIT_PAN
 $(UI_NATIVE_TEXT_OBJ): $(KIT_UI_DIR)/src/kit_ui_native_text_sdl.c $(KIT_UI_DIR)/include/kit_ui_native_text_sdl.h
 	mkdir -p $(dir $@)
 	$(APP_CC) $(ARCH_FLAGS) $(CFLAGS) $(INC) -c $< -o $@
+
+$(OBJ_DIR)/shared/kit_pane_host.o: $(KIT_PANE_DIR)/src/kit_pane_host.c $(KIT_PANE_DIR)/include/kit_pane_host.h
+	@mkdir -p "$(dir $@)"
+	$(HOST_CC) $(CFLAGS) $(INC) -c $< -o $@
+$(OBJ_DIR)/shared/kit_pane_header.o: $(KIT_PANE_DIR)/src/kit_pane_header.c $(KIT_PANE_DIR)/include/kit_pane_host.h
+	@mkdir -p "$(dir $@)"
+	$(HOST_CC) $(CFLAGS) $(INC) -c $< -o $@
+$(OBJ_DIR)/shared/core_layout.o: $(CORE_LAYOUT_DIR)/src/core_layout.c $(CORE_LAYOUT_DIR)/include/core_layout.h
+	@mkdir -p "$(dir $@)"
+	$(HOST_CC) $(CFLAGS) $(INC) -c $< -o $@

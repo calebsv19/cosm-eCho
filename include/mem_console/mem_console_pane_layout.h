@@ -49,6 +49,8 @@ int mem_console_pane_layout_update_drag(MemConsoleState *state,
                                         float mouse_x,
                                         float mouse_y);
 
+void mem_console_pane_layout_cancel_drag(MemConsoleState *state);
+
 void mem_console_pane_layout_end_drag(MemConsoleState *state);
 
 #endif

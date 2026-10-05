@@ -4,6 +4,7 @@
 #include "mem_console_state_roles.h"
 #include "mem_console_ui_common.h"
 #include "mem_console_ui_detail_panel.h"
+#include "mem_console_ui_pane_composition.h"
 
 #include <string.h>
 
@@ -228,6 +229,12 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         return (CoreResult){ CORE_ERR_INVALID_ARG, "invalid detail render state" };
     }
 
+    KitUiInputState meta_input=mem_console_ui_leaf_input(state,input,4);
+    KitUiInputState relationship_input=mem_console_ui_leaf_input(state,input,5);
+    KitUiInputState body_input=mem_console_ui_leaf_input(state,input,6);
+    input=&meta_input;
+    result=mem_console_ui_leaf_begin(ui_ctx,frame,state,4);
+    if(result.code!=CORE_OK)return result;
     title_input_active = state->input_target == MEM_CONSOLE_INPUT_TITLE_EDIT;
 
     result = kit_ui_stack_begin(&meta_layout,
@@ -345,6 +352,9 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         return result;
     }
 
+    result=kit_ui_clip_pop(ui_ctx,frame);if(result.code!=CORE_OK)return result;
+    result=mem_console_ui_leaf_begin(ui_ctx,frame,state,5);if(result.code!=CORE_OK)return result;
+    input=&relationship_input;
     result = mem_console_ui_detail_draw_relationships(render_ctx,
                                                       ui_ctx,
                                                       frame,
@@ -357,6 +367,9 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
         return result;
     }
 
+    result=kit_ui_clip_pop(ui_ctx,frame);if(result.code!=CORE_OK)return result;
+    result=mem_console_ui_leaf_begin(ui_ctx,frame,state,6);if(result.code!=CORE_OK)return result;
+    input=&body_input;
     result = kit_ui_stack_begin(&body_layout,
                                 KIT_UI_AXIS_VERTICAL,
                                 (KitRenderRect){
@@ -436,6 +449,7 @@ CoreResult mem_console_ui_draw_detail_section(KitRenderContext *render_ctx,
 
     }
 
+    result=kit_ui_clip_pop(ui_ctx,frame);if(result.code!=CORE_OK)return result;
     *out_right_layout = body_layout;
     return core_result_ok();
 }

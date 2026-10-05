@@ -191,7 +191,7 @@ static void pane_build_nodes(const MemConsoleState *state,
     }
     right_ratio = core_pane_clamp_ratio(right_ratio, right_min_ratio, right_max_ratio);
 
-    pane_ratio_limits_for_span(detail_total_min, top_row_min, body_min, &detail_min_ratio, &detail_max_ratio);
+    pane_ratio_limits_for_span(pane_height * right_ratio, top_row_min, body_min, &detail_min_ratio, &detail_max_ratio);
     if (state->pane_detail_split_ratio > 0.0f && state->pane_detail_split_ratio < 1.0f) {
         detail_ratio = state->pane_detail_split_ratio;
     } else {
@@ -199,7 +199,7 @@ static void pane_build_nodes(const MemConsoleState *state,
     }
     detail_ratio = core_pane_clamp_ratio(detail_ratio, detail_min_ratio, detail_max_ratio);
 
-    pane_ratio_limits_for_span(right_min, top_left_min, top_right_min, &detail_top_min_ratio, &detail_top_max_ratio);
+    pane_ratio_limits_for_span(split_span * (1.0f - root_ratio), top_left_min, top_right_min, &detail_top_min_ratio, &detail_top_max_ratio);
     if (state->pane_detail_top_split_ratio > 0.0f && state->pane_detail_top_split_ratio < 1.0f) {
         detail_top_ratio = state->pane_detail_top_split_ratio;
     }
@@ -610,6 +610,8 @@ int mem_console_pane_layout_begin_drag(MemConsoleState *state,
         return 0;
     }
 
+    if (!state->pane_layout_revision.active_revision) core_layout_state_init(&state->pane_layout_revision);
+    if (!kit_pane_layout_edit_begin(&state->pane_layout_edit, &state->pane_layout_revision)) return 0;
     state->pane_drag_active = 1;
     state->pane_drag_splitter_id = hit_splitter;
     state->pane_drag_anchor_x = mouse_x;
@@ -642,6 +644,8 @@ int mem_console_pane_layout_update_drag(MemConsoleState *state,
         return 0;
     }
 
+    const float before_left=state->pane_left_ratio,before_right=state->pane_right_split_ratio;
+    const float before_detail=state->pane_detail_split_ratio,before_top=state->pane_detail_top_split_ratio;
     pane_normalize_frame(layout_cfg, &frame_width, &frame_height);
     pane_height = (float)frame_height - (layout_cfg->outer_margin * 2.0f);
     split_span = ((float)frame_width - (layout_cfg->outer_margin * 2.0f)) - layout_cfg->pane_gap;
@@ -673,9 +677,7 @@ int mem_console_pane_layout_update_drag(MemConsoleState *state,
                                                 &hit,
                                                 dx,
                                                 0.0f) ? 1 : 0;
-        if (changed) {
-            state->pane_left_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_ROOT].ratio_01;
-        }
+        state->pane_left_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_ROOT].ratio_01;
     } else if (state->pane_drag_splitter_id == MEM_CONSOLE_PANE_SPLITTER_RIGHT_STACK) {
         pane_ratio_limits_for_span(pane_height,
                                    nodes[MEM_CONSOLE_PANE_TREE_NODE_RIGHT_SPLIT].constraints.min_size_a,
@@ -695,9 +697,7 @@ int mem_console_pane_layout_update_drag(MemConsoleState *state,
                                                 &hit,
                                                 0.0f,
                                                 dy) ? 1 : 0;
-        if (changed) {
-            state->pane_right_split_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_RIGHT_SPLIT].ratio_01;
-        }
+        state->pane_right_split_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_RIGHT_SPLIT].ratio_01;
     } else if (state->pane_drag_splitter_id == MEM_CONSOLE_PANE_SPLITTER_DETAIL_STACK) {
         pane_ratio_limits_for_span(state->pane_right_detail.height,
                                    nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_SPLIT].constraints.min_size_a,
@@ -717,9 +717,7 @@ int mem_console_pane_layout_update_drag(MemConsoleState *state,
                                                 &hit,
                                                 0.0f,
                                                 dy) ? 1 : 0;
-        if (changed) {
-            state->pane_detail_split_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_SPLIT].ratio_01;
-        }
+        state->pane_detail_split_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_SPLIT].ratio_01;
     } else if (state->pane_drag_splitter_id == MEM_CONSOLE_PANE_SPLITTER_DETAIL_TOP_ROW) {
         pane_ratio_limits_for_span(state->pane_right_detail.width,
                                    nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_TOP_SPLIT].constraints.min_size_a,
@@ -739,14 +737,14 @@ int mem_console_pane_layout_update_drag(MemConsoleState *state,
                                                 &hit,
                                                 dx,
                                                 0.0f) ? 1 : 0;
-        if (changed) {
-            state->pane_detail_top_split_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_TOP_SPLIT].ratio_01;
-        }
+        state->pane_detail_top_split_ratio = nodes[MEM_CONSOLE_PANE_TREE_NODE_DETAIL_TOP_SPLIT].ratio_01;
     }
 
     (void)root_bounds;
+    changed=state->pane_left_ratio!=before_left||state->pane_right_split_ratio!=before_right||
+        state->pane_detail_split_ratio!=before_detail||state->pane_detail_top_split_ratio!=before_top;
     if (changed) {
-        mem_console_pane_prefs_mark_dirty(state);
+        (void)kit_pane_layout_edit_update(&state->pane_layout_edit, &state->pane_layout_revision, 1);
         (void)mem_console_pane_layout_compute(state, layout_cfg, frame_width, frame_height);
     }
     return changed;
@@ -756,6 +754,27 @@ void mem_console_pane_layout_end_drag(MemConsoleState *state) {
     if (!state) {
         return;
     }
+    if (state->pane_layout_edit.active) {
+        int changed = state->pane_left_ratio!=state->pane_drag_start_left_ratio ||
+            state->pane_right_split_ratio!=state->pane_drag_start_right_ratio ||
+            state->pane_detail_split_ratio!=state->pane_drag_start_detail_ratio ||
+            state->pane_detail_top_split_ratio!=state->pane_drag_start_detail_top_ratio;
+        if(!changed) { (void)kit_pane_layout_edit_cancel(&state->pane_layout_edit,&state->pane_layout_revision); }
+
+        if (changed && kit_pane_layout_edit_commit(&state->pane_layout_edit, &state->pane_layout_revision))
+            mem_console_pane_prefs_mark_dirty(state);
+    }
     state->pane_drag_active = 0;
     state->pane_drag_splitter_id = MEM_CONSOLE_PANE_SPLITTER_NONE;
+}
+
+void mem_console_pane_layout_cancel_drag(MemConsoleState *state) {
+    if (!state || !state->pane_drag_active) return;
+    if (kit_pane_layout_edit_cancel(&state->pane_layout_edit, &state->pane_layout_revision)) {
+        state->pane_left_ratio=state->pane_drag_start_left_ratio;
+        state->pane_right_split_ratio=state->pane_drag_start_right_ratio;
+        state->pane_detail_split_ratio=state->pane_drag_start_detail_ratio;
+        state->pane_detail_top_split_ratio=state->pane_drag_start_detail_top_ratio;
+    }
+    state->pane_drag_active=0;state->pane_drag_splitter_id=MEM_CONSOLE_PANE_SPLITTER_NONE;
 }

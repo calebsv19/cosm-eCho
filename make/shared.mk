@@ -21,3 +21,5 @@ VK_RENDERER_DIR ?= $(SHARED_ROOT)/vk_renderer
 VK_RUNTIME_DIR ?= $(SHARED_ROOT)/vk_runtime
 
 KIT_PANE_DIR ?= $(SHARED_ROOT)/kit/kit_pane
+
+CORE_LAYOUT_DIR ?= $(SHARED_ROOT)/core/core_layout

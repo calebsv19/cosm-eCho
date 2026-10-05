@@ -7,7 +7,7 @@ enum {
     MC_BUTTON_REL_ADD, MC_BUTTON_REL_NAV, MC_BUTTON_REL_KIND, MC_BUTTON_REL_DELETE,
     MC_BUTTON_DB_ROW, MC_BUTTON_DB_ACTION, MC_BUTTON_GRAPH_SETTING,
     MC_BUTTON_GRAPH_HOP, MC_BUTTON_GRAPH_ROLE, MC_BUTTON_ACTION,
-    MC_BUTTON_LEGEND, MC_BUTTON_FONT, MC_BUTTON_OVERLAY
+    MC_BUTTON_LEGEND, MC_BUTTON_FONT, MC_BUTTON_OVERLAY, MC_BUTTON_PANE_HEADER
 };
 int mem_console_ui_text_event(MemConsoleState *state, const SDL_Event *event, MemConsoleAction *action);
 uint32_t mem_console_ui_surface_scope(const MemConsoleState *state);

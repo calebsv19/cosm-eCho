@@ -1,5 +1,6 @@
 #include "mem_console_ui_surface.h"
 #include "mem_console_ui_common.h"
+#include "mem_console_pane_layout.h"
 #include "kit_ui_interaction_sdl.h"
 #include "kit_workspace_authoring_interaction.h"
 #include <math.h>
@@ -79,6 +80,9 @@ static void collect_authoring(MemConsoleState *state, KitRenderContext *render) 
 int mem_console_ui_surface_event(MemConsoleState *state, KitRenderContext *render,
     KitUiContext *ui, const SDL_Event *event, KitUiInputState *input) {
     if (!state || !render || !ui || !event) return 0;
+    if (state->pane_drag_active && event->type==SDL_KEYDOWN && event->key.keysym.sym==SDLK_ESCAPE) {
+        mem_console_pane_layout_cancel_drag(state);mem_console_redraw_mark(state,MEM_CONSOLE_REDRAW_REASON_INPUT);return 1;
+    }
     KitUiInteractionEvent e;
     if (!kit_ui_interaction_event_from_sdl(event,&e)) return 0;
     KitUiSurface *s=&state->button_surface;
@@ -109,6 +113,8 @@ int mem_console_ui_surface_event(MemConsoleState *state, KitRenderContext *rende
         input->mouse_down=0; input->mouse_pressed=0; input->mouse_released=0;
     }
     if (e.type==KIT_UI_INTERACTION_CANCEL) {
+        kit_pane_host_cancel(&state->pane_host,0,0);
+        mem_console_pane_layout_cancel_drag(state);
         state->pane_pointer_owner=(KitPanePointerOwner){0};
         if (input) { input->mouse_down=0; input->mouse_pressed=0; input->mouse_released=0; }
         return 0;

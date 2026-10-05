@@ -1,3 +1,4 @@
+#include "mem_console_pane_layout.h"
 #include "mem_console_app_internal.h"
 #include "mem_console_ui_surface.h"
 
@@ -68,6 +69,18 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
         return;
     }
 
+    /* Pane cancellation precedes text/button consumers so an editor cannot
+     * swallow Escape or focus loss while a splitter owns the pointer. */
+    if(state->pane_drag_active && event->type==SDL_KEYDOWN && event->key.keysym.sym==SDLK_ESCAPE) {
+        mem_console_pane_layout_cancel_drag(state);kit_pane_host_cancel(&state->pane_host,0,0);
+        input->mouse_down=input->mouse_pressed=input->mouse_released=0;
+        mem_console_redraw_mark(state,MEM_CONSOLE_REDRAW_REASON_INPUT);return;
+    }
+    if(event->type==SDL_WINDOWEVENT && (event->window.event==SDL_WINDOWEVENT_FOCUS_LOST ||
+        event->window.event==SDL_WINDOWEVENT_HIDDEN || event->window.event==SDL_WINDOWEVENT_SIZE_CHANGED)) {
+        mem_console_pane_layout_cancel_drag(state);kit_pane_host_cancel(&state->pane_host,0,0);
+        input->mouse_down=input->mouse_pressed=input->mouse_released=0;
+    }
     if(mem_console_ui_text_event(state,event,keyboard_action)) {
         mem_console_redraw_mark(state,MEM_CONSOLE_REDRAW_REASON_INPUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
         if(state->text_edit_changed && state->text_edit.text==state->search_text)mark_search_input_changed(state);

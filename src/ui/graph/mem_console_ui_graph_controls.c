@@ -338,13 +338,7 @@ CoreResult mem_console_ui_draw_graph_controls(KitRenderContext *render_ctx,
     if (result.code != CORE_OK) {
         return result;
     }
-    result = mem_console_ui_draw_info_line_custom(ui_ctx,
-                                                  frame,
-                                                  row,
-                                                  "GRAPH",
-                                                  CORE_THEME_COLOR_TEXT_PRIMARY,
-                                                  CORE_FONT_ROLE_UI_MEDIUM,
-                                                  CORE_FONT_TEXT_SIZE_CAPTION);
+    result = mem_console_ui_pane_header(render_ctx,ui_ctx,frame,state,row,io_action);
     if (result.code != CORE_OK) {
         return result;
     }

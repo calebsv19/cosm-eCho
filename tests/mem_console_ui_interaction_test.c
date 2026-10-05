@@ -4,6 +4,7 @@
 #include "mem_console_ui_common.h"
 #include "app/mem_console_app_internal.h"
 #include "mem_console_ui_pane_composition.h"
+#include "mem_console_pane_layout.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -219,11 +220,59 @@ int main(void) {
     puts("Echo presentation: field click cancels preedit/collapses selection; body caret reveal, wheel scroll and scrollbar pass");
     puts("Echo six field presentation slots: Unicode preedit, measured hit, queued lifetime and explicit multiline rows pass");
     KitPaneComposition panes;assert(mem_console_ui_panes_build(&state,1440,1000,&panes).code==CORE_OK);
-    assert(panes.count==3&&panes.entries[0].id==1&&panes.entries[2].id==3);
+    assert(panes.count==6&&panes.entries[0].id==1&&panes.entries[2].id==3);
     KitUiInputState press={state.left_pane.x+10,state.left_pane.y+10,1,1,0};
     KitPanePointerOwner owner={0};CorePaneId pane=kit_pane_pointer_route(&owner,&panes,press.mouse_x,press.mouse_y,1,0,0);
     assert(pane==1&&mem_console_ui_pane_input(&press,pane,1).mouse_pressed&&!mem_console_ui_pane_input(&press,pane,3).mouse_pressed);
     assert(kit_pane_pointer_route(&owner,&panes,state.pane_right_graph.x+10,state.pane_right_graph.y+10,0,1,0)==1);
     puts("Echo production pane adapter: navigation/detail/graph identity and cross-pane release ownership pass");
+
+    MemConsoleLayoutConfig config=*mem_console_layout_config_get();
+    assert(mem_console_pane_layout_compute(&state,&config,1440,1000).code==CORE_OK);
+    float original=state.pane_detail_top_split_ratio;KitRenderRect split;
+    assert(mem_console_pane_layout_get_splitter_bounds(&state,&config,MEM_CONSOLE_PANE_SPLITTER_DETAIL_TOP_ROW,&split).code==CORE_OK);
+    float sx=split.x+split.width/2,sy=split.y+split.height/2;
+    assert(mem_console_pane_layout_begin_drag(&state,&config,1440,1000,sx,sy));
+    assert(mem_console_pane_layout_update_drag(&state,&config,1440,1000,sx+40,sy));
+    assert(state.pane_detail_top_split_ratio!=original);
+    uint64_t rev=state.pane_layout_revision.active_revision;
+    mem_console_pane_layout_cancel_drag(&state);
+    assert(state.pane_detail_top_split_ratio==original&&state.pane_layout_revision.active_revision==rev);
+    assert(mem_console_pane_layout_begin_drag(&state,&config,1440,1000,sx,sy));
+    assert(mem_console_pane_layout_update_drag(&state,&config,1440,1000,sx+40,sy));
+    mem_console_pane_layout_end_drag(&state);assert(state.pane_layout_revision.active_revision==rev+1);
+    assert(mem_console_ui_panes_build(&state,1440,1000,&panes).code==CORE_OK);
+    assert(kit_pane_host_sync(&state.pane_host,&panes,0,0,0).code==CORE_OK);
+    CorePaneRect meta=kit_pane_composition_find(&panes,4)->content;
+    assert(kit_pane_host_pointer(&state.pane_host,KIT_PANE_HOST_POINTER_DOWN,meta.x+2,meta.y+2,0,0)==4);
+    assert(kit_pane_host_keyboard_owner(&state.pane_host)==4);
+    KitUiInputState leaf={meta.x+2,meta.y+2,1,1,0};
+    assert(mem_console_ui_leaf_input(&state,&leaf,4).mouse_pressed&&!mem_console_ui_leaf_input(&state,&leaf,5).mouse_pressed);
+    kit_pane_host_sync(&state.pane_host,&panes,1,0,0);assert(!state.pane_host.pointer.down&&!state.pane_host.focused_id);
+
+    (void)mem_console_pane_layout_compute(&state,&config,1440,1000);
+    assert(mem_console_pane_layout_get_splitter_bounds(&state,&config,MEM_CONSOLE_PANE_SPLITTER_DETAIL_TOP_ROW,&split).code==CORE_OK);
+    sx=split.x+split.width/2;sy=split.y+split.height/2;
+    original=state.pane_detail_top_split_ratio;rev=state.pane_layout_revision.active_revision;
+    assert(mem_console_pane_layout_begin_drag(&state,&config,1440,1000,sx,sy));
+    assert(mem_console_pane_layout_update_drag(&state,&config,1440,1000,sx+40,sy));
+    assert(mem_console_pane_layout_update_drag(&state,&config,1440,1000,sx,sy));
+    mem_console_pane_layout_end_drag(&state);assert(state.pane_detail_top_split_ratio==original&&state.pane_layout_revision.active_revision==rev);
+    assert(mem_console_pane_layout_begin_drag(&state,&config,1440,1000,sx,sy));
+    assert(mem_console_pane_layout_update_drag(&state,&config,1440,1000,sx+40,sy));
+    SDL_Event escape={0};escape.type=SDL_KEYDOWN;escape.key.keysym.sym=SDLK_ESCAPE;
+    route(&state,&render,&ui,&escape);assert(!state.pane_drag_active&&state.pane_detail_top_split_ratio==original);
+    assert(mem_console_pane_layout_begin_drag(&state,&config,1440,1000,sx,sy));
+    assert(mem_console_pane_layout_update_drag(&state,&config,1440,1000,sx+40,sy));
+    SDL_Event lost={0};lost.type=SDL_WINDOWEVENT;lost.window.event=SDL_WINDOWEVENT_FOCUS_LOST;
+    route(&state,&render,&ui,&lost);assert(!state.pane_drag_active&&state.pane_detail_top_split_ratio==original);
+    input=(KitUiInputState){0};state.title_edit_mode=state.body_edit_mode=state.db_modal_open=0;
+    state.pane_host.blocked=0;(void)frame(&state,&render,&ui);
+    KitUiInteractionControl header_refresh=control(&state,MC_BUTTON_PANE_HEADER,MEM_CONSOLE_ACTION_REFRESH_GRAPH);
+    pointer(&state,&render,&ui,header_refresh.bounds,SDL_MOUSEBUTTONDOWN);
+    pointer(&state,&render,&ui,header_refresh.bounds,SDL_MOUSEBUTTONUP);
+    assert(frame(&state,&render,&ui)==MEM_CONSOLE_ACTION_REFRESH_GRAPH);
+    puts("Echo real events: text cannot swallow splitter Escape, focus loss restores ratios, round-trip drag adds no revision, header REFRESH dispatches existing action pass");
+    puts("Echo nested production panes: independent meta/relationship/body input, cancel restores ratio, commit revision and modal takeover pass");
     return 0;
 }

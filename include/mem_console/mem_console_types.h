@@ -9,7 +9,7 @@
 #include "kit_ui_surface.h"
 #include "kit_ui_text_edit.h"
 #include "kit_ui_focus_scope.h"
-#include "kit_pane_composition.h"
+#include "kit_pane_host.h"
 
 enum {
     MEM_CONSOLE_LIST_FETCH_LIMIT = 96,
@@ -230,7 +230,10 @@ typedef struct MemConsoleState {
     KitUiTextEdit text_edit;
     int text_edit_changed;
     KitUiFocusScope focus_scope;
-    KitPanePointerOwner pane_pointer_owner;
+    KitPanePointerOwner pane_pointer_owner; /* compatibility observation */
+    KitPaneHost pane_host;
+    CoreLayoutState pane_layout_revision;
+    KitPaneLayoutEdit pane_layout_edit;
     MemConsoleInputTarget text_edit_target;
     int search_cursor;
     int title_edit_cursor;

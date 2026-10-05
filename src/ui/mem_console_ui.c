@@ -505,6 +505,7 @@ int run_frame(KitRenderContext *render_ctx,
                                                   input->mouse_x,
                                                   input->mouse_y);
     }
+    if (state->db_modal_open || authoring_active) mem_console_pane_layout_cancel_drag(state);
     if ((!state->db_modal_open && input->mouse_released) || authoring_active) {
         if (state->left_panel_drag_active) {
             mem_console_ui_left_end_panel_drag(state);
@@ -524,11 +525,14 @@ int run_frame(KitRenderContext *render_ctx,
     KitPaneComposition panes;
     result=mem_console_ui_panes_build(state,draw_width,draw_height,&panes);
     if(result.code!=CORE_OK)return MEM_CONSOLE_FRAME_FATAL;
-    CorePaneId pane_owner=kit_pane_pointer_route(&state->pane_pointer_owner,&panes,
-        input->mouse_x,input->mouse_y,input->mouse_pressed,input->mouse_released,
-        state->db_modal_open||authoring_active||state->pane_drag_active||state->left_panel_drag_active);
+    (void)kit_pane_host_sync(&state->pane_host,&panes,
+        state->db_modal_open||authoring_active||state->pane_drag_active||state->left_panel_drag_active,0,0);
+    CorePaneId pane_owner=kit_pane_host_pointer(&state->pane_host,
+        input->mouse_pressed?KIT_PANE_HOST_POINTER_DOWN:(input->mouse_released?KIT_PANE_HOST_POINTER_UP:KIT_PANE_HOST_POINTER_MOVE),
+        input->mouse_x,input->mouse_y,0,0);
+    state->pane_pointer_owner=state->pane_host.pointer;
     KitUiInputState pane_inputs[3];
-    for(unsigned i=0;i<3;++i)pane_inputs[i]=mem_console_ui_pane_input(&blocked_input,pane_owner,i+1);
+    for(unsigned i=0;i<3;++i)pane_inputs[i]=mem_console_ui_pane_input(&blocked_input,pane_owner>=4?2:pane_owner,i+1);
 
 
     command_buffer.commands = commands;
@@ -638,11 +642,13 @@ int run_frame(KitRenderContext *render_ctx,
                 result.message ? result.message : "no message");
         return 1;
     }
+    KitUiInputState controls_input=mem_console_ui_leaf_input(state,&pane_inputs[1],6);
+    result=mem_console_ui_leaf_begin(ui_ctx,&frame,state,6);if(result.code!=CORE_OK)return MEM_CONSOLE_FRAME_FATAL;
     result = mem_console_ui_draw_graph_controls(render_ctx,
                                                 ui_ctx,
                                                 &frame,
                                                 state,
-                                                &pane_inputs[1],
+                                                &controls_input,
                                                 layout_cfg,
                                                 has_any_edit_mode,
                                                 &right_layout,
@@ -655,6 +661,7 @@ int run_frame(KitRenderContext *render_ctx,
                 result.message ? result.message : "no message");
         return 1;
     }
+    result=kit_ui_clip_pop(ui_ctx,&frame);if(result.code!=CORE_OK)return MEM_CONSOLE_FRAME_FATAL;
     result = kit_ui_clip_pop(ui_ctx, &frame);
     if (result.code != CORE_OK) {
         fprintf(stderr,
