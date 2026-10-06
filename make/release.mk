@@ -23,8 +23,12 @@ release-clean:
 	@rm -rf "$(RELEASE_DIR)"
 	@echo "release-clean complete."
 
-release-build:
-	@$(MAKE) BUILD_TOOLCHAIN="$(RELEASE_TOOLCHAIN)" PACKAGE_TOOLCHAIN="$(RELEASE_TOOLCHAIN)" TARGET_OS="$(TARGET_OS)" TARGET_ARCH="$(TARGET_ARCH)" TARGET_VARIANT="$(TARGET_VARIANT)" package-desktop-self-test
+.PHONY: release-root-prepare
+release-root-prepare:
+	@python3 tools/packaging/prepare_release_root.py --output "$(RELEASE_ROOT)"
+
+release-build: release-root-prepare
+	@$(MAKE) BUILD_TOOLCHAIN="$(RELEASE_TOOLCHAIN)" PACKAGE_TOOLCHAIN="$(RELEASE_TOOLCHAIN)" TARGET_OS="$(TARGET_OS)" TARGET_ARCH="$(TARGET_ARCH)" TARGET_VARIANT="$(TARGET_VARIANT)" release-package-self-test
 	@echo "release-build complete."
 
 release-bundle-audit: release-build
@@ -44,8 +48,8 @@ release-bundle-audit: release-build
 		printf '%s\n' "$$dylib_archs" > "$$arch_out"; \
 		otool -L "$$dylib" > "$$out"; \
 	done
-	@! rg -q '/opt/homebrew|/usr/local|/Users/' "$(RELEASE_DIR)"/otool_*.txt || (echo "Found non-portable dylib linkage"; exit 1)
-	@! rg -q '@rpath/' "$(RELEASE_DIR)"/otool_*.txt || (echo "Found unresolved @rpath dylib linkage"; exit 1)
+	@! sed '/^[^[:space:]].*:$$/d' "$(RELEASE_DIR)"/otool_*.txt | rg -q '/opt/homebrew|/usr/local|/Users/' || (echo "Found non-portable dylib linkage"; exit 1)
+	@! sed '/^[^[:space:]].*:$$/d' "$(RELEASE_DIR)"/otool_*.txt | rg -q '@rpath/' || (echo "Found unresolved @rpath dylib linkage"; exit 1)
 	@find "$(PACKAGE_APP_DIR)" -print > "$(RELEASE_DIR)/bundle_manifest.txt"
 	@! rg -q '(^|/)(_private_workspace_artifacts|demo|tmp|ide_files)(/|$$)' "$(RELEASE_DIR)/bundle_manifest.txt" || (echo "Found private/generated path in release bundle"; exit 1)
 	@! rg -q '(^|/)data/.*\.ui\.pack$$' "$(RELEASE_DIR)/bundle_manifest.txt" || (echo "Found packaged UI prefs sidecar in release bundle"; exit 1)

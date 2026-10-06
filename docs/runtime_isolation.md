@@ -38,3 +38,12 @@ sidecar. Quiesce writers or use SQLite's consistent backup API so WAL contents a
 included; verify restore on copies. Keep original data until rollback is no longer
 needed. This change does not alter schema 6, UI prefs 11 or app prefs 2, and does
 not install or activate any worker or service.
+
+Release packaging accepts a job root under the checkout's or CodeWorkData's
+`mem_console/build/release-authenticated` directory, including a bound
+`job/targets/target` path. The destination must be absent; traversal, symlink
+ancestors and occupied outputs fail before packaging. Signed bundles, archives
+and launcher diagnostics remain under that selected root. `CODEWORK_DATA_ROOT`
+may select the configured data parent; its default is `~/CodeWorkData`.
+`python3 tests/test_release_root.py` proves containment and make-path routing
+using synthetic directories. These rules do not install the generated app.

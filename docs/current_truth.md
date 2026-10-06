@@ -3,8 +3,9 @@
 ## 2026-10-06 source adoption
 
 Canonical source now includes the accumulated Main Edit UI work and the runtime
-isolation/empty-seed repairs. VERSION remains 0.3.0 pending the authorized 0.4.0
-preparation. Public release and installed applications are unchanged. Earlier
+isolation/empty-seed repairs. VERSION is 0.4.0 for authorized local preparation;
+public release remains 0.3.0 and installed applications are unchanged. Release
+packaging uses a create-only job root and isolated synthetic runtime. Earlier
 rollout notes below describe their original Main Edit-only proof boundaries;
 they do not describe the current canonical source adoption state.
 
