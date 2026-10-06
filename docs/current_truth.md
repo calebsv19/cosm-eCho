@@ -1,5 +1,14 @@
 # eCho Current Truth
 
+## 2026-10-06 source adoption
+
+Canonical source now includes the accumulated Main Edit UI work and the runtime
+isolation/empty-seed repairs. VERSION remains 0.3.0 pending the authorized 0.4.0
+preparation. Public release and installed applications are unchanged. Earlier
+rollout notes below describe their original Main Edit-only proof boundaries;
+they do not describe the current canonical source adoption state.
+
+
 Last updated: 2026-10-04
 
 ## Program Identity
