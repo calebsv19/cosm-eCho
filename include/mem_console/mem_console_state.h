@@ -17,6 +17,7 @@ int mem_console_path_has_sqlite_suffix(const char *path);
 const char *mem_console_db_path_policy_error(const char *path);
 int mem_console_db_path_is_safe(const char *path);
 int mem_console_resolve_app_data_dir(char *out_path, size_t out_cap);
+int mem_console_runtime_is_isolated(void);
 int resolve_default_db_path(char *out_path, size_t out_cap);
 int mem_console_path_contract_normalize(const char *input_root_hint,
                                         const char *output_root_hint,

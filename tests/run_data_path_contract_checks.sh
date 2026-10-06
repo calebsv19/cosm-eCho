@@ -27,7 +27,7 @@ check_contains "int mem_console_build_app_prefs_path_for_output_root(" \
 check_contains "mem_console_build_app_prefs_path_for_output_root(ctx->output_root" \
     "${ROOT_DIR}/src/app/mem_console_app_main.c"
 check_contains ".local/share/mem_console/mem_console.app.pack" \
-    "${ROOT_DIR}/src/app/mem_console_app_main.c"
+    "${ROOT_DIR}/src/runtime/mem_console_startup_paths.c"
 
 # S3 matrix lock: open/switch is reference mode and returns before suffix rewrite.
 check_contains "if (!state->db_modal_create_mode) {" \

@@ -21,16 +21,10 @@ package-desktop: package-build-lane
 	@chmod +x "$(PACKAGE_MACOS_DIR)/mem-console-bin" "$(PACKAGE_MACOS_DIR)/mem-console-launcher"
 	@PACKAGE_DEP_SEARCH_ROOTS="$(TARGET_DEP_SEARCH_ROOTS)" "$(PACKAGE_DYLIB_BUNDLER)" "$(PACKAGE_MACOS_DIR)/mem-console-bin" "$(PACKAGE_FRAMEWORKS_DIR)"
 	@mkdir -p "$(PACKAGE_RESOURCES_DIR)/data"
-	@if [ -f "$(PACKAGE_DEFAULT_DB_SRC)" ]; then \
-		cp "$(PACKAGE_DEFAULT_DB_SRC)" "$(PACKAGE_RESOURCES_DIR)/data/default.sqlite"; \
-	else \
-		$(MAKE) -C "$(CORE_MEMDB_DIR)" tools; \
-		mkdir -p "$(dir $(PACKAGE_GENERATED_DEFAULT_DB))"; \
-		rm -f "$(PACKAGE_GENERATED_DEFAULT_DB)"; \
-		"$(CORE_MEMDB_DIR)/build/mem_cli" list --db "$(PACKAGE_GENERATED_DEFAULT_DB)" >/dev/null; \
-		cp "$(PACKAGE_GENERATED_DEFAULT_DB)" "$(PACKAGE_RESOURCES_DIR)/data/default.sqlite"; \
-		echo "Generated clean package DB seed: $(PACKAGE_GENERATED_DEFAULT_DB)"; \
-	fi
+	@$(MAKE) -C "$(CORE_MEMDB_DIR)" tools
+	@python3 tools/packaging/generate_empty_seed.py \
+		--mem-cli "$(CORE_MEMDB_DIR)/build/mem_cli" \
+		--output "$(PACKAGE_RESOURCES_DIR)/data/default.sqlite"
 	@mkdir -p "$(PACKAGE_RESOURCES_DIR)/shared/assets/fonts"
 	@cp -R "$(SHARED_ROOT)/assets/fonts/." "$(PACKAGE_RESOURCES_DIR)/shared/assets/fonts/"
 	@if [ -f "$(PACKAGE_APP_ICON_SRC)" ]; then \

@@ -129,16 +129,17 @@ for checks and a visual review route.
     the shared compute, residency, or timing workload APIs
 
 ## Runtime and Data Path Contract
-- Active DB startup resolution is explicit:
-  1. `CODEWORK_MEMDB_PATH` when set
-  2. last-used DB path from app prefs under `<output_root>/mem_console.app.pack`
-  3. fallback default DB at
-     `~/Library/Application Support/MemConsole/runtime/default.sqlite` on
-     macOS or `mem_console/data/default.sqlite` otherwise
-- Path roots are normalized together:
-  - `output_root` prefers the mutable app-data/runtime root when available
-  - `input_root` falls back to the active DB parent when no explicit
-    input-root hint survives normalization
+- Active DB startup resolution preserves `--db`, an explicit
+  `CODEWORK_MEMDB_PATH`, then a DB saved in the selected runtime's own app
+  preferences. The launcher's generated default is used only without a selection.
+- `MEM_CONSOLE_RUNTIME_DIR` selects the mutable runtime root; Main Edit defaults
+  to the `MemConsole-Main-Edit` namespace. Isolated roots never fall back to
+  standard/legacy app preferences. The standard default keeps legacy compatibility.
+- Path roots are normalized together. An explicit runtime root cannot be replaced
+  by a saved output root; `input_root` falls back to the selected DB parent when
+  no explicit input-root hint survives normalization. Invalid runtime roots fail.
+- See [runtime isolation](runtime_isolation.md) for exact selection and backup
+  boundaries. No database schema or stored preference format changes are required.
 - In-session `LOAD DB` and `NEW DB` keep the same contract:
   - `LOAD DB` uses the entered `.sqlite` path directly after validation
   - `NEW DB` creates a bare-name target under `input_root` and uses explicit
@@ -247,9 +248,11 @@ for checks and a visual review route.
 - Standardized package/release target graph is active.
 - Launcher diagnostics include `--print-config`, `--self-test`, startup logfile
   output, failed-path self-test context, and package self-test config readback.
-- R4-S4 package data artifact hardening is complete: desktop packaging copies
-  only `data/default.sqlite` into bundle resources and rejects additional data
-  sidecars in package smoke.
+- Package seeds are generated from schema code in a fresh temporary directory,
+  checked for integrity, schema version 6 and zero application records, and
+  copied into bundle resources with exclusive creation. Ignored `data/` files
+  and `PACKAGE_DEFAULT_DB_SRC` are never seed inputs. Additional data sidecars
+  remain rejected in package smoke.
 - R4-S5 release artifact boundary hardening is complete:
   `release-bundle-audit` writes `bundle_manifest.txt` and rejects
   private/generated root names, packaged `.ui.pack` sidecars, and unexpected

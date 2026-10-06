@@ -16,21 +16,7 @@
 #include "mem_console_prefs.h"
 #include "mem_console_vulkan_rollout.h"
 #include "ui/mem_console_visual_artifact.h"
-
-static int mem_console_build_legacy_app_prefs_path(char *out_path, size_t out_cap) {
-    const char *home_path = getenv("HOME");
-    int written = 0;
-
-    if (!out_path || out_cap == 0u || !home_path || !home_path[0]) {
-        return 0;
-    }
-    written = snprintf(out_path, out_cap, "%s/.local/share/mem_console/mem_console.app.pack", home_path);
-    if (written <= 0 || (size_t)written >= out_cap) {
-        out_path[0] = '\0';
-        return 0;
-    }
-    return 1;
-}
+#include "runtime/mem_console_startup_paths.h"
 
 typedef enum MemConsoleAppStage {
     MEM_CONSOLE_APP_STAGE_INIT = 0,
@@ -61,12 +47,6 @@ typedef struct MemConsoleAppMainContext {
     const char *visual_review_mode_flag;
     const char *visual_review_selected_id_flag;
     char app_prefs_path[1200];
-    char app_prefs_legacy_path[1200];
-    char app_prefs_db_path[1024];
-    char app_prefs_input_root[1024];
-    char app_prefs_output_root[1024];
-    char app_prefs_active_db_path[1024];
-    char default_db_path[1024];
     char input_root[1024];
     char output_root[1024];
     char active_db_path[1024];
@@ -201,9 +181,7 @@ static int mem_console_app_bootstrap(MemConsoleAppMainContext *ctx,
 }
 
 static int mem_console_app_config_load(MemConsoleAppMainContext *ctx) {
-    char default_output_root[1024];
-    int app_prefs_loaded = 0;
-    int loaded_from_default_path = 0;
+    MemConsoleStartupPaths paths;
 
     if (!ctx) {
         return 0;
@@ -245,61 +223,14 @@ static int mem_console_app_config_load(MemConsoleAppMainContext *ctx) {
         fprintf(stderr, "mem_console: invalid --visual-review-selected-id value.\n");
         return 0;
     }
-    default_output_root[0] = '\0';
-    if (mem_console_resolve_app_data_dir(default_output_root, sizeof(default_output_root)) &&
-        mem_console_build_app_prefs_path_for_output_root(default_output_root,
-                                                         ctx->app_prefs_path,
-                                                         sizeof(ctx->app_prefs_path))) {
-        ctx->app_prefs_path_valid = 1;
-        ctx->result = mem_console_app_prefs_load(ctx->app_prefs_path,
-                                                 ctx->app_prefs_db_path,
-                                                 sizeof(ctx->app_prefs_db_path),
-                                                 ctx->app_prefs_input_root,
-                                                 sizeof(ctx->app_prefs_input_root),
-                                                 ctx->app_prefs_output_root,
-                                                 sizeof(ctx->app_prefs_output_root),
-                                                 ctx->app_prefs_active_db_path,
-                                                 sizeof(ctx->app_prefs_active_db_path));
-        loaded_from_default_path = ctx->result.code == CORE_OK &&
-                                   ctx->result.message &&
-                                   strcmp(ctx->result.message, "app prefs loaded") == 0;
-        app_prefs_loaded = loaded_from_default_path ? 1 : 0;
-    }
-    if (!getenv("CODEWORK_WINDOW_LIFECYCLE_PROOF") && !loaded_from_default_path &&
-        mem_console_build_legacy_app_prefs_path(ctx->app_prefs_legacy_path, sizeof(ctx->app_prefs_legacy_path))) {
-        ctx->result = mem_console_app_prefs_load(ctx->app_prefs_legacy_path,
-                                                 ctx->app_prefs_db_path,
-                                                 sizeof(ctx->app_prefs_db_path),
-                                                 ctx->app_prefs_input_root,
-                                                 sizeof(ctx->app_prefs_input_root),
-                                                 ctx->app_prefs_output_root,
-                                                 sizeof(ctx->app_prefs_output_root),
-                                                 ctx->app_prefs_active_db_path,
-                                                 sizeof(ctx->app_prefs_active_db_path));
-        app_prefs_loaded = ctx->result.code == CORE_OK &&
-                           ctx->result.message &&
-                           strcmp(ctx->result.message, "app prefs loaded") == 0;
-    }
-    if (ctx->db_flag) {
-        ctx->db_path = ctx->db_flag;
-    } else if (app_prefs_loaded) {
-        ctx->db_path = ctx->app_prefs_db_path;
-    } else if (resolve_default_db_path(ctx->default_db_path, sizeof(ctx->default_db_path))) {
-        ctx->db_path = ctx->default_db_path;
-    }
-
-    if (!mem_console_path_contract_normalize(ctx->app_prefs_input_root,
-                                             ctx->app_prefs_output_root,
-                                             ctx->db_path,
-                                             ctx->input_root,
-                                             sizeof(ctx->input_root),
-                                             ctx->output_root,
-                                             sizeof(ctx->output_root),
-                                             ctx->active_db_path,
-                                             sizeof(ctx->active_db_path))) {
-        fprintf(stderr, "mem_console: failed to normalize runtime path contract.\n");
+    ctx->result = mem_console_startup_paths_resolve(ctx->db_flag, &paths);
+    if (ctx->result.code != CORE_OK) {
+        fprintf(stderr, "mem_console: startup paths failed: %s\n", ctx->result.message);
         return 0;
     }
+    memcpy(ctx->input_root, paths.input_root, sizeof(ctx->input_root));
+    memcpy(ctx->output_root, paths.output_root, sizeof(ctx->output_root));
+    memcpy(ctx->active_db_path, paths.db_path, sizeof(ctx->active_db_path));
     ctx->db_path = ctx->active_db_path;
     ctx->app_prefs_path_valid = mem_console_build_app_prefs_path_for_output_root(ctx->output_root,
                                                                                   ctx->app_prefs_path,

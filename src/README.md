@@ -111,8 +111,8 @@ contracts stay in `include/mem_console/`.
   require a returned selected active item before success or FTS sync, and stale
   or archived selected-item writes fail closed.
 - `R4-S4` local private/generated artifact boundary hardening is complete:
-  desktop packaging copies only `data/default.sqlite` into bundle resources and
-  rejects local data sidecars during package smoke.
+  desktop packaging generates a verified empty synthetic database from schema
+  code and rejects local data sidecars during package smoke.
 - `R4-S5` package/release artifact boundary closeout is complete:
   `release-bundle-audit` now writes a bundle manifest and rejects
   private/generated paths, packaged `.ui.pack` sidecars, and unexpected data

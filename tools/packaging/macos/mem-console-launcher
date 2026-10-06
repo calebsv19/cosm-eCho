@@ -22,6 +22,13 @@ BUILD_LABEL="$(read_plist_string MemConsoleBuildLabel eCho)"
 APP_BUNDLE_DB="$RES_DIR/data/default.sqlite"
 RUNTIME_DIR_DEFAULT="${HOME}/Library/Application Support/${RUNTIME_NAMESPACE}/runtime"
 RUNTIME_DIR="${MEM_CONSOLE_RUNTIME_DIR:-$RUNTIME_DIR_DEFAULT}"
+case "$RUNTIME_DIR" in
+    /*) ;;
+    *) echo "eCho: runtime directory must be absolute" >&2; exit 1 ;;
+esac
+case "/$RUNTIME_DIR/" in
+    */../*) echo "eCho: runtime directory must not contain parent traversal" >&2; exit 1 ;;
+esac
 
 ensure_bundle_copy() {
     target="$1"
@@ -64,8 +71,8 @@ ensure_bundle_link() {
 }
 
 if ! mkdir -p "$RUNTIME_DIR" 2>/dev/null; then
-    RUNTIME_DIR="${TMPDIR:-/tmp}/MemConsole/runtime"
-    mkdir -p "$RUNTIME_DIR" 2>/dev/null || true
+    echo "eCho: cannot create the selected runtime directory: $RUNTIME_DIR" >&2
+    exit 1
 fi
 mkdir -p "$RUNTIME_DIR/data" "$RUNTIME_DIR/vk" "$RUNTIME_DIR/config/shared/shaders" 2>/dev/null || true
 APP_DB_PATH="$RUNTIME_DIR/data/default.sqlite"
@@ -150,6 +157,7 @@ cat >"$ICD_FILE" <<EOF
 EOF
 
 export CODEWORK_MEMDB_PATH="${CODEWORK_MEMDB_PATH:-$APP_DB_PATH}"
+export MEM_CONSOLE_LAUNCHER_DEFAULT_DB="$APP_DB_PATH"
 export MEM_CONSOLE_RUNTIME_DIR="$RUNTIME_DIR"
 export MEM_CONSOLE_PACKAGE_PROFILE="$PACKAGE_PROFILE"
 export MEM_CONSOLE_RUNTIME_NAMESPACE="$RUNTIME_NAMESPACE"

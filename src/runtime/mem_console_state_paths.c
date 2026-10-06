@@ -218,6 +218,9 @@ int mem_console_ensure_parent_directory(const char *path) {
 
 int mem_console_resolve_app_data_dir(char *out_path, size_t out_cap) {
     const char *home_path = 0;
+    const char *runtime_root = getenv("MEM_CONSOLE_RUNTIME_DIR");
+    const char *runtime_namespace = getenv("MEM_CONSOLE_RUNTIME_NAMESPACE");
+    const char *profile = getenv("MEM_CONSOLE_PACKAGE_PROFILE");
     char *base_path = 0;
     int written = 0;
 
@@ -226,22 +229,45 @@ int mem_console_resolve_app_data_dir(char *out_path, size_t out_cap) {
     }
 
     out_path[0] = '\0';
+    if (runtime_root && runtime_root[0]) {
+        if (!path_is_absolute(runtime_root) || path_has_control_byte(runtime_root) ||
+            path_has_parent_segment(runtime_root) || !mem_console_path_is_mutable_root_safe(runtime_root)) {
+            return 0;
+        }
+        written = snprintf(out_path, out_cap, "%s", runtime_root);
+        return written > 0 && (size_t)written < out_cap;
+    }
     const char *proof_root=getenv("CODEWORK_WINDOW_LIFECYCLE_PROOF");
     if(proof_root && *proof_root) {
         written=snprintf(out_path,out_cap,"%s/echo-runtime",proof_root);
         return written>0 && (size_t)written<out_cap;
     }
     home_path = getenv("HOME");
+    if (!runtime_namespace || !runtime_namespace[0]) {
+        runtime_namespace = profile && strcmp(profile, "main-edit") == 0
+            ? "MemConsole-Main-Edit" : "MemConsole";
+    }
+    for (const char *c = runtime_namespace; *c; ++c) {
+        if (!((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') ||
+              (*c >= '0' && *c <= '9') || *c == '-' || *c == '_')) {
+            return 0;
+        }
+    }
     if (home_path && home_path[0]) {
 #if defined(__APPLE__)
-        written = snprintf(out_path, out_cap, "%s/Library/Application Support/MemConsole/runtime", home_path);
+        written = snprintf(out_path, out_cap, "%s/Library/Application Support/%s/runtime", home_path, runtime_namespace);
 #else
-        written = snprintf(out_path, out_cap, "%s/.local/share/mem_console", home_path);
+        written = snprintf(out_path, out_cap, "%s/.local/share/%s", home_path,
+                           strcmp(runtime_namespace, "MemConsole") == 0 ? "mem_console" : runtime_namespace);
 #endif
         if (written > 0 && (size_t)written < out_cap) {
             return 1;
         }
         out_path[0] = '\0';
+    }
+
+    if (mem_console_runtime_is_isolated()) {
+        return 0;
     }
 
     base_path = SDL_GetBasePath();
@@ -253,6 +279,31 @@ int mem_console_resolve_app_data_dir(char *out_path, size_t out_cap) {
     written = snprintf(out_path, out_cap, "%s../data", base_path);
     SDL_free(base_path);
     return written > 0 && (size_t)written < out_cap;
+}
+
+int mem_console_runtime_is_isolated(void) {
+    const char *proof = getenv("CODEWORK_WINDOW_LIFECYCLE_PROOF");
+    const char *profile = getenv("MEM_CONSOLE_PACKAGE_PROFILE");
+    const char *name = getenv("MEM_CONSOLE_RUNTIME_NAMESPACE");
+    const char *root = getenv("MEM_CONSOLE_RUNTIME_DIR");
+    const char *home_path = getenv("HOME");
+    char standard[1024];
+    if ((proof && proof[0]) || (profile && profile[0] && strcmp(profile, "standard") != 0) ||
+        (name && name[0] && strcmp(name, "MemConsole") != 0)) {
+        return 1;
+    }
+    if (!root || !root[0]) {
+        return 0;
+    }
+    if (!home_path || !home_path[0]) {
+        return 1;
+    }
+#if defined(__APPLE__)
+    int written = snprintf(standard, sizeof(standard), "%s/Library/Application Support/MemConsole/runtime", home_path);
+#else
+    int written = snprintf(standard, sizeof(standard), "%s/.local/share/mem_console", home_path);
+#endif
+    return written <= 0 || (size_t)written >= sizeof(standard) || strcmp(root, standard) != 0;
 }
 
 int mem_console_path_is_mutable_root_safe(const char *path) {

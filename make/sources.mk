@@ -30,6 +30,7 @@ APP_SRCS := src/app/mem_console.c \
 	src/runtime/mem_console_state_core.c \
 	src/runtime/mem_console_state_graph_filters.c \
 	src/runtime/mem_console_state_paths.c \
+	src/runtime/mem_console_startup_paths.c \
 	src/runtime/mem_console_state_project_filters.c \
 	src/layout/mem_console_layout_config.c \
 	src/layout/mem_console_pane_layout.c \

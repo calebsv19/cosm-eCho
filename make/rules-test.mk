@@ -11,12 +11,14 @@ run-demo: $(BIN)
 test:
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-headless-smoke
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-data-path-contract-checks
+	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-runtime-isolation-test
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-db-mutation-contract-checks
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-state-boundary-contract-checks
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-runtime-refresh-contract-checks
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-graph-contract-checks
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-detail-relationship-contract-checks
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-package-diagnostic-contract-checks
+	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-package-empty-seed-test
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-demo-helper-safety-contract-checks
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-item-mutation-test
 	@$(MAKE) BUILD_TOOLCHAIN="$(TEST_TOOLCHAIN)" run-relationship-mutation-test
@@ -42,6 +44,22 @@ run-data-path-contract-checks:
 
 run-db-mutation-contract-checks:
 	@bash ./tests/run_db_mutation_contract_checks.sh
+
+.PHONY: run-runtime-isolation-test run-package-empty-seed-test
+run-runtime-isolation-test:
+	@mkdir -p $(TARGET_BUILD_ROOT)/tests
+	$(HOST_CC) $(CFLAGS) $(INC) tests/mem_console_runtime_isolation_test.c \
+		src/runtime/mem_console_startup_paths.c src/runtime/mem_console_state_paths.c \
+		src/runtime/mem_console_prefs_app_io.c $(CORE_PACK_DIR)/src/core_pack.c \
+		$(CORE_BASE_DIR)/src/core_base.c -o $(TARGET_BUILD_ROOT)/tests/mem_console_runtime_isolation_test \
+		$(SDL_LIBS) -lm
+	@set -eu; fixture=$$(mktemp -d "$(CURDIR)/build/runtime-isolation.XXXXXX"); \
+		trap 'rm -rf "$$fixture"' EXIT HUP INT TERM; \
+		$(TARGET_BUILD_ROOT)/tests/mem_console_runtime_isolation_test "$$fixture"
+
+run-package-empty-seed-test:
+	@$(MAKE) -C $(CORE_MEMDB_DIR) tools
+	python3 -B tests/test_package_empty_seed.py
 
 run-state-boundary-contract-checks:
 	@mkdir -p $(TARGET_BUILD_ROOT)/tests

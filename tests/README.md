@@ -62,3 +62,10 @@ This lane holds deterministic verification checks for `mem_console`.
   assert the SVG metadata/content is nonblank and frame-derived:
   - `make -C mem_console test`
   - `make -C mem_console run-visual-artifact-contract-checks`
+
+- `mem_console_runtime_isolation_test.c`: synthetic startup preference and DB-path
+  selection, with canonical/legacy sentinel preservation and invalid-root checks.
+  Run `make run-runtime-isolation-test`; included in `make test`.
+- `test_package_empty_seed.py`: generates schema-only seeds, rejects populated
+  seeds, preserves existing destinations and excludes ambient database bytes.
+  Run `make run-package-empty-seed-test`; included in `make test`.

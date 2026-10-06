@@ -88,3 +88,9 @@ not automate clicking macOS's green window control. Next: apply the established
 migration recipe to one selected program, then qualify its actual UI/native paths.
 Mixed field/button traversal and OS IME sessions remain bounded follow-on work;
 generalized docking/provider insertion/persistence needs its own contract.
+
+## Runtime and package data safety
+
+See [runtime isolation and package seeds](runtime_isolation.md) for startup
+preference boundaries, explicit database selection, synthetic package seeds,
+and the backup boundary before installing a release.
