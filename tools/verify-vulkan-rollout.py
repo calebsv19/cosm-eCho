@@ -7,7 +7,7 @@ import struct
 import subprocess
 from pathlib import Path
 
-EXPECTED_SHARED_COMMIT = "ddc9fee6e17482dcd64cf777d7a105b7ed9b157d"
+EXPECTED_SHARED_COMMIT = "2ed6262fbb4ee10d57b39bbd7f521ba7571d3ddd"
 SOURCE_MODULES = ("vk_runtime", "vk_renderer", "kit/kit_render", "kit/kit_ui",
                   "kit/kit_workspace_authoring", "kit/kit_pane", "core/core_pane", "core/core_layout")
 
@@ -160,8 +160,8 @@ def main() -> int:
     renderer = read_version(root / "vk_renderer/VERSION")
     if runtime != (0, 6, 0):
         raise SystemExit(f"vk_runtime 0.6.0 required, found {runtime}")
-    if renderer != (1, 5, 0):
-        raise SystemExit(f"vk_renderer 1.5.0 required, found {renderer}")
+    if renderer != (1, 6, 0):
+        raise SystemExit(f"vk_renderer 1.6.0 required, found {renderer}")
     if read_version(root / "kit/kit_render/VERSION") != (0, 14, 6):
         raise SystemExit("kit_render 0.14.6 required")
 

@@ -81,7 +81,8 @@ APP_OBJS += $(UI_INTERACTION_SDL_OBJ) $(UI_TEXT_SDL_OBJ)
 
 UI_PANE_COMPOSITION_OBJ := $(OBJ_DIR)/shared/kit_pane_composition.o
 UI_NATIVE_TEXT_OBJ := $(OBJ_DIR)/shared/kit_ui_native_text_sdl.o
-APP_OBJS += $(UI_PANE_COMPOSITION_OBJ) $(UI_NATIVE_TEXT_OBJ)
+UI_WINDOW_OBJ := $(OBJ_DIR)/shared/kit_ui_window_sdl.o $(OBJ_DIR)/shared/kit_ui_window_probe_sdl.o
+APP_OBJS += $(UI_PANE_COMPOSITION_OBJ) $(UI_NATIVE_TEXT_OBJ) $(UI_WINDOW_OBJ)
 
 UI_PANE_HOST_OBJ := $(OBJ_DIR)/shared/kit_pane_host.o $(OBJ_DIR)/shared/kit_pane_header.o $(OBJ_DIR)/shared/core_layout.o
 APP_OBJS += $(UI_PANE_HOST_OBJ)

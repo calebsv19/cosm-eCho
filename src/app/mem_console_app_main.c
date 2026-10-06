@@ -265,7 +265,7 @@ static int mem_console_app_config_load(MemConsoleAppMainContext *ctx) {
                                    strcmp(ctx->result.message, "app prefs loaded") == 0;
         app_prefs_loaded = loaded_from_default_path ? 1 : 0;
     }
-    if (!loaded_from_default_path &&
+    if (!getenv("CODEWORK_WINDOW_LIFECYCLE_PROOF") && !loaded_from_default_path &&
         mem_console_build_legacy_app_prefs_path(ctx->app_prefs_legacy_path, sizeof(ctx->app_prefs_legacy_path))) {
         ctx->result = mem_console_app_prefs_load(ctx->app_prefs_legacy_path,
                                                  ctx->app_prefs_db_path,
@@ -431,7 +431,7 @@ static int mem_console_app_subsystems_init(MemConsoleAppMainContext *ctx) {
     ctx->window_created = 1;
 
     vk_renderer_config_set_defaults(&ctx->config);
-    ctx->config.enable_validation = VK_FALSE;
+    ctx->config.enable_validation = getenv("MEM_CONSOLE_REQUIRE_VK_VALIDATION") ? VK_TRUE : VK_FALSE;
     if (vk_renderer_init(&ctx->renderer, ctx->window, &ctx->config) != VK_SUCCESS) {
         fprintf(stderr, "mem_console: vk_renderer_init failed\n");
         return 0;

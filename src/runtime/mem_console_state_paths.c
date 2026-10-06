@@ -226,6 +226,11 @@ int mem_console_resolve_app_data_dir(char *out_path, size_t out_cap) {
     }
 
     out_path[0] = '\0';
+    const char *proof_root=getenv("CODEWORK_WINDOW_LIFECYCLE_PROOF");
+    if(proof_root && *proof_root) {
+        written=snprintf(out_path,out_cap,"%s/echo-runtime",proof_root);
+        return written>0 && (size_t)written<out_cap;
+    }
     home_path = getenv("HOME");
     if (home_path && home_path[0]) {
 #if defined(__APPLE__)

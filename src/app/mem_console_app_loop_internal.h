@@ -1,3 +1,4 @@
+#include "kit_ui_window_probe_sdl.h"
 #ifndef MEM_CONSOLE_APP_LOOP_INTERNAL_H
 #define MEM_CONSOLE_APP_LOOP_INTERNAL_H
 
@@ -84,6 +85,8 @@ typedef enum MemConsoleLoopInputPhaseResult {
 
 typedef struct MemConsoleLoopRunState {
     bool running;
+    KitUiWindowState window_state;
+    KitUiWindowProbe window_probe;
     int frame_width;
     int frame_height;
     int last_frame_width;

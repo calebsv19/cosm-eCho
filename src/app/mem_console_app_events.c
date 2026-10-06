@@ -1,3 +1,4 @@
+#include "kit_ui_window_sdl.h"
 #include "mem_console_pane_layout.h"
 #include "mem_console_app_internal.h"
 #include "mem_console_ui_surface.h"
@@ -69,6 +70,17 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
         return;
     }
 
+    SDL_Window *owning_window=SDL_GetWindowFromID(event->key.windowID);
+    if(event->type==SDL_KEYDOWN && owning_window) {
+        int fullscreen_key=kit_ui_window_fullscreen_key_sdl(owning_window,event);
+        if(fullscreen_key) {
+            mem_console_pane_layout_cancel_drag(state);kit_pane_host_cancel(&state->pane_host,0,0);
+            kit_ui_surface_reset(&state->button_surface);input->mouse_down=input->mouse_pressed=input->mouse_released=0;
+            mem_console_redraw_mark(state,MEM_CONSOLE_REDRAW_REASON_LAYOUT);
+            if(fullscreen_key<0)mem_console_app_set_statusf(state,"Fullscreen transition failed: %s",SDL_GetError());
+            return;
+        }
+    }
     /* Pane cancellation precedes text/button consumers so an editor cannot
      * swallow Escape or focus loss while a splitter owns the pointer. */
     if(state->pane_drag_active && event->type==SDL_KEYDOWN && event->key.keysym.sym==SDLK_ESCAPE) {
@@ -76,9 +88,9 @@ void mem_console_app_process_sdl_event(const SDL_Event *event,
         input->mouse_down=input->mouse_pressed=input->mouse_released=0;
         mem_console_redraw_mark(state,MEM_CONSOLE_REDRAW_REASON_INPUT);return;
     }
-    if(event->type==SDL_WINDOWEVENT && (event->window.event==SDL_WINDOWEVENT_FOCUS_LOST ||
-        event->window.event==SDL_WINDOWEVENT_HIDDEN || event->window.event==SDL_WINDOWEVENT_SIZE_CHANGED)) {
+    if(kit_ui_window_event_invalidates_sdl(event)) {
         mem_console_pane_layout_cancel_drag(state);kit_pane_host_cancel(&state->pane_host,0,0);
+        kit_ui_surface_reset(&state->button_surface);
         input->mouse_down=input->mouse_pressed=input->mouse_released=0;
     }
     if(mem_console_ui_text_event(state,event,keyboard_action)) {

@@ -266,6 +266,15 @@ int main(void) {
     assert(mem_console_pane_layout_update_drag(&state,&config,1440,1000,sx+40,sy));
     SDL_Event lost={0};lost.type=SDL_WINDOWEVENT;lost.window.event=SDL_WINDOWEVENT_FOCUS_LOST;
     route(&state,&render,&ui,&lost);assert(!state.pane_drag_active&&state.pane_detail_top_split_ratio==original);
+    Uint8 window_events[]={SDL_WINDOWEVENT_RESIZED,SDL_WINDOWEVENT_SIZE_CHANGED,SDL_WINDOWEVENT_DISPLAY_CHANGED,SDL_WINDOWEVENT_MOVED,SDL_WINDOWEVENT_MINIMIZED,SDL_WINDOWEVENT_MAXIMIZED,SDL_WINDOWEVENT_RESTORED,SDL_WINDOWEVENT_HIDDEN,SDL_WINDOWEVENT_SHOWN,SDL_WINDOWEVENT_FOCUS_LOST};
+    for(unsigned i=0;i<sizeof(window_events);i++) {
+        assert(mem_console_pane_layout_begin_drag(&state,&config,1440,1000,sx,sy));
+        assert(mem_console_pane_layout_update_drag(&state,&config,1440,1000,sx+40,sy));
+        SDL_Event changed={0};changed.type=SDL_WINDOWEVENT;changed.window.event=window_events[i];
+        route(&state,&render,&ui,&changed);
+        assert(!state.pane_drag_active&&state.pane_detail_top_split_ratio==original);
+    }
+    puts("Echo all window lifecycle events restore splitter ratios and cancel capture");
     input=(KitUiInputState){0};state.title_edit_mode=state.body_edit_mode=state.db_modal_open=0;
     state.pane_host.blocked=0;(void)frame(&state,&render,&ui);
     KitUiInteractionControl header_refresh=control(&state,MC_BUTTON_PANE_HEADER,MEM_CONSOLE_ACTION_REFRESH_GRAPH);

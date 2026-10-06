@@ -1,3 +1,4 @@
+#include "mem_console_pane_layout.h"
 #include "mem_console_app_loop_internal.h"
 
 #include <SDL2/SDL.h>
@@ -332,22 +333,25 @@ static void mem_console_loop_apply_async_outcome(const MemConsoleAppLoopContext 
     }
 }
 
-static void mem_console_loop_resize_phase(const MemConsoleAppLoopContext *ctx,
-                                          MemConsoleLoopRunState *run_state) {
-    if (!ctx || !run_state) {
-        return;
+static int mem_console_loop_resize_phase(const MemConsoleAppLoopContext *ctx, MemConsoleLoopRunState *run) {
+    uint32_t changes=0;
+    if(kit_ui_window_refresh_sdl(&run->window_state,ctx->window,&changes).code!=CORE_OK)return -1;
+    KitUiWindowState *w=&run->window_state;
+    run->frame_width=w->logical_width;run->frame_height=w->logical_height;
+    if(changes)mem_console_redraw_mark(ctx->state,MEM_CONSOLE_REDRAW_REASON_LAYOUT);
+    if(changes & (KIT_UI_WINDOW_GEOMETRY|KIT_UI_WINDOW_MODE|KIT_UI_WINDOW_DISPLAY|KIT_UI_WINDOW_VISIBILITY)) {
+        mem_console_pane_layout_cancel_drag(ctx->state);kit_pane_host_cancel(&ctx->state->pane_host,0,0);
+        kit_ui_surface_reset(&ctx->state->button_surface);
+        run->input.mouse_down=run->input.mouse_pressed=run->input.mouse_released=0;
     }
-    SDL_GetWindowSize(ctx->window, &run_state->frame_width, &run_state->frame_height);
-    if (run_state->frame_width != run_state->last_frame_width ||
-        run_state->frame_height != run_state->last_frame_height) {
-        (void)mem_console_app_recreate_swapchain_and_mark(ctx->renderer,
-                                                          ctx->window,
-                                                          ctx->state,
-                                                          "Swapchain refresh failed after resize");
-        mem_console_redraw_mark(ctx->state, MEM_CONSOLE_REDRAW_REASON_LAYOUT);
-        run_state->last_frame_width = run_state->frame_width;
-        run_state->last_frame_height = run_state->frame_height;
-    }
+    if(!w->presentable)return 0;
+    if(w->drawable_width!=(int)ctx->renderer->context.swapchain.extent.width || w->drawable_height!=(int)ctx->renderer->context.swapchain.extent.height)
+        if(!mem_console_app_recreate_swapchain_and_mark(ctx->renderer,ctx->window,ctx->state,"Drawable recovery failed"))return -1;
+    run->last_frame_width=run->frame_width;run->last_frame_height=run->frame_height;
+    return 1;
+}
+static int mem_console_window_capture(void *renderer,const char *path) {
+    return vk_renderer_request_capture(renderer,path)==VK_SUCCESS;
 }
 
 static MemConsoleLoopRenderDecision mem_console_loop_render_decide(const MemConsoleAppLoopContext *ctx) {
@@ -557,7 +561,9 @@ static MemConsoleLoopStepResult mem_console_loop_frame_step(const MemConsoleAppL
 
     async_outcome = mem_console_loop_async_phase(ctx);
     mem_console_loop_apply_async_outcome(ctx, &async_outcome);
-    mem_console_loop_resize_phase(ctx, run_state);
+    int drawable_ready=mem_console_loop_resize_phase(ctx,run_state);
+    if(drawable_ready<0){step_result=MEM_CONSOLE_LOOP_STEP_FATAL;goto finalize_frame;}
+    if(!drawable_ready){SDL_Delay(16);goto finalize_frame;}
     render_phase_result = mem_console_loop_render_phase(ctx, run_state, &frame);
     if (render_phase_result == MEM_CONSOLE_LOOP_RENDER_PHASE_FATAL) {
         step_result = MEM_CONSOLE_LOOP_STEP_FATAL;
@@ -590,10 +596,17 @@ int mem_console_app_run_loop(MemConsoleAppLoopContext *ctx) {
     }
     memset(&run_state, 0, sizeof(run_state));
     run_state.running = true;
+    kit_ui_window_probe_init_sdl(&run_state.window_probe,"echo");
     run_state.last_frame_width = -1;
     run_state.last_frame_height = -1;
 
     while (run_state.running) {
+        int proof_status=kit_ui_window_probe_tick_sdl(&run_state.window_probe,ctx->window,run_state.rs1_diag_totals.submit_ok_count,mem_console_window_capture,ctx->renderer);
+        if(proof_status){
+            const VkRuntimeCapabilityReport *report=vk_runtime_get_capability_report(&ctx->renderer->context.device->runtime);
+            if(proof_status<0 || !report || !report->validation_enabled || report->validation_warning_count || report->validation_error_count)return 1;
+            puts("WINDOW_LIFECYCLE_VALIDATION program=echo status=pass warnings=0 errors=0");break;}
+        if(run_state.window_probe.directory)mem_console_redraw_mark(ctx->state,MEM_CONSOLE_REDRAW_REASON_BACKGROUND);
         MemConsoleLoopStepResult step_result = mem_console_loop_frame_step(ctx, &run_state);
         if (step_result == MEM_CONSOLE_LOOP_STEP_FATAL) {
             mem_console_workspace_authoring_host_cancel_active_preview(&ctx->state->workspace_authoring,

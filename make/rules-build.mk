@@ -72,3 +72,11 @@ $(OBJ_DIR)/shared/kit_pane_header.o: $(KIT_PANE_DIR)/src/kit_pane_header.c $(KIT
 $(OBJ_DIR)/shared/core_layout.o: $(CORE_LAYOUT_DIR)/src/core_layout.c $(CORE_LAYOUT_DIR)/include/core_layout.h
 	@mkdir -p "$(dir $@)"
 	$(HOST_CC) $(CFLAGS) $(INC) -c $< -o $@
+
+$(OBJ_DIR)/shared/kit_ui_window_sdl.o: $(KIT_UI_DIR)/src/kit_ui_window_sdl.c $(KIT_UI_DIR)/include/kit_ui_window_sdl.h
+	@mkdir -p "$(dir $@)"
+	$(HOST_CC) $(ARCH_FLAGS) $(CFLAGS) $(INC) -MMD -MP -c $< -o $@
+$(OBJ_DIR)/shared/kit_ui_window_probe_sdl.o: $(KIT_UI_DIR)/src/kit_ui_window_probe_sdl.c $(KIT_UI_DIR)/include/kit_ui_window_probe_sdl.h $(KIT_UI_DIR)/include/kit_ui_window_sdl.h
+	@mkdir -p "$(dir $@)"
+	$(HOST_CC) $(ARCH_FLAGS) $(CFLAGS) $(INC) -MMD -MP -c $< -o $@
+-include $(UI_WINDOW_OBJ:.o=.d)
