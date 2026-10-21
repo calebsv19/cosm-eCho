@@ -42,7 +42,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True)
     parser.add_argument("--source-root", default=os.getcwd())
-    parser.add_argument("--data-root", default=os.environ.get("CODEWORK_DATA_ROOT", str(Path.home() / "CodeWorkData")))
+    parser.add_argument("--data-root", default=os.environ.get("CODEWORKCTL_WORKSPACE_ROOT", os.environ.get("CODEWORK_DATA_ROOT", str(Path.home() / "CodeWorkData"))))
     args = parser.parse_args()
     print(prepare_root(args.output, args.source_root, args.data_root))
 

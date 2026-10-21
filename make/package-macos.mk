@@ -21,7 +21,7 @@ package-desktop: package-build-lane
 	@chmod +x "$(PACKAGE_MACOS_DIR)/mem-console-bin" "$(PACKAGE_MACOS_DIR)/mem-console-launcher"
 	@PACKAGE_DEP_SEARCH_ROOTS="$(TARGET_DEP_SEARCH_ROOTS)" "$(PACKAGE_DYLIB_BUNDLER)" "$(PACKAGE_MACOS_DIR)/mem-console-bin" "$(PACKAGE_FRAMEWORKS_DIR)"
 	@mkdir -p "$(PACKAGE_RESOURCES_DIR)/data"
-	@$(MAKE) -C "$(CORE_MEMDB_DIR)" tools
+	@$(MAKE) -C "$(CORE_MEMDB_DIR)" CC="$(SHARED_CC)" tools
 	@python3 tools/packaging/generate_empty_seed.py \
 		--mem-cli "$(CORE_MEMDB_DIR)/build/mem_cli" \
 		--output "$(PACKAGE_RESOURCES_DIR)/data/default.sqlite"
@@ -77,11 +77,11 @@ package-desktop-smoke: package-desktop
 	@test -f "$(PACKAGE_RESOURCES_DIR)/shared/assets/fonts/Montserrat-Regular.ttf" || (echo "Missing shared font"; exit 1)
 	@test -f "$(PACKAGE_RESOURCES_DIR)/vk_renderer/shaders/textured.vert.spv" || (echo "Missing bundled vk shader"; exit 1)
 	@test -f "$(PACKAGE_RESOURCES_DIR)/shaders/textured.vert.spv" || (echo "Missing bundled runtime shader"; exit 1)
-	@actual_archs="$$(/usr/bin/lipo -archs "$(PACKAGE_MACOS_DIR)/mem-console-bin" 2>/dev/null || true)"; \
+	@actual_archs="$$(tools/packaging/macos/developer-tool.sh lipo -archs "$(PACKAGE_MACOS_DIR)/mem-console-bin" 2>/dev/null || true)"; \
 	printf '%s\n' "$$actual_archs" | /usr/bin/grep -qw "$(TARGET_ARCH)" || (echo "Unexpected app binary archs: $$actual_archs"; exit 1)
 	@for dylib in "$(PACKAGE_FRAMEWORKS_DIR)"/*.dylib; do \
 		[ -f "$$dylib" ] || continue; \
-		dylib_archs="$$(/usr/bin/lipo -archs "$$dylib" 2>/dev/null || true)"; \
+		dylib_archs="$$(tools/packaging/macos/developer-tool.sh lipo -archs "$$dylib" 2>/dev/null || true)"; \
 		printf '%s\n' "$$dylib_archs" | /usr/bin/grep -qw "$(TARGET_ARCH)" || (echo "Unexpected dylib archs for $$dylib: $$dylib_archs"; exit 1); \
 	done
 	@echo "package-desktop-smoke passed."
@@ -116,6 +116,7 @@ package-desktop-refresh: package-desktop
 	@echo "Refreshed $(PACKAGE_APP_NAME) at $(DESKTOP_APP_DIR)"
 
 package-desktop-main-edit:
+	@test -s "$(PACKAGE_APP_ICON_SRC)" || test -d "$(PACKAGE_APP_ICONSET_SRC)" || (echo "Missing Main Edit icon input: $(PACKAGE_APP_ICON_SRC)"; exit 1)
 	@test -f "$(MEW1_TOOL)" || (echo "Missing shared MEW1 helper: $(MEW1_TOOL)"; exit 1)
 	@before="$$(python3 "$(MEW1_TOOL)" fingerprint --repo "$(CURDIR)")"; \
 	$(MAKE) package-desktop-smoke \
@@ -137,6 +138,9 @@ package-desktop-main-edit:
 	@echo "Main Edit desktop package ready: $(MAIN_EDIT_APP_DIR)"
 
 package-desktop-main-edit-self-test: package-desktop-main-edit
+	@test -s "$(MAIN_EDIT_APP_DIR)/Contents/Resources/$(PACKAGE_APP_ICON_FILE)" || (echo "Missing bundled Main Edit icon"; exit 1)
+	@test "$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$(MAIN_EDIT_APP_DIR)/Contents/Info.plist")" = "$(PACKAGE_APP_ICON_NAME)" || (echo "Main Edit icon metadata mismatch"; exit 1)
+	@if [ -f "$(PACKAGE_APP_ICON_SRC)" ]; then cmp "$(PACKAGE_APP_ICON_SRC)" "$(MAIN_EDIT_APP_DIR)/Contents/Resources/$(PACKAGE_APP_ICON_FILE)" || exit 1; fi
 	@test "$$('/usr/libexec/PlistBuddy' -c 'Print :CFBundleIdentifier' "$(MAIN_EDIT_APP_DIR)/Contents/Info.plist")" = "$(MAIN_EDIT_BUNDLE_ID)"
 	@test "$$('/usr/libexec/PlistBuddy' -c 'Print :CFBundleDisplayName' "$(MAIN_EDIT_APP_DIR)/Contents/Info.plist")" = "$(MAIN_EDIT_DISPLAY_NAME)"
 	@test "$$('/usr/libexec/PlistBuddy' -c 'Print :MemConsolePackageProfile' "$(MAIN_EDIT_APP_DIR)/Contents/Info.plist")" = "$(MAIN_EDIT_PROFILE)"
@@ -152,13 +156,13 @@ package-desktop-main-edit-self-test: package-desktop-main-edit
 		--product eCho \
 		--version "$(PACKAGE_PROGRAM_VERSION)"
 	@set -e; \
-	fake_home="$(CURDIR)/$(TARGET_BUILD_ROOT)/package-main-edit-self-test/home"; \
-	isolated_runtime="$(CURDIR)/$(TARGET_BUILD_ROOT)/package-main-edit-self-test/runtime"; \
-	isolated_logs="$(CURDIR)/$(TARGET_BUILD_ROOT)/package-main-edit-self-test/logs"; \
+	fake_home="$(abspath $(TARGET_BUILD_ROOT))/package-main-edit-self-test/home"; \
+	isolated_runtime="$(abspath $(TARGET_BUILD_ROOT))/package-main-edit-self-test/runtime"; \
+	isolated_logs="$(abspath $(TARGET_BUILD_ROOT))/package-main-edit-self-test/logs"; \
 	rm -rf "$$fake_home" "$$isolated_runtime" "$$isolated_logs"; \
 	mkdir -p "$$fake_home" "$$isolated_runtime" "$$isolated_logs"; \
-	HOME="$$fake_home" MEM_CONSOLE_RUNTIME_DIR="$$isolated_runtime" MEM_CONSOLE_LOG_DIR="$$isolated_logs" "$(MAIN_EDIT_APP_DIR)/Contents/MacOS/mem-console-launcher" --self-test; \
-	config="$$(HOME="$$fake_home" MEM_CONSOLE_RUNTIME_DIR="$$isolated_runtime" MEM_CONSOLE_LOG_DIR="$$isolated_logs" "$(MAIN_EDIT_APP_DIR)/Contents/MacOS/mem-console-launcher" --print-config)"; \
+	HOME="$$fake_home" MEM_CONSOLE_RUNTIME_DIR="$$isolated_runtime" MEM_CONSOLE_LOG_DIR="$$isolated_logs" CODEWORK_MEMDB_PATH="$$isolated_runtime/data/default.sqlite" VK_RENDERER_SHADER_ROOT="$$isolated_runtime" "$(MAIN_EDIT_APP_DIR)/Contents/MacOS/mem-console-launcher" --self-test; \
+	config="$$(HOME="$$fake_home" MEM_CONSOLE_RUNTIME_DIR="$$isolated_runtime" MEM_CONSOLE_LOG_DIR="$$isolated_logs" CODEWORK_MEMDB_PATH="$$isolated_runtime/data/default.sqlite" VK_RENDERER_SHADER_ROOT="$$isolated_runtime" "$(MAIN_EDIT_APP_DIR)/Contents/MacOS/mem-console-launcher" --print-config)"; \
 	printf '%s\n' "$$config"; \
 	printf '%s\n' "$$config" | grep -Fqx "MEM_CONSOLE_PACKAGE_PROFILE=$(MAIN_EDIT_PROFILE)"; \
 	printf '%s\n' "$$config" | grep -Fqx "MEM_CONSOLE_RUNTIME_NAMESPACE=$(MAIN_EDIT_RUNTIME_NAMESPACE)"; \

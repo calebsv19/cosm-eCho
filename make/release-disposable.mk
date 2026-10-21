@@ -13,7 +13,7 @@ release-artifact-disposable:
 	archive="$(RELEASE_ARTIFACT_ZIP)"; \
 	manifest="$(RELEASE_ARTIFACT_MANIFEST)"; \
 	/usr/bin/ditto -c -k --sequesterRsrc --keepParent "$$root/$(PACKAGE_APP_NAME)" "$$archive"; \
-	shasum -a 256 "$$archive" > "$$archive.sha256"; \
+	(cd "$$(dirname "$$archive")" && shasum -a 256 "$$(basename "$$archive")") > "$$archive.sha256"; \
 	{ \
 		echo "product=$(RELEASE_PRODUCT_NAME)"; \
 		echo "program=$(RELEASE_PROGRAM_KEY)"; \
@@ -42,6 +42,7 @@ release-artifact-disposable:
 .PHONY: release-package-self-test
 release-package-self-test: package-desktop-smoke
 	@set -eu; \
-	runtime="$$(mktemp -d "$(CURDIR)/build/echo-package-self-test.XXXXXX")"; \
+	mkdir -p "$(BUILD_ROOT)/diagnostics"; \
+	runtime="$$(mktemp -d "$(BUILD_ROOT)/diagnostics/echo-package-self-test.XXXXXX")"; \
 	trap 'rm -rf "$$runtime"' EXIT HUP INT TERM; \
 	MEM_CONSOLE_RUNTIME_DIR="$$runtime/runtime" MEM_CONSOLE_LOG_DIR="$$runtime/logs" CODEWORK_MEMDB_PATH="$$runtime/runtime/data/default.sqlite" VK_RENDERER_SHADER_ROOT="$$runtime/runtime" "$(PACKAGE_MACOS_DIR)/mem-console-launcher" --self-test

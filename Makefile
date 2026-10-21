@@ -1,20 +1,12 @@
-include make/config.mk
-include make/target.mk
-include make/shared.mk
-include make/flags.mk
-include make/paths.mk
-include make/sources.mk
-include make/objects.mk
-
-.DEFAULT_GOAL := all
-
-.PHONY: all clean run run-demo vk-renderer-lib vulkan-rollout-contract vulkan-rollout-self-test test run-headless-smoke run-data-path-contract-checks run-db-mutation-contract-checks run-state-boundary-contract-checks run-runtime-refresh-contract-checks run-graph-contract-checks run-detail-relationship-contract-checks run-package-diagnostic-contract-checks run-demo-helper-safety-contract-checks run-item-mutation-test run-relationship-mutation-test run-browse-filter-contract-checks run-visual-fixture-contract-checks run-visual-artifact-contract-checks visual-harness visual-artifact visual-fixture-capture memory-check-build memory-check-run memory-check-audit package-build-lane package-desktop package-desktop-smoke package-desktop-self-test package-desktop-copy-desktop package-desktop-sync package-desktop-open package-desktop-remove package-desktop-refresh package-desktop-main-edit package-desktop-main-edit-self-test package-desktop-main-edit-refresh release-contract release-clean release-build release-bundle-audit release-sign release-verify release-verify-signed release-notarize release-staple release-verify-notarized release-artifact release-distribute release-desktop-refresh FORCE
-
-include make/rules-memory-check.mk
-include make/rules-build.mk
-include make/rules-test.mk
-include make/rules-vulkan-runtime.mk
-include make/rules-render-fidelity.mk
-include make/package-macos.mk
-include make/release.mk
-include make/release-disposable.mk
+# The declared preparation profile routes ordinary goals through an isolated
+# shared-input copy. Recursive producer commands keep their original targets.
+ifneq ($(strip $(PREPARATION_ROOT)),)
+ifneq ($(PREPARATION_CHILD),1)
+PREPARATION_DISPATCH := 1
+endif
+endif
+ifeq ($(PREPARATION_DISPATCH),1)
+include make/preparation.mk
+else
+include make/application.mk
+endif

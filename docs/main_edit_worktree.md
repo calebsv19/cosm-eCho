@@ -67,3 +67,26 @@ audits the distinct Main Edit app process before replacing only
 - A successful local package is development evidence, not a release artifact.
 - Keep source adoption, Desktop refresh, release packaging, and publication as
   distinct authority boundaries.
+
+## Main Edit icon packaging
+
+The existing product icon is retained at
+`tools/packaging/macos/local_app_icon/AppIcon.icns`; this file is deliberately
+excluded from the local-icon ignore rule so future source checkpoints and
+worktrees retain it. Main Edit packaging requires an icon input. Its self-test
+requires the bundled icon, the matching `CFBundleIconFile`, and byte equality
+with the selected `.icns` input. Missing icons must fail rather than silently
+produce a generic Desktop icon. Other local icon experiments remain ignored.
+
+## Contained preparation gates
+
+The Registry producer profile sets PREPARATION_ROOT and BUILD_ROOT to the same
+fresh attempt-owned directory. The ordinary release-contract, headless smoke,
+package self-test and disposable-package targets then dispatch through
+make/preparation.mk. It creates a fresh declared shared-input copy for legacy
+in-tree builders and invokes the same targets. Frozen source is never writable.
+A reused output, mismatched build root or unsupported goal refuses before build.
+The Main Edit self-test is also supported with declared shared MEW1 tooling and
+isolated runtime/DB/log/shader paths. No Desktop-refresh or live-authentication
+goal is admitted by this dispatcher. Existing non-profile development stays on
+the ordinary application Make rules.

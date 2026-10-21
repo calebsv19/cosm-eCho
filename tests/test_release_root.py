@@ -1,5 +1,7 @@
 """Synthetic containment and make-routing checks; no credentials or user DBs."""
 import importlib.util
+import os
+import sys
 from pathlib import Path
 import subprocess
 import tempfile
@@ -52,6 +54,17 @@ class ReleaseRootTests(unittest.TestCase):
         (self.source / "build").symlink_to(outside, target_is_directory=True)
         with self.assertRaises(ValueError): self.prepare("build/release-authenticated/rapcj_test")
         self.assertEqual(list(outside.iterdir()), [])
+
+    def test_normal_owner_data_root_context(self):
+        selected = self.data / "mem_console/build/release-authenticated/normal-owner"
+        env = dict(os.environ, CODEWORKCTL_WORKSPACE_ROOT=str(self.data),
+                   CODEWORK_DATA_ROOT=str(self.root / "unselected"))
+        result = subprocess.run([sys.executable, str(ROOT / "tools/packaging/prepare_release_root.py"),
+                                 "--source-root", str(self.source), "--output", str(selected)],
+                                env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(selected.is_dir())
+        self.assertFalse((self.root / "unselected").exists())
 
     def test_make_routes_bundle_artifact_and_runtime_to_selected_root(self):
         selected = self.data / "mem_console/build/release-authenticated/rapcj_test"

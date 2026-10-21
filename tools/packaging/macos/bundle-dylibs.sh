@@ -13,8 +13,9 @@ GREP_BIN="/usr/bin/grep"
 CP_BIN="/bin/cp"
 CHMOD_BIN="/bin/chmod"
 BASENAME_BIN="/usr/bin/basename"
-OTOOL_BIN="/usr/bin/otool"
-INSTALL_NAME_TOOL_BIN="/usr/bin/install_name_tool"
+DEVELOPER_TOOL="$(dirname "$0")/developer-tool.sh"
+OTOOL_BIN="$DEVELOPER_TOOL"
+INSTALL_NAME_TOOL_BIN="$DEVELOPER_TOOL"
 MKDIR_BIN="/bin/mkdir"
 
 "$MKDIR_BIN" -p "$FRAMEWORKS_DIR"
@@ -45,7 +46,7 @@ while IFS= read -r current_file; do
     fi
     echo "$current_file" >>"$SEEN_FILE"
 
-    deps="$("$OTOOL_BIN" -L "$current_file" | "$AWK_BIN" 'NR>1 {print $1}' | "$GREP_BIN" -E '^/opt/homebrew|^/usr/local|^@rpath/' || true)"
+    deps="$("$OTOOL_BIN" otool -L "$current_file" | "$AWK_BIN" 'NR>1 {print $1}' | "$GREP_BIN" -E '^/opt/homebrew|^/usr/local|^@rpath/' || true)"
     if [ -z "$deps" ]; then
         continue
     fi
@@ -80,7 +81,7 @@ while IFS= read -r current_file; do
         if [ ! -f "$dep_dst" ]; then
             "$CP_BIN" -fL "$dep_src" "$dep_dst"
             "$CHMOD_BIN" u+w "$dep_dst"
-            "$INSTALL_NAME_TOOL_BIN" -id "@loader_path/$dep_base" "$dep_dst" || true
+            "$INSTALL_NAME_TOOL_BIN" install_name_tool -id "@loader_path/$dep_base" "$dep_dst" || true
             echo "$dep_dst" >>"$QUEUE_FILE"
         fi
 
@@ -89,7 +90,7 @@ while IFS= read -r current_file; do
         else
             replacement="@loader_path/$dep_base"
         fi
-        "$INSTALL_NAME_TOOL_BIN" -change "$dep" "$replacement" "$current_file"
+        "$INSTALL_NAME_TOOL_BIN" install_name_tool -change "$dep" "$replacement" "$current_file"
     done
 done <"$QUEUE_FILE"
 
@@ -108,7 +109,7 @@ if [ -n "$MOLTENVK_SRC" ]; then
         "$CP_BIN" -fL "$MOLTENVK_SRC" "$MOLTENVK_DST"
         "$CHMOD_BIN" u+w "$MOLTENVK_DST"
     fi
-    "$INSTALL_NAME_TOOL_BIN" -id "@loader_path/libMoltenVK.dylib" "$MOLTENVK_DST" || true
+    "$INSTALL_NAME_TOOL_BIN" install_name_tool -id "@loader_path/libMoltenVK.dylib" "$MOLTENVK_DST" || true
 fi
 
 exit 0
