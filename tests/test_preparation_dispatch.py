@@ -31,10 +31,13 @@ class DispatchTest(unittest.TestCase):
             self.assertEqual((output/'preparation-shared/input.c').read_text(), 'source')
             result = subprocess.run(args+['run-headless-smoke'], capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
-            for goal in ('release-notarize', 'package-desktop-refresh', 'clean'):
+            for goal in ('package-desktop-refresh', 'clean'):
                 result = subprocess.run(args+[goal], capture_output=True, text=True)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn('Unsupported contained preparation goal', result.stderr)
+            result = subprocess.run(args+['release-notarize', 'run-headless-smoke'], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('cannot mix', result.stderr)
             mismatch = base/'mismatch'
             result = subprocess.run(args+['BUILD_ROOT='+str(mismatch), 'run-headless-smoke'], capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)

@@ -28,29 +28,29 @@ release-root-prepare:
 	@python3 tools/packaging/prepare_release_root.py --output "$(RELEASE_ROOT)"
 
 release-build: release-root-prepare
-	@$(MAKE) BUILD_TOOLCHAIN="$(RELEASE_TOOLCHAIN)" PACKAGE_TOOLCHAIN="$(RELEASE_TOOLCHAIN)" TARGET_OS="$(TARGET_OS)" TARGET_ARCH="$(TARGET_ARCH)" TARGET_VARIANT="$(TARGET_VARIANT)" release-package-self-test
+	@$(MAKE) PREPARATION_CHILD=1 SHARED_ROOT="$(SHARED_ROOT)" BUILD_TOOLCHAIN="$(RELEASE_TOOLCHAIN)" PACKAGE_TOOLCHAIN="$(RELEASE_TOOLCHAIN)" TARGET_OS="$(TARGET_OS)" TARGET_ARCH="$(TARGET_ARCH)" TARGET_VARIANT="$(TARGET_VARIANT)" release-package-self-test
 	@echo "release-build complete."
 
 release-bundle-audit: release-build
 	@mkdir -p "$(RELEASE_DIR)"
 	@/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$(PACKAGE_CONTENTS_DIR)/Info.plist" > "$(RELEASE_DIR)/bundle_id.txt"
 	@test "$$(cat "$(RELEASE_DIR)/bundle_id.txt")" = "$(RELEASE_BUNDLE_ID)" || (echo "Bundle identifier mismatch"; exit 1)
-	@binary_archs="$$(/usr/bin/lipo -archs "$(PACKAGE_MACOS_DIR)/mem-console-bin" 2>/dev/null || true)"; \
+	@binary_archs="$$(tools/packaging/macos/developer-tool.sh lipo -archs "$(PACKAGE_MACOS_DIR)/mem-console-bin" 2>/dev/null || true)"; \
 		printf '%s\n' "$$binary_archs" | /usr/bin/grep -qw "$(TARGET_ARCH)" || (echo "Unexpected release binary archs: $$binary_archs"; exit 1); \
 		printf '%s\n' "$$binary_archs" > "$(RELEASE_DIR)/lipo_mem_console_bin.txt"
-	@otool -L "$(PACKAGE_MACOS_DIR)/mem-console-bin" > "$(RELEASE_DIR)/otool_mem_console_bin.txt"
+	@tools/packaging/macos/developer-tool.sh otool -L "$(PACKAGE_MACOS_DIR)/mem-console-bin" > "$(RELEASE_DIR)/otool_mem_console_bin.txt"
 	@for dylib in "$(PACKAGE_FRAMEWORKS_DIR)"/*.dylib; do \
 		[ -f "$$dylib" ] || continue; \
 		out="$(RELEASE_DIR)/otool_$$(basename "$$dylib").txt"; \
 		arch_out="$(RELEASE_DIR)/lipo_$$(basename "$$dylib").txt"; \
-		dylib_archs="$$(/usr/bin/lipo -archs "$$dylib" 2>/dev/null || true)"; \
+		dylib_archs="$$(tools/packaging/macos/developer-tool.sh lipo -archs "$$dylib" 2>/dev/null || true)"; \
 		printf '%s\n' "$$dylib_archs" | /usr/bin/grep -qw "$(TARGET_ARCH)" || (echo "Unexpected release dylib archs for $$dylib: $$dylib_archs"; exit 1); \
 		printf '%s\n' "$$dylib_archs" > "$$arch_out"; \
-		otool -L "$$dylib" > "$$out"; \
+		tools/packaging/macos/developer-tool.sh otool -L "$$dylib" > "$$out"; \
 	done
 	@! sed '/^[^[:space:]].*:$$/d' "$(RELEASE_DIR)"/otool_*.txt | rg -q '/opt/homebrew|/usr/local|/Users/' || (echo "Found non-portable dylib linkage"; exit 1)
 	@! sed '/^[^[:space:]].*:$$/d' "$(RELEASE_DIR)"/otool_*.txt | rg -q '@rpath/' || (echo "Found unresolved @rpath dylib linkage"; exit 1)
-	@find "$(PACKAGE_APP_DIR)" -print > "$(RELEASE_DIR)/bundle_manifest.txt"
+	@(cd "$(PACKAGE_APP_DIR)" && find . -print) > "$(RELEASE_DIR)/bundle_manifest.txt"
 	@! rg -q '(^|/)(_private_workspace_artifacts|demo|tmp|ide_files)(/|$$)' "$(RELEASE_DIR)/bundle_manifest.txt" || (echo "Found private/generated path in release bundle"; exit 1)
 	@! rg -q '(^|/)data/.*\.ui\.pack$$' "$(RELEASE_DIR)/bundle_manifest.txt" || (echo "Found packaged UI prefs sidecar in release bundle"; exit 1)
 	@extra_data="$$(find "$(PACKAGE_RESOURCES_DIR)/data" -type f ! -name default.sqlite -print -quit)"; \
@@ -106,7 +106,7 @@ release-verify-signed: release-verify
 release-notarize: release-verify-signed
 	@test -n "$(APPLE_NOTARY_PROFILE)" || (echo "Missing APPLE_NOTARY_PROFILE"; exit 1)
 	@mkdir -p "$(RELEASE_DIR)"
-	@ditto -c -k --keepParent "$(PACKAGE_APP_DIR)" "$(RELEASE_APP_ZIP)"
+	@/usr/bin/ditto -c -k --keepParent "$(PACKAGE_APP_DIR)" "$(RELEASE_APP_ZIP)"
 	@xcrun notarytool submit "$(RELEASE_APP_ZIP)" --keychain-profile "$(APPLE_NOTARY_PROFILE)" --wait --output-format json > "$(RELEASE_DIR)/notary_submit.json"
 	@rg -q '"status"[[:space:]]*:[[:space:]]*"Accepted"' "$(RELEASE_DIR)/notary_submit.json" || (cat "$(RELEASE_DIR)/notary_submit.json" && echo "Notary submission was not accepted" && exit 1)
 	@echo "release-notarize passed."
@@ -132,7 +132,7 @@ release-verify-notarized: release-staple
 
 release-artifact: release-verify-notarized
 	@mkdir -p "$(RELEASE_DIR)"
-	@ditto -c -k --keepParent "$(PACKAGE_APP_DIR)" "$(RELEASE_APP_ZIP)"
+	@/usr/bin/ditto -c -k --keepParent "$(PACKAGE_APP_DIR)" "$(RELEASE_APP_ZIP)"
 	@shasum -a 256 "$(RELEASE_APP_ZIP)" > "$(RELEASE_APP_ZIP).sha256"
 	@{ \
 		echo "product=$(RELEASE_PRODUCT_NAME)"; \

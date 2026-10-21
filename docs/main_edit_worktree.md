@@ -87,6 +87,8 @@ make/preparation.mk. It creates a fresh declared shared-input copy for legacy
 in-tree builders and invokes the same targets. Frozen source is never writable.
 A reused output, mismatched build root or unsupported goal refuses before build.
 The Main Edit self-test is also supported with declared shared MEW1 tooling and
-isolated runtime/DB/log/shader paths. No Desktop-refresh or live-authentication
-goal is admitted by this dispatcher. Existing non-profile development stays on
+isolated runtime/DB/log/shader paths. Desktop-refresh remains excluded. Native authentication phase targets use
+make/preparation-auth.mk in the original Make process, preserving the owner
+checkpoint flags; only the initial release-build stages its shared inputs.
+Authentication still requires the separate bound owner and its evidence. Existing non-profile development stays on
 the ordinary application Make rules.
