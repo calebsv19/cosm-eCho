@@ -669,7 +669,30 @@ static int test_external_backend_attachment(void) {
     return 0;
 }
 
+static int test_prepared_text_context(void) {
+    KitRenderContext entry, next, untouched;
+    if (kit_render_context_init(&entry, KIT_RENDER_BACKEND_NULL,
+        CORE_THEME_PRESET_DAW_DEFAULT, CORE_FONT_PRESET_DAW_DEFAULT).code != CORE_OK) return 1;
+    if (kit_render_prepare_text_context(&entry, CORE_FONT_PRESET_IDE, 2, 1, &next).code != CORE_OK) return 1;
+    if (entry.font.id != CORE_FONT_PRESET_DAW_DEFAULT || entry.text_zoom_step != 0 ||
+        next.font.id != CORE_FONT_PRESET_IDE || next.text_zoom_step != 2) return 1;
+    memset(&untouched, 0x5a, sizeof(untouched));
+    KitRenderContext before = untouched;
+    if (kit_render_prepare_text_context(&entry, (CoreFontPresetId)999, 0, 1, &untouched).code == CORE_OK ||
+        memcmp(&before, &untouched, sizeof(before))) return 1;
+    entry.frame_open = 1;
+    if (kit_render_prepare_text_context(&entry, CORE_FONT_PRESET_IDE, 0, 1, &untouched).code == CORE_OK ||
+        memcmp(&before, &untouched, sizeof(before))) return 1;
+    entry.frame_open = 0;
+    kit_render_context_shutdown(&next);
+    kit_render_context_shutdown(&entry);
+    return 0;
+}
+
 int main(void) {
+    if (test_prepared_text_context() != 0) {
+        fprintf(stderr, "prepared text context test failed\n"); return 1;
+    }
     if (test_frame_recording() != 0) {
         fprintf(stderr, "test_frame_recording failed\n");
         return 1;

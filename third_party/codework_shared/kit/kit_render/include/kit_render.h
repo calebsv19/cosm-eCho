@@ -178,6 +178,15 @@ CoreResult kit_render_context_init(KitRenderContext *ctx,
                                    KitRenderBackendKind backend,
                                    CoreThemePresetId theme_id,
                                    CoreFontPresetId font_id);
+/* Prepare an independent context, eagerly opening every role/tier. On failure
+ * source and out_context are unchanged. The result borrows source's renderer;
+ * that renderer must outlive both contexts. Call between frames, into an empty
+ * destination; shutdown releases only that context's fonts. NULL backend keeps
+ * its semantic test behavior. Native pixels is opt-in for this new context. */
+CoreResult kit_render_prepare_text_context(const KitRenderContext *source,
+    CoreFontPresetId font_id, int zoom_step, int native_pixels,
+    KitRenderContext *out_context);
+
 CoreResult kit_render_set_theme_preset(KitRenderContext *ctx, CoreThemePresetId theme_id);
 CoreResult kit_render_set_font_preset(KitRenderContext *ctx, CoreFontPresetId font_id);
 int kit_render_text_zoom_step(const KitRenderContext *ctx);

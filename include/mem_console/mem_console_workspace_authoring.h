@@ -42,6 +42,9 @@ typedef struct MemConsoleWorkspaceAuthoringHost {
     uint32_t add_stub_count;
     uint32_t last_overlay_button_id;
     uint32_t last_font_theme_button_id;
+    KitRenderContext baseline_render;
+    int baseline_render_valid;
+    int baseline_pane_prefs_dirty;
     int baseline_text_zoom_step;
     int baseline_theme_preset_id;
     int baseline_font_preset_id;

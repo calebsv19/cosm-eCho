@@ -28,6 +28,7 @@ typedef struct KitRenderVkBackendState {
     int ttf_cache_initialized;
     int ttf_runtime_ready;
     int ttf_runtime_failed;
+    int native_pixels;
 #endif
 } KitRenderVkBackendState;
 
@@ -72,7 +73,7 @@ static void vk_backend_shutdown(KitRenderContext *ctx) {
     }
     state = (KitRenderVkBackendState *)ctx->backend_state;
 #if KIT_RENDER_ENABLE_VK_BACKEND
-    if (state->renderer) {
+    if (state->renderer && state->owns_renderer) {
         kit_render_external_text_reset_renderer((SDL_Renderer *)state->renderer);
     }
     vk_backend_clear_font_cache(state);
@@ -469,11 +470,17 @@ static CoreResult vk_backend_get_ttf_font(KitRenderContext *ctx,
     TTF_SetFontKerning(font, text_run.kerning_enabled);
 
     state->ttf_font_cache[(int)role_id][(int)tier] = font;
-    kit_render_external_text_register_font_source(font,
+    (state->native_pixels ? kit_render_external_text_register_font_source_native_pixels
+                          : kit_render_external_text_register_font_source)(font,
                                                   loaded_path[0] ? loaded_path : role_spec.primary_path,
                                                   point_size,
                                                   point_size,
                                                   text_run.kerning_enabled);
+    if (!kit_render_external_text_has_font_source(font)) {
+        state->ttf_font_cache[(int)role_id][(int)tier] = 0;
+        TTF_CloseFont(font);
+        return vk_backend_invalid("font source registry full");
+    }
     if (out_point_size) {
         *out_point_size = point_size;
     }
@@ -896,4 +903,46 @@ const KitRenderBackendOps *kit_render_backend_vk_ops(void) {
         vk_backend_measure_text
     };
     return &ops;
+}
+
+CoreResult kit_render_prepare_text_context(const KitRenderContext *source,
+    CoreFontPresetId font_id, int zoom_step, int native_pixels,
+    KitRenderContext *out_context) {
+    KitRenderContext candidate;
+    CoreResult result;
+    if (!source || !out_context || source == out_context || source->frame_open ||
+        (!source->backend_state && source->backend != KIT_RENDER_BACKEND_NULL) || !source->backend_ops)
+        return vk_backend_invalid("invalid text preparation source/destination");
+    result = kit_render_context_init(&candidate, source->backend, source->theme.id, font_id);
+    if (result.code != CORE_OK) return result;
+    result = kit_render_set_text_zoom_step(&candidate, zoom_step);
+#if KIT_RENDER_ENABLE_VK_BACKEND
+    if (result.code == CORE_OK && source->backend == KIT_RENDER_BACKEND_VULKAN) {
+        KitRenderVkBackendState *old = vk_backend_state(source);
+        KitRenderVkBackendState *next = vk_backend_state(&candidate);
+        /* A prepared candidate never assumes ownership of the shared renderer. */
+        if (!old->renderer) result = vk_backend_invalid("text preparation needs renderer");
+        else {
+            next->renderer = old->renderer;
+            next->native_pixels = native_pixels != 0;
+            for (int role = 0; role < CORE_FONT_ROLE_COUNT && result.code == CORE_OK; ++role)
+                for (int tier = 0; tier < CORE_FONT_TEXT_SIZE_COUNT && result.code == CORE_OK; ++tier) {
+                    TTF_Font *font = 0;
+                    result = vk_backend_get_ttf_font(&candidate, next,
+                        (CoreFontRoleId)role, (CoreFontTextSizeTier)tier, &font, 0);
+                }
+        }
+    }
+#else
+    (void)native_pixels;
+    if (source->backend == KIT_RENDER_BACKEND_VULKAN)
+        result = vk_backend_invalid("native text preparation unavailable");
+#endif
+    if (result.code != CORE_OK) {
+        kit_render_context_shutdown(&candidate);
+        return result;
+    }
+    candidate.theme = source->theme;
+    *out_context = candidate;
+    return core_result_ok();
 }

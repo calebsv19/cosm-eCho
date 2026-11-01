@@ -185,3 +185,8 @@ ui-text-presentation-self-test: ui-text-focus-self-test
 
 .PHONY: ui-pane-host-self-test
 ui-pane-host-self-test: ui-interaction-self-test
+
+# Build-only native proof. Caller supplies an isolated runtime/output directory.
+.PHONY: text-settings-harness
+text-settings-harness: $(BIN)
+	$(HOST_CC) $(ARCH_FLAGS) $(CFLAGS) $(INC) tests/mem_console_text_settings_test.c $(filter-out $(OBJ_DIR)/src/app/mem_console.o,$(APP_OBJS)) $(APP_SHARED_LIBS) $(VULKAN_LIBS) $(SDL_LIBS) $(SDL_TTF_LIBS) $(APPLE_FW) -lm -o $(BIN_DIR)/mem_console_text_settings_test

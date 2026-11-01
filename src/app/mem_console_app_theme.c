@@ -33,128 +33,57 @@ void mem_console_app_apply_compact_ui_density(KitUiContext *ui_ctx,
     ui_ctx->style.control_height = target_control_height;
 }
 
-int mem_console_app_handle_theme_shortcut(KitRenderContext *render_ctx,
-                                          KitUiContext *ui_ctx,
-                                          MemConsoleState *state,
-                                          const char *prefs_path,
-                                          SDL_Keycode keycode) {
-    int direction;
-    CoreResult result;
-
-    if (!render_ctx || !ui_ctx || !state) {
-        return 0;
-    }
-
-    if (keycode == SDLK_t) {
-        direction = 1;
-    } else if (keycode == SDLK_y) {
-        direction = -1;
-    } else {
-        return 0;
-    }
-
-    if (!cycle_theme_preset(state, direction)) {
-        mem_console_app_set_statusf(state, "Theme switch failed.");
+/* The existing cycle order remains owned by state_core. Restore the proposed
+ * identity before preparing fonts; only the transaction commits it. */
+int mem_console_app_handle_theme_shortcut(KitRenderContext *r, KitUiContext *ui,
+    MemConsoleState *s, const char *prefs_path, SDL_Keycode key) {
+    if (!r || !ui || !s || (key != SDLK_t && key != SDLK_y)) return 0;
+    CoreThemePresetId old = s->theme_preset_id;
+    (void)cycle_theme_preset(s, key == SDLK_t ? 1 : -1);
+    CoreThemePresetId next = s->theme_preset_id;
+    (void)state_set_theme_preset(s, old);
+    if (!mem_console_app_apply_text_settings(r, ui, s, next, s->font_preset_id, s->text_zoom_step)) {
+        mem_console_app_set_statusf(s, "Theme switch failed; previous settings retained.");
         return 1;
     }
-
-    result = kit_render_set_theme_preset(render_ctx, state->theme_preset_id);
-    if (result.code != CORE_OK) {
-        mem_console_app_set_statusf(state, "Theme switch failed.");
-        return 1;
-    }
-
-    (void)kit_ui_style_apply_theme_scale(ui_ctx);
-    mem_console_app_apply_compact_ui_density(ui_ctx, render_ctx);
     (void)prefs_path;
-    mem_console_pane_prefs_mark_dirty(state);
-
-    mem_console_app_set_statusf(state, "Theme switched to %s.", state->theme_name);
-    mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_THEME | MEM_CONSOLE_REDRAW_REASON_CONTENT);
+    mem_console_pane_prefs_mark_dirty(s);
+    mem_console_app_set_statusf(s, "Theme switched to %s.", s->theme_name);
     return 1;
 }
 
-int mem_console_app_handle_font_shortcut(KitRenderContext *render_ctx,
-                                         KitUiContext *ui_ctx,
-                                         MemConsoleState *state,
-                                         const char *prefs_path,
-                                         SDL_Keycode keycode) {
-    int direction;
-    CoreResult result;
-
-    if (!render_ctx || !ui_ctx || !state) {
-        return 0;
-    }
-
-    if (keycode == SDLK_u) {
-        direction = 1;
-    } else if (keycode == SDLK_i) {
-        direction = -1;
-    } else {
-        return 0;
-    }
-
-    if (!cycle_font_preset(state, direction)) {
-        mem_console_app_set_statusf(state, "Font switch failed.");
+int mem_console_app_handle_font_shortcut(KitRenderContext *r, KitUiContext *ui,
+    MemConsoleState *s, const char *prefs_path, SDL_Keycode key) {
+    if (!r || !ui || !s || (key != SDLK_u && key != SDLK_i)) return 0;
+    CoreFontPresetId old = s->font_preset_id;
+    (void)cycle_font_preset(s, key == SDLK_u ? 1 : -1);
+    CoreFontPresetId next = s->font_preset_id;
+    (void)state_set_font_preset(s, old);
+    if (!mem_console_app_apply_text_settings(r, ui, s, s->theme_preset_id, next, s->text_zoom_step)) {
+        mem_console_app_set_statusf(s, "Font switch failed; previous settings retained.");
         return 1;
     }
-
-    result = kit_render_set_font_preset(render_ctx, state->font_preset_id);
-    if (result.code != CORE_OK) {
-        mem_console_app_set_statusf(state, "Font switch failed.");
-        return 1;
-    }
-
-    (void)kit_ui_style_apply_theme_scale(ui_ctx);
-    mem_console_app_apply_compact_ui_density(ui_ctx, render_ctx);
     (void)prefs_path;
-    mem_console_pane_prefs_mark_dirty(state);
-
-    mem_console_app_set_statusf(state, "Font switched to %s.", state->font_name);
-    mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_THEME | MEM_CONSOLE_REDRAW_REASON_CONTENT);
+    mem_console_pane_prefs_mark_dirty(s);
+    mem_console_app_set_statusf(s, "Font switched to %s.", s->font_name);
     return 1;
 }
 
-int mem_console_app_handle_text_zoom_shortcut(KitRenderContext *render_ctx,
-                                              KitUiContext *ui_ctx,
-                                              MemConsoleState *state,
-                                              const char *prefs_path,
-                                              SDL_Keycode keycode) {
-    CoreResult result;
-    int handled = 0;
-
-    if (!render_ctx || !ui_ctx || !state) {
-        return 0;
-    }
-
-    if (keycode == SDLK_EQUALS || keycode == SDLK_PLUS || keycode == SDLK_KP_PLUS) {
-        result = kit_render_adjust_text_zoom_step(render_ctx, 1);
-        handled = 1;
-    } else if (keycode == SDLK_MINUS || keycode == SDLK_KP_MINUS) {
-        result = kit_render_adjust_text_zoom_step(render_ctx, -1);
-        handled = 1;
-    } else if (keycode == SDLK_0 || keycode == SDLK_KP_0) {
-        result = kit_render_reset_text_zoom_step(render_ctx);
-        handled = 1;
-    } else {
-        return 0;
-    }
-
-    if (!handled || result.code != CORE_OK) {
-        mem_console_app_set_statusf(state, "Text zoom update failed.");
+int mem_console_app_handle_text_zoom_shortcut(KitRenderContext *r, KitUiContext *ui,
+    MemConsoleState *s, const char *prefs_path, SDL_Keycode key) {
+    int zoom;
+    if (!r || !ui || !s) return 0;
+    zoom = s->text_zoom_step;
+    if (key == SDLK_EQUALS || key == SDLK_PLUS || key == SDLK_KP_PLUS) ++zoom;
+    else if (key == SDLK_MINUS || key == SDLK_KP_MINUS) --zoom;
+    else if (key == SDLK_0 || key == SDLK_KP_0) zoom = 0;
+    else return 0;
+    if (!mem_console_app_apply_text_settings(r, ui, s, s->theme_preset_id, s->font_preset_id, zoom)) {
+        mem_console_app_set_statusf(s, "Text zoom update failed; previous settings retained.");
         return 1;
     }
-
-    (void)state_set_text_zoom_step(state, kit_render_text_zoom_step(render_ctx));
-    (void)kit_ui_style_apply_theme_scale(ui_ctx);
-    mem_console_app_apply_compact_ui_density(ui_ctx, render_ctx);
-
     (void)prefs_path;
-    mem_console_pane_prefs_mark_dirty(state);
-
-    mem_console_app_set_statusf(state,
-                                "Text zoom set to %d%%.",
-                                kit_render_text_zoom_percent(render_ctx));
-    mem_console_redraw_mark(state, MEM_CONSOLE_REDRAW_REASON_LAYOUT | MEM_CONSOLE_REDRAW_REASON_CONTENT);
+    mem_console_pane_prefs_mark_dirty(s);
+    mem_console_app_set_statusf(s, "Text zoom set to %d%%.", kit_render_text_zoom_percent(r));
     return 1;
 }

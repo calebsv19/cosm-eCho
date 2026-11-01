@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import hashlib
+import json
 import os
 import re
 import struct
@@ -50,23 +51,36 @@ def verify_shared_source(root: Path, canonical: Path, require_current_canonical:
     ).splitlines()
     if not tracked:
         raise SystemExit("canonical shared Vulkan source has no tracked files")
-    mismatches = []
+    # Only the text module advances in this development slice. Every other
+    # adopted module remains bound to the original accepted snapshot.
+    pin = json.loads(Path(__file__).with_name("text-render-source-pin.json").read_text())
+    if pin["module"] != "kit/kit_render" or pin["version"] != "0.17.0":
+        raise SystemExit("invalid text renderer source pin")
+    expected = {}
     for relative in tracked:
-        canonical_path = canonical / relative
-        adopted_path = root / relative
+        if relative.startswith("kit/kit_render/"):
+            continue
         accepted_bytes = subprocess.check_output(
             ["git", "show", f"{EXPECTED_SHARED_COMMIT}:{relative}"], cwd=canonical)
-        accepted_digest = hashlib.sha256(accepted_bytes).hexdigest()
-        if not adopted_path.is_file():
-            mismatches.append(f"missing {relative}")
-        elif ((require_current_canonical and (not canonical_path.is_file() or
-              digest(canonical_path) != accepted_digest)) or digest(adopted_path) != accepted_digest):
+        expected[relative] = hashlib.sha256(accepted_bytes).hexdigest()
+    for name, sha in pin["sha256"].items():
+        relative = Path(name)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise SystemExit("unsafe text source pin path")
+        expected["kit/kit_render/" + name] = sha
+    mismatches = []
+    for relative, sha in expected.items():
+        adopted_path = root / relative
+        canonical_path = canonical / relative
+        if not adopted_path.is_file() or digest(adopted_path) != sha:
             mismatches.append(f"digest {relative}")
+        if require_current_canonical and (not canonical_path.is_file() or digest(canonical_path) != sha):
+            mismatches.append(f"canonical digest {relative}")
     if mismatches:
-        raise SystemExit("adopted Vulkan source differs from canonical: " +
+        raise SystemExit("adopted Vulkan source differs from declared pins: " +
                          ", ".join(mismatches[:12]))
-    print(f"render fidelity exact-source contract: {EXPECTED_SHARED_COMMIT}; "
-          f"{len(tracked)} files")
+    print(f"render fidelity exact-source contract: base={EXPECTED_SHARED_COMMIT}; "
+          f"text=0.17.0 development snapshot; {len(expected)} files")
 
 
 def bmp_evidence(path: Path) -> tuple[int, int, int]:
@@ -92,7 +106,7 @@ def bmp_evidence(path: Path) -> tuple[int, int, int]:
     return width, abs(height), len(colors)
 
 
-def validation_environment() -> dict[str, str]:
+def validation_environment(output_dir: Path) -> dict[str, str]:
     env = os.environ.copy()
     candidates = [
         Path("/opt/homebrew/opt/vulkan-validationlayers"),
@@ -103,12 +117,14 @@ def validation_environment() -> dict[str, str]:
                   None)
     if prefix is None:
         raise SystemExit("Khronos validation layer library is unavailable")
-    library_dir = str(prefix / "lib")
-    layer_dir = str(prefix / "share/vulkan/explicit_layer.d")
-    prior_library_path = env.get("DYLD_LIBRARY_PATH", "")
-    env["DYLD_LIBRARY_PATH"] = (library_dir + ":" + prior_library_path
-                                if prior_library_path else library_dir)
-    env["VK_LAYER_PATH"] = layer_dir
+    # Scope layer discovery without redirecting system ImageIO dependencies.
+    layers = output_dir.resolve() / "validation-layers"
+    layers.mkdir(parents=True, exist_ok=True)
+    manifest = json.loads((prefix / "share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json").read_text())
+    manifest["layer"]["library_path"] = str((prefix / "lib/libVkLayer_khronos_validation.dylib").resolve())
+    (layers / "VkLayer_khronos_validation.json").write_text(json.dumps(manifest))
+    env.pop("DYLD_LIBRARY_PATH", None)
+    env["VK_LAYER_PATH"] = str(layers)
     return env
 
 
@@ -116,7 +132,7 @@ def run_app(app: Path, initial: Path, resized: Path, log: Path,
             minimum_scale: float) -> None:
     for capture in (initial, resized):
         capture.unlink(missing_ok=True)
-    env = validation_environment()
+    env = validation_environment(log.parent)
     env["MEM_CONSOLE_VULKAN_ROLLOUT_INITIAL_CAPTURE"] = str(initial.resolve())
     env["MEM_CONSOLE_VULKAN_ROLLOUT_RESIZED_CAPTURE"] = str(resized.resolve())
     env["MEM_CONSOLE_VULKAN_ROLLOUT_MIN_SCALE"] = str(minimum_scale)
@@ -162,8 +178,8 @@ def main() -> int:
         raise SystemExit(f"vk_runtime 0.6.0 required, found {runtime}")
     if renderer != (1, 6, 0):
         raise SystemExit(f"vk_renderer 1.6.0 required, found {renderer}")
-    if read_version(root / "kit/kit_render/VERSION") != (0, 14, 6):
-        raise SystemExit("kit_render 0.14.6 required")
+    if read_version(root / "kit/kit_render/VERSION") != (0, 17, 0):
+        raise SystemExit("kit_render 0.17.0 required")
 
     if args.app:
         if not args.initial_capture or not args.resized_capture or not args.log:

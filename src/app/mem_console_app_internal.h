@@ -101,4 +101,9 @@ typedef struct MemConsoleAppLoopContext {
 
 int mem_console_app_run_loop(MemConsoleAppLoopContext *ctx);
 
+/* Shared by shortcuts and the authoring preview. Commits state only after load. */
+int mem_console_app_apply_text_settings(KitRenderContext *render, KitUiContext *ui,
+    MemConsoleState *state, CoreThemePresetId theme, CoreFontPresetId font, int zoom);
+int mem_console_app_prepare_initial_text(KitRenderContext *render);
+
 #endif

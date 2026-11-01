@@ -52,6 +52,10 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
         return result;
     }
 
+    /* A direct switch must release an active preview before reseeding host state. */
+    mem_console_workspace_authoring_host_cancel_active_preview(&state->workspace_authoring,
+                                                               state, render_ctx, ui_ctx);
+
     if (*prefs_path_valid && state->pane_prefs_dirty) {
         result = mem_console_prefs_save(prefs_path, state);
         if (result.code != CORE_OK) {
@@ -88,23 +92,17 @@ CoreResult mem_console_app_switch_active_db(CoreMemDb *db,
         return result;
     }
     sync_edit_buffers_from_selection(state);
-    result = kit_render_set_theme_preset(render_ctx, state->theme_preset_id);
-    if (result.code != CORE_OK) {
-        mem_console_app_set_path_result_status(state, "Theme apply after DB switch", state->db_path, result);
-        return result;
-    }
-    result = kit_render_set_font_preset(render_ctx, state->font_preset_id);
-    if (result.code != CORE_OK) {
+    if (!mem_console_app_apply_text_settings(render_ctx, ui_ctx, state,
+            state->theme_preset_id, state->font_preset_id, state->text_zoom_step)) {
+        /* The DB switch already succeeded. Keep its data, but retain the working
+         * presentation if the new DB's preferred font cannot be prepared. */
+        (void)state_set_theme_preset(state, render_ctx->theme.id);
+        (void)state_set_font_preset(state, render_ctx->font.id);
+        (void)state_set_text_zoom_step(state, kit_render_text_zoom_step(render_ctx));
+        result = (CoreResult){ CORE_ERR_IO, "font preparation after DB switch failed; previous presentation retained" };
         mem_console_app_set_path_result_status(state, "Font apply after DB switch", state->db_path, result);
         return result;
     }
-    result = kit_render_set_text_zoom_step(render_ctx, state->text_zoom_step);
-    if (result.code != CORE_OK) {
-        mem_console_app_set_path_result_status(state, "Text zoom apply after DB switch", state->db_path, result);
-        return result;
-    }
-    (void)kit_ui_style_apply_theme_scale(ui_ctx);
-    mem_console_app_apply_compact_ui_density(ui_ctx, render_ctx);
 
     if (*prefs_path_valid) {
         *prefs_last_saved_signature = mem_console_prefs_state_signature(state);

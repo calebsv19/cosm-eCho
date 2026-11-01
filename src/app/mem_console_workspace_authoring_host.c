@@ -79,28 +79,12 @@ static void mem_console_workspace_authoring_clear_event_flags(MemConsoleWorkspac
     host->last_event_canceled = 0u;
 }
 
-static void mem_console_workspace_authoring_apply_render_state(MemConsoleState *state,
-                                                              KitRenderContext *render_ctx,
-                                                              KitUiContext *ui_ctx) {
-    if (!state || !render_ctx || !ui_ctx) {
-        return;
-    }
-    (void)kit_render_set_theme_preset(render_ctx, state->theme_preset_id);
-    (void)kit_render_set_font_preset(render_ctx, state->font_preset_id);
-    (void)kit_render_set_text_zoom_step(render_ctx, state->text_zoom_step);
-    (void)kit_ui_style_apply_theme_scale(ui_ctx);
-    mem_console_app_apply_compact_ui_density(ui_ctx, render_ctx);
-    mem_console_redraw_mark(state,
-                            MEM_CONSOLE_REDRAW_REASON_THEME |
-                                MEM_CONSOLE_REDRAW_REASON_LAYOUT |
-                                MEM_CONSOLE_REDRAW_REASON_CONTENT);
-}
-
 static void mem_console_workspace_authoring_capture_baseline(MemConsoleWorkspaceAuthoringHost *host,
                                                              const MemConsoleState *state) {
     if (!host || !state) {
         return;
     }
+    host->baseline_pane_prefs_dirty = state->pane_prefs_dirty;
     host->baseline_theme_preset_id = (int)state->theme_preset_id;
     host->baseline_font_preset_id = (int)state->font_preset_id;
     host->baseline_text_zoom_step = state->text_zoom_step;
@@ -117,8 +101,18 @@ static void mem_console_workspace_authoring_restore_baseline(MemConsoleWorkspace
     (void)state_set_theme_preset(state, (CoreThemePresetId)host->baseline_theme_preset_id);
     (void)state_set_font_preset(state, (CoreFontPresetId)host->baseline_font_preset_id);
     (void)state_set_text_zoom_step(state, host->baseline_text_zoom_step);
-    mem_console_pane_prefs_mark_clean(state);
-    mem_console_workspace_authoring_apply_render_state(state, render_ctx, ui_ctx);
+    if (host->baseline_render_valid && render_ctx) {
+        kit_render_context_shutdown(render_ctx);
+        *render_ctx = host->baseline_render;
+        memset(&host->baseline_render, 0, sizeof(host->baseline_render));
+        host->baseline_render_valid = 0;
+    }
+    if (render_ctx && ui_ctx) {
+        (void)kit_render_set_theme_preset(render_ctx, state->theme_preset_id);
+        (void)kit_ui_style_apply_theme_scale(ui_ctx);
+        mem_console_app_apply_compact_ui_density(ui_ctx, render_ctx);
+    }
+    state->pane_prefs_dirty = host->baseline_pane_prefs_dirty;
     host->font_theme_pending_changes = 0u;
 }
 
@@ -184,6 +178,10 @@ static void mem_console_workspace_authoring_apply(MemConsoleWorkspaceAuthoringHo
     if (host->active) {
         host->active = 0u;
         host->last_event_accepted = 1u;
+        if (host->baseline_render_valid) {
+            kit_render_context_shutdown(&host->baseline_render);
+            host->baseline_render_valid = 0;
+        }
         host->font_theme_baseline_valid = 0u;
         host->font_theme_pending_changes = 0u;
         mem_console_pane_prefs_mark_dirty(state);
@@ -209,6 +207,7 @@ static void mem_console_workspace_authoring_cancel(MemConsoleWorkspaceAuthoringH
         mem_console_workspace_authoring_restore_baseline(host, state, render_ctx, ui_ctx);
         host->active = 0u;
         host->last_event_canceled = 1u;
+        host->font_theme_baseline_valid = 0u;
         mem_console_app_set_statusf(state, "Authoring canceled.");
     }
     host->key_c_down = 0u;
@@ -284,6 +283,9 @@ int mem_console_workspace_authoring_apply_font_theme_button(MemConsoleWorkspaceA
                                                                    KitUiContext *ui_ctx,
                                                                    KitWorkspaceAuthoringFontThemeButtonId button_id) {
     KitWorkspaceAuthoringFontThemeAction action;
+    CoreThemePresetId theme;
+    CoreFontPresetId font;
+    int zoom;
 
     if (!host || !state || !render_ctx || !ui_ctx ||
         !mem_console_workspace_authoring_host_font_theme_overlay_active(host)) {
@@ -295,30 +297,29 @@ int mem_console_workspace_authoring_apply_font_theme_button(MemConsoleWorkspaceA
 
     action = kit_workspace_authoring_ui_font_theme_action_for_button(button_id);
     host->last_font_theme_button_id = (uint32_t)button_id;
+    theme = state->theme_preset_id;
+    font = state->font_preset_id;
+    zoom = state->text_zoom_step;
 
     switch (action.type) {
         case KIT_WORKSPACE_AUTHORING_FONT_THEME_ACTION_TEXT_SIZE_DEC:
-            (void)state_adjust_text_zoom_step(state, -1);
+            --zoom;
             mem_console_workspace_authoring_set_status(host, "Text size decreased.");
             break;
         case KIT_WORKSPACE_AUTHORING_FONT_THEME_ACTION_TEXT_SIZE_INC:
-            (void)state_adjust_text_zoom_step(state, 1);
+            ++zoom;
             mem_console_workspace_authoring_set_status(host, "Text size increased.");
             break;
         case KIT_WORKSPACE_AUTHORING_FONT_THEME_ACTION_TEXT_SIZE_RESET:
-            (void)state_reset_text_zoom_step(state);
+            zoom = 0;
             mem_console_workspace_authoring_set_status(host, "Text size reset.");
             break;
         case KIT_WORKSPACE_AUTHORING_FONT_THEME_ACTION_SET_FONT_PRESET:
-            if (!state_set_font_preset(state, action.font_preset_id)) {
-                return 0;
-            }
+            font = action.font_preset_id;
             mem_console_workspace_authoring_set_status(host, "Font preset previewed.");
             break;
         case KIT_WORKSPACE_AUTHORING_FONT_THEME_ACTION_SET_THEME_PRESET:
-            if (!state_set_theme_preset(state, action.theme_preset_id)) {
-                return 0;
-            }
+            theme = action.theme_preset_id;
             mem_console_workspace_authoring_set_status(host, "Theme preset previewed.");
             break;
         case KIT_WORKSPACE_AUTHORING_FONT_THEME_ACTION_CUSTOM_THEME_STATUS:
@@ -329,9 +330,12 @@ int mem_console_workspace_authoring_apply_font_theme_button(MemConsoleWorkspaceA
             return 0;
     }
 
+    if (!mem_console_app_apply_text_settings(render_ctx, ui_ctx, state, theme, font, zoom)) {
+        mem_console_workspace_authoring_set_status(host, "Font/theme preview failed; previous settings retained.");
+        return 1;
+    }
     host->font_theme_button_click_count += 1u;
     host->font_theme_pending_changes += 1u;
-    mem_console_workspace_authoring_apply_render_state(state, render_ctx, ui_ctx);
     return 1;
 }
 

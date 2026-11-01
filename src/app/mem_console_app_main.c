@@ -397,6 +397,11 @@ static int mem_console_app_subsystems_init(MemConsoleAppMainContext *ctx) {
         return 0;
     }
 
+    if (!mem_console_app_prepare_initial_text(&ctx->render_ctx)) {
+        fprintf(stderr, "mem_console: initial font preparation failed\n");
+        return 0;
+    }
+
     ctx->result = kit_ui_context_init(&ctx->ui_ctx, &ctx->render_ctx);
     if (ctx->result.code != CORE_OK) {
         fprintf(stderr,

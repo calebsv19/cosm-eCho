@@ -1,6 +1,6 @@
 # Bounded entrypoint for the snapshot_sandbox_v1 producer declaration.
 PREPARATION_GOALS := $(if $(MAKECMDGOALS),$(MAKECMDGOALS),all)
-PREPARATION_ALLOWED := all release-contract run-headless-smoke release-package-self-test release-artifact-disposable package-desktop-main-edit-self-test
+PREPARATION_ALLOWED := all text-settings-harness release-contract run-headless-smoke release-package-self-test release-artifact-disposable package-desktop-main-edit-self-test
 ifneq ($(filter-out $(PREPARATION_ALLOWED),$(PREPARATION_GOALS)),)
 $(error Unsupported contained preparation goal: $(filter-out $(PREPARATION_ALLOWED),$(PREPARATION_GOALS)))
 endif
