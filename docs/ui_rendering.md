@@ -1,14 +1,19 @@
-# Shared UI rendering and text in Main Edit
+# Shared UI rendering and text
 
-Last updated: 2026-10-31
+Last updated: 2026-11-01
 
-The retained Main Edit uses vk_renderer 1.6.0 / vk_runtime 0.6.0 and kit_ui
+The accepted eCho source uses vk_renderer 1.6.0 / vk_runtime 0.6.0 and kit_ui
 0.18.0. Its original accepted renderer source baseline is
 `854b51ff57c756b4565021fe759c27a459efbfd3`. The font refinement imports only
 kit_render 0.17.0 as an exact, bounded development module snapshot;
 [the source pin](../tools/text-render-source-pin.json) binds all 25 module files.
-This is uncommitted source development, with canonical and installed adoption
-remaining separate. Other shared modules keep their prior pins.
+The exact module postimages are committed in the eCho-specific vendored capsule
+at `1271e1f63683c12f163d1dd6459719a5a9b78f68` and integrated into canonical source
+at `0074e3bde7772e31b5150a787e7d5210ed501456`. The pin preserves its original
+development provenance; it does not assert a new accepted shared canonical commit.
+Release preparation consumes these committed vendored bytes, never mutable live
+shared sources. Other shared modules keep their prior pins. Publication and
+installed adoption remain separate.
 
 Text opts into the shared native-pixel policy. Glyphs rasterize at the drawable
 scale, keep their native texel dimensions and snap origins to drawable pixels.
@@ -44,7 +49,9 @@ make PREPARATION_ROOT=/private/tmp/echo-text-proof-UNIQUE \
 
 `text-settings-harness` builds a native lifecycle test. Run its generated
 `mem_console_text_settings_test` with a fresh output-directory argument, an
-isolated runtime/cache and the Vulkan validation layer. It uses task-owned fixture
+isolated runtime/cache and the Vulkan validation layer. Its working directory
+must expose the pinned `shared/assets/fonts` assets; deep executable paths can
+exceed the renderer's bounded relative asset search. It uses task-owned fixture
 databases and loader fault injection. It covers startup, shortcut and preview
 failure, exact Cancel, dirty preservation, Apply/save/reload, database preference
 switches, both presets, all ten zoom steps, all 25 role/tier pairs and compact resize.
@@ -56,7 +63,8 @@ exact source pins, startup/resize/restart and zero validation warnings/errors.
 Its layer manifest uses an absolute library path, avoiding a global dylib override.
 Main Edit package self-test checks package isolation without refreshing Desktop.
 
-October 31 qualification passed at actual 1× and 2× drawable sizes. The pixel
+October 31 qualification and November 1 integration verification passed at actual
+1× and 2× drawable sizes. The pixel
 oracle also passed cold/cached/wrapped text at logical-to-drawable ratios 1,
 1.25, 1.5 and 2. Targeted ASan/UBSan covered the changed native font/settings
 owners. Fractional ratios are controlled renderer tests, not physical monitor
